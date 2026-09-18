@@ -55,7 +55,7 @@ $stageBase = Join-Path ([IO.Path]::GetTempPath()) ('pi-kether-build-' + [guid]::
 $stage = Join-Path $stageBase 'pi-kether-portable'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 try {
-  Get-ChildItem -LiteralPath $root -Force | Where-Object { $_.Name -in @('install','payload','templates','Workflow.ps1','Build-Release.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','SECURITY-HARDENING.md','THIRD_PARTY.md','.gitignore') } | ForEach-Object {
+  Get-ChildItem -LiteralPath $root -Force | Where-Object { $_.Name -in @('install','payload','templates','docs','.readme-assets','Workflow.ps1','Build-Release.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','.gitignore') } | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination $stage -Recurse -Force
   }
   $zip = Join-Path $release "pi-kether-portable-$version.zip"

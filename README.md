@@ -1,8 +1,12 @@
 # YHWH
 
+[![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
+
 Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责意图、授权、任务拆分、整合和验收；Pi 提供受控的模型调用、确定性 LSP、资源限制、结果验证和运行监控。
 
 开发背景、架构演进、关键决策及历史验证边界见 [架构开发历史](docs/architecture-history.md)；对应的脱敏记录见 [历史证据索引](docs/history-evidence.json)。
+
+本仓库的 README 统一采用中英文双版本，并在顶部提供语言切换按钮；新增或修改时同步维护两版。维护约定见 [AGENTS.md](https://github.com/Yuzu482/YHWH/blob/main/AGENTS.md)（仓库文件，不随安装包分发）。
 
 ## 仓库结构
 
@@ -42,7 +46,7 @@ pwsh -NoProfile -File .\Workflow.ps1 -Action Verify
 pwsh -NoProfile -File .\Workflow.ps1 -Action Build
 ```
 
-`Init` 不覆盖已有配置；`Plan` 校验配置且不安装；`Install` 执行完整安装并备份已有文件；`Verify` 检查已安装环境；`Build` 运行验证并生成带版本号的 ZIP。安装会更新依赖并可能重启专用 WSL，已有活动任务时请先等待任务结束。这不是热更新脚本。发布文件使用白名单打包，本地配置、测试目录和运行凭据不进入 ZIP。
+`Init` 不覆盖已有配置；`Plan` 校验配置且不安装；`Install` 执行完整安装并备份已有文件；`Verify` 检查已安装环境；`Build` 运行验证并生成带版本号的 ZIP。安装会更新依赖并可能重启专用 WSL，已有活动任务时请先等待任务结束。这不是热更新脚本。发布文件使用白名单打包，本地配置、临时测试目录和运行凭据不进入 ZIP。
 
 统一入口不会修改 Codex 内置插件缓存。此前针对本机应用工具 `cmd.exe` 启动器的修复属于特定 Codex 版本的本机补丁，不作为通用安装步骤。ChatGPT Work 连接仍取决于账号、工作区权限和 Tunnel 配置，安装本地规则不代表已在所有产品会话中生效。
 
