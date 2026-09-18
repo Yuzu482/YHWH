@@ -1,0 +1,10 @@
+{
+  "target": "model",
+  "cwd": "D:\\Projects\\Example\\pi-dispatch\\tests",
+  "provider": "opencode-go",
+  "model": "deepseek-v4-flash",
+  "prompt": "Reply with exactly PI_OTHER_OK. Do not use any tools or read any files.",
+  "access": "none",
+  "thinking": "off",
+  "timeoutSeconds": 60
+}

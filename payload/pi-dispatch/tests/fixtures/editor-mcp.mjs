@@ -1,0 +1,10 @@
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
+import {z} from 'zod';
+const server=new McpServer({name:'editor-fixture',version:'1'});
+server.registerTool('fixture_read',{inputSchema:z.object({}).strict()},()=>({content:[{type:'text',text:'ok'}]}));
+server.registerTool('fixture_write',{inputSchema:z.object({value:z.string()}).strict()},()=>{const path=process.argv[2];const n=existsSync(path)?Number(readFileSync(path,'utf8')):0;writeFileSync(path,String(n+1));return {content:[{type:'text',text:'written'}]};});
+server.registerTool('fixture_slow',{inputSchema:z.object({}).strict()},async()=>{await new Promise(r=>setTimeout(r,10000));return {content:[{type:'text',text:'late'}]};});
+server.registerTool('fixture_big',{inputSchema:z.object({}).strict()},()=>({content:[{type:'text',text:'x'.repeat(20000)}]}));
+await server.connect(new StdioServerTransport());

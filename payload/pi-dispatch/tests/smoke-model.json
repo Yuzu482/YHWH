@@ -1,0 +1,10 @@
+{
+  "target": "model",
+  "cwd": "D:\\Projects\\Example\\pi-dispatch\\tests",
+  "provider": "openai-codex",
+  "model": "gpt-5.6-luna",
+  "prompt": "Reply with exactly PI_MODEL_OK. Do not use any tools or read any files.",
+  "access": "none",
+  "thinking": "low",
+  "timeoutSeconds": 60
+}

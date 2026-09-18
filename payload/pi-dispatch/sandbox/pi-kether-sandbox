@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE=/var/lib/pi-kether/jobs
+PI_ENTRY=/opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
+
+probe() {
+  local host_visible=false interop=false bwrap_ok=false pi_ok=false resource_limits=false
+  mountpoint -q /mnt/c && host_visible=true
+  command -v cmd.exe >/dev/null 2>&1 && interop=true
+  if runuser -u pi-sandbox -- bwrap --die-with-parent --new-session \
+    "${network_args[@]}" --unshare-user --unshare-pid --unshare-uts --unshare-ipc --unshare-cgroup-try --cap-drop ALL \
+    --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 \
+    --ro-bind /opt /opt --dev /dev --tmpfs /tmp --dir /workspace --chdir /workspace \
+    --setenv PATH /opt/node/bin:/usr/bin:/bin -- node -e \
+    'process.exit(require("fs").existsSync("/mnt/c/Windows") ? 9 : 0)'; then
+    bwrap_ok=true
+  fi
+  test -f "$PI_ENTRY" && /opt/node/bin/node "$PI_ENTRY" --version >/dev/null 2>&1 && pi_ok=true
+  local probe_cgroup="/sys/fs/cgroup/pi-kether-probe-$$"
+  printf '+memory +cpu +pids\n' >/sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
+  if [[ "$(stat -fc %T /sys/fs/cgroup 2>/dev/null)" == cgroup2fs ]] \
+    && grep -qw memory /sys/fs/cgroup/cgroup.controllers \
+    && grep -qw cpu /sys/fs/cgroup/cgroup.controllers \
+    && grep -qw pids /sys/fs/cgroup/cgroup.controllers \
+    && mkdir "$probe_cgroup" 2>/dev/null; then
+    if printf '%s\n' 67108864 >"$probe_cgroup/memory.max" \
+      && printf '%s\n' '25000 100000' >"$probe_cgroup/cpu.max" \
+      && printf '%s\n' 16 >"$probe_cgroup/pids.max" \
+      && (printf '%s\n' "$BASHPID" >"$probe_cgroup/cgroup.procs" && grep -q "/${probe_cgroup##*/}$" /proc/self/cgroup); then
+      resource_limits=true
+    fi
+    rmdir "$probe_cgroup" 2>/dev/null || true
+  fi
+  local ok=false
+  [[ "$host_visible" == false && "$interop" == false && "$bwrap_ok" == true && "$pi_ok" == true && "$resource_limits" == true ]] && ok=true
+  printf '{"ok":%s,"backend":"wsl2-bwrap","hostMountVisible":%s,"windowsInterop":%s,"bubblewrap":%s,"pi":%s,"resourceLimits":%s}\n' \
+    "$ok" "$host_visible" "$interop" "$bwrap_ok" "$pi_ok" "$resource_limits"
+}
+
+cleanup_job() {
+  local job="$1"
+  [[ "$job" =~ ^[a-f0-9-]{36}$ ]] || exit 2
+  local failed=0 mount_root="/run/pi-kether-$job"
+  pkill -KILL -f "$BASE/$job" 2>/dev/null || true
+  for mount_path in "$mount_root/host-work" "$mount_root/host-c"; do
+    if mountpoint -q "$mount_path"; then
+      umount "$mount_path" 2>/dev/null || { echo "failed to unmount $mount_path" >&2; failed=1; }
+    fi
+  done
+  if ! mountpoint -q "$mount_root/host-work" && ! mountpoint -q "$mount_root/host-c"; then
+    rm -rf -- "$mount_root" || { echo "failed to remove $mount_root" >&2; failed=1; }
+  fi
+  local cgroup_dir="/sys/fs/cgroup/pi-kether-$job"
+  if [[ -d "$cgroup_dir" ]]; then
+    if [[ -w "$cgroup_dir/cgroup.kill" ]]; then
+      printf '1\n' >"$cgroup_dir/cgroup.kill" 2>/dev/null || { echo "failed to kill $cgroup_dir" >&2; failed=1; }
+    fi
+    local attempt
+    for attempt in {1..20}; do
+      rmdir "$cgroup_dir" 2>/dev/null && break
+      sleep 0.05
+    done
+    [[ ! -d "$cgroup_dir" ]] || { echo "failed to remove $cgroup_dir" >&2; failed=1; }
+  fi
+  if mountpoint -q "$BASE/$job"; then umount "$BASE/$job" || return 1; fi
+  rm -rf -- "$BASE/$job" || { echo "failed to remove $BASE/$job" >&2; failed=1; }
+  [[ ! -e "$BASE/$job" ]] || { echo "job directory remains: $BASE/$job" >&2; failed=1; }
+  return "$failed"
+}
+
+cleanup_orphans() {
+  local scanned=0 cleaned=0 failed=0 skipped_active=0 path job
+  declare -A jobs=()
+  shopt -s nullglob
+  for path in "$BASE"/* /sys/fs/cgroup/pi-kether-* /run/pi-kether-*; do
+    job="${path##*/}"
+    job="${job#pi-kether-}"
+    [[ "$job" =~ ^[a-f0-9-]{36}$ ]] && jobs["$job"]=1
+  done
+  shopt -u nullglob
+  for job in "${!jobs[@]}"; do
+    scanned=$((scanned + 1))
+    local lease="$BASE/$job/lease.env" now owner_pid expires newest=0 modified
+    now=$(date +%s)
+    owner_pid=""; expires=""
+    if [[ -f "$lease" ]]; then
+      owner_pid=$(sed -n 's/^wsl_pid=\([0-9][0-9]*\)$/\1/p' "$lease" | head -n1)
+      expires=$(sed -n 's/^lease_expires=\([0-9][0-9]*\)$/\1/p' "$lease" | head -n1)
+    fi
+    if [[ "$owner_pid" =~ ^[0-9]+$ && "$expires" =~ ^[0-9]+$ ]] && kill -0 "$owner_pid" 2>/dev/null && (( now < expires )); then
+      skipped_active=$((skipped_active + 1))
+      continue
+    fi
+    if [[ ! -f "$lease" ]]; then
+      for path in "$BASE/$job" "/sys/fs/cgroup/pi-kether-$job" "/run/pi-kether-$job"; do
+        [[ -e "$path" ]] || continue
+        modified=$(stat -c %Y "$path" 2>/dev/null || printf '0')
+        (( modified > newest )) && newest=$modified
+      done
+      if (( now - newest < 120 )); then skipped_active=$((skipped_active + 1)); continue; fi
+    fi
+    if cleanup_job "$job"; then cleaned=$((cleaned + 1)); else failed=$((failed + 1)); fi
+  done
+  local ok=true
+  (( failed == 0 )) || ok=false
+  printf '{"ok":%s,"scanned":%d,"cleaned":%d,"skippedActive":%d,"failed":%d}\n' "$ok" "$scanned" "$cleaned" "$skipped_active" "$failed"
+  (( failed == 0 ))
+}
+
+run_job() {
+  local job="$1" drive="$2" relative_path="$3" access="$4" resource_profile="$5" timeout_seconds="$6" host_user="$7" scope_b64="$8" gateway_instance="$9" windows_pid="${10}"
+  shift 10
+  local direct_lsp=false bootstrap=/opt/pi-kether/scripts/secure-pi-bootstrap.mjs
+  local editor_bridge=false
+  if [[ "${1:-}" == --editor-bridge ]]; then
+    editor_bridge=true
+    bootstrap=/opt/pi-kether/scripts/editor-pi-bootstrap.mjs
+    shift
+  fi
+  if [[ "$#" == 1 && "$1" == --direct-lsp ]]; then
+    [[ "$access" == read ]] || { echo "direct LSP requires read access" >&2; exit 2; }
+    direct_lsp=true
+    bootstrap=/opt/pi-kether/scripts/direct-lsp-bootstrap.mjs
+  fi
+  local provider="" previous="" arg
+  for arg in "$@"; do
+    if [[ "$previous" == --provider ]]; then
+      [[ -z "$provider" ]] || { echo "duplicate provider" >&2; exit 2; }
+      provider="$arg"
+    fi
+    previous="$arg"
+  done
+  [[ "$direct_lsp" == true || "$provider" == openai-codex || "$provider" == pi-claude-code-provider ]] || { echo "invalid provider" >&2; exit 2; }
+  [[ "$editor_bridge" == false || "$provider" == openai-codex ]] || { echo "editor bridge requires openai-codex" >&2; exit 2; }
+  if [[ "$provider" == pi-claude-code-provider && "$access" != none ]]; then echo "Claude review requires none access" >&2; exit 2; fi
+  [[ "$job" =~ ^[a-f0-9-]{36}$ ]] || { echo "invalid job id" >&2; exit 2; }
+  [[ "$drive" =~ ^[A-Z]$ ]] || { echo "invalid drive" >&2; exit 2; }
+  [[ "$relative_path" != /* && "$relative_path" != *".."* ]] || { echo "invalid relative path" >&2; exit 2; }
+  [[ "$access" == none || "$access" == read || "$access" == workspace-write ]] || { echo "invalid access" >&2; exit 2; }
+  local memory_bytes cpu_quota cpu_period pids_max max_output_bytes max_run_seconds
+  case "$resource_profile" in
+    small) memory_bytes=1073741824; cpu_quota=50000; cpu_period=100000; pids_max=64; max_output_bytes=1048576; max_run_seconds=120 ;;
+    standard) memory_bytes=3221225472; cpu_quota=100000; cpu_period=100000; pids_max=128; max_output_bytes=4194304; max_run_seconds=300 ;;
+    large) memory_bytes=6442450944; cpu_quota=200000; cpu_period=100000; pids_max=256; max_output_bytes=8388608; max_run_seconds=900 ;;
+    *) echo "invalid resource profile" >&2; exit 2 ;;
+  esac
+  [[ "$timeout_seconds" =~ ^[0-9]+$ ]] && (( timeout_seconds >= 1 && timeout_seconds <= max_run_seconds )) || { echo "invalid timeout for resource profile" >&2; exit 2; }
+  [[ "$host_user" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "invalid host user" >&2; exit 2; }
+  [[ "$scope_b64" =~ ^[A-Za-z0-9+/=]+$ ]] || { echo "invalid write scope manifest" >&2; exit 2; }
+  [[ "$gateway_instance" =~ ^[a-f0-9-]{36}$ ]] || { echo "invalid gateway instance id" >&2; exit 2; }
+  [[ "$windows_pid" =~ ^[0-9]+$ ]] || { echo "invalid Windows pid" >&2; exit 2; }
+
+  local jobdir="$BASE/$job"
+  local baseline="$jobdir/baseline" workspace="$jobdir/workspace" home="$jobdir/home"
+  local mount_root="/run/pi-kether-$job"
+  local cgroup_dir="/sys/fs/cgroup/pi-kether-$job"
+  CURRENT_JOB="$job"
+  cleanup_current_job() {
+    local original_status=$?
+    trap - EXIT INT TERM
+    set +e
+    cleanup_job "$CURRENT_JOB"
+    local cleanup_status=$?
+    if (( original_status == 0 && cleanup_status != 0 )); then original_status=10; fi
+    exit "$original_status"
+  }
+  trap cleanup_current_job EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  install -d -o root -g root -m 0711 "$jobdir"
+  mount -t tmpfs -o size=512M,nr_inodes=30000,nosuid,nodev,mode=0711 tmpfs "$jobdir"
+  local created_at lease_expires
+  created_at=$(date +%s)
+  lease_expires=$((created_at + timeout_seconds + 90))
+  printf 'gateway_instance=%s\nwindows_pid=%s\nwsl_pid=%s\ncreated_at=%s\nlease_expires=%s\n' \
+    "$gateway_instance" "$windows_pid" "$$" "$created_at" "$lease_expires" >"$jobdir/lease.env"
+  chmod 0600 "$jobdir/lease.env"
+  printf '+memory +cpu +pids\n' >/sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
+  mkdir "$cgroup_dir" || { echo "resource cgroup creation failed" >&2; exit 9; }
+  printf '%s\n' "$memory_bytes" >"$cgroup_dir/memory.max"
+  [[ -w "$cgroup_dir/memory.swap.max" ]] && printf '0\n' >"$cgroup_dir/memory.swap.max"
+  [[ -w "$cgroup_dir/memory.oom.group" ]] && printf '1\n' >"$cgroup_dir/memory.oom.group"
+  printf '%s %s\n' "$cpu_quota" "$cpu_period" >"$cgroup_dir/cpu.max"
+  printf '%s\n' "$pids_max" >"$cgroup_dir/pids.max"
+  install -d -o root -g root -m 0700 "$baseline"
+  install -d -o root -g root -m 0755 "$workspace"
+  install -d -o pi-sandbox -g pi-sandbox -m 0700 "$home" "$home/agent" "$home/.claude"
+  install -d -o root -g root -m 0700 "$mount_root/host-work" "$mount_root/host-c"
+  printf '%s' "$scope_b64" | base64 -d -i >"$jobdir/scopes.json"
+  /opt/node/bin/node -e 'const fs=require("fs"); fs.writeFileSync(process.argv[2],JSON.stringify(JSON.parse(fs.readFileSync(process.argv[1])).write))' "$jobdir/scopes.json" "$home/agent/write-scope.json"
+  chown root:root "$home/agent/write-scope.json"
+  chmod 0444 "$home/agent/write-scope.json"
+  cp "$home/agent/write-scope.json" "$jobdir/write-scope.json"
+  chmod 0600 "$jobdir/write-scope.json"
+
+  if [[ "$access" != none ]]; then
+    mount -t drvfs "${drive}:" "$mount_root/host-work" -o ro,metadata
+    local source="$mount_root/host-work/$relative_path"
+    test -d "$source" || { echo "workspace source missing" >&2; exit 3; }
+    timeout 35s python3 /opt/pi-kether/scripts/snapshot-scope.py "$source" "$baseline" "$jobdir/scopes.json" >/dev/null
+    umount "$mount_root/host-work"
+    cp -a --reflink=auto "$baseline/." "$workspace/"
+  fi
+
+  if [[ "$direct_lsp" == true ]]; then
+    printf '{}' >"$jobdir/credentials.json"
+  else
+  mount -t drvfs C: "$mount_root/host-c" -o ro,metadata
+  local auth_source="$mount_root/host-c/Users/$host_user/.pi/agent/auth.json"
+  if [[ "$provider" == pi-claude-code-provider ]]; then
+    auth_source="$mount_root/host-c/Users/$host_user/.claude/.credentials.json"
+  fi
+  /opt/node/bin/node /opt/pi-kether/scripts/prepare-credentials.mjs "$provider" "$auth_source" "$jobdir/credentials.json"
+  umount "$mount_root/host-c"
+  fi
+
+  if [[ "$access" == workspace-write ]]; then
+    chown -R pi-sandbox:pi-sandbox "$workspace"
+    chmod -R u+rwX,go-rwx "$workspace"
+  else
+    chown -R root:root "$workspace"
+    chmod -R a+rX,a-w "$workspace"
+  fi
+
+  local workspace_bind=(--ro-bind "$workspace" /workspace)
+  local network_args=()
+  [[ "$direct_lsp" == true ]] && network_args=(--unshare-net)
+  local proc_bind=(--dir /proc)
+  # Bun needs /proc/self/exe. Only the no-tools reviewer gets a procfs
+  # belonging to its own PID namespace; host processes are never visible.
+  [[ "$provider" == pi-claude-code-provider ]] && proc_bind=(--proc /proc)
+  [[ "$access" == workspace-write ]] && workspace_bind=(--bind "$workspace" /workspace)
+
+  install -d -o pi-sandbox -g pi-sandbox -m 0700 "$jobdir/tmp"
+  set +e
+  ( printf '%s\n' "$BASHPID" >"$cgroup_dir/cgroup.procs"
+  exec setpriv --reuid=pi-sandbox --regid=pi-sandbox --init-groups bwrap --die-with-parent --new-session \
+    "${network_args[@]}" --unshare-user --unshare-pid --unshare-uts --unshare-ipc --unshare-cgroup-try --cap-drop ALL \
+    --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 --ro-bind /opt /opt \
+    --ro-bind /etc/ssl /etc/ssl --ro-bind /etc/resolv.conf /etc/resolv.conf --ro-bind /etc/hosts /etc/hosts \
+    --ro-bind /etc/nsswitch.conf /etc/nsswitch.conf --dev /dev "${proc_bind[@]}" --bind "$jobdir/tmp" /tmp --dir /home/pi-sandbox \
+    --bind "$home" /home/pi-sandbox --ro-bind "$home/agent/write-scope.json" /home/pi-sandbox/agent/write-scope.json "${workspace_bind[@]}" --chdir /workspace --clearenv \
+    --setenv HOME /home/pi-sandbox --setenv PI_CODING_AGENT_DIR /home/pi-sandbox/agent \
+    --setenv PI_DISPATCH_ACTIVE 1 --setenv PI_TELEMETRY 0 \
+    --setenv PI_WRITE_SCOPE_FILE /home/pi-sandbox/agent/write-scope.json \
+    --setenv PATH /opt/node/bin:/opt/pi-kether/node_modules/.bin:/opt/pi-kether/dotnet-tools:/usr/local/bin:/usr/bin:/bin \
+    --setenv SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt \
+    -- timeout --signal=TERM --kill-after=5s "${timeout_seconds}s" /opt/node/bin/node "$bootstrap" "$@" ) 3<"$jobdir/credentials.json"
+  local status=$?
+  set -e
+
+  rm -f -- "$home/.claude/.credentials.json"
+
+  if (( status == 0 )) && [[ -e "$home/agent/auth.json" ]]; then
+    echo "sandbox credential was not scrubbed after the model stream started" >&2
+    status=7
+  fi
+
+  if [[ "$access" == workspace-write ]]; then
+    local patch="$jobdir/changes.patch"
+    timeout 35s python3 /opt/pi-kether/scripts/snapshot-scope.py --verify "$baseline" "$workspace" "$jobdir/write-scope.json" || exit 8
+    set +e
+    diff -ruN "$baseline" "$workspace" >"$patch"
+    local diff_status=$?
+    set -e
+    (( diff_status <= 1 )) || { echo "sandbox diff failed" >&2; exit 5; }
+    /opt/node/bin/node /opt/pi-kether/scripts/validate-write-scope.mjs "$jobdir/write-scope.json" "$patch" "$baseline" "$workspace" >/dev/null \
+      || { echo "sandbox write scope validation failed" >&2; exit 8; }
+    local patch_size
+    patch_size=$(stat -c %s "$patch")
+    (( patch_size <= 4194304 )) || { echo "sandbox patch exceeds 4 MiB" >&2; exit 6; }
+    printf '\nPI_SANDBOX_PATCH_B64='
+    base64 -w0 "$patch"
+    printf '\n'
+  fi
+  return "$status"
+}
+
+case "${1:-}" in
+  --probe) probe ;;
+  --cleanup) cleanup_job "${2:-}" ;;
+  --cleanup-orphans) cleanup_orphans ;;
+  run) shift; run_job "$@" ;;
+  *) echo "usage: pi-kether-sandbox --probe | --cleanup JOB | --cleanup-orphans | run JOB DRIVE REL ACCESS PROFILE TIMEOUT USER SCOPE [PI_ARGS...]" >&2; exit 2 ;;
+esac

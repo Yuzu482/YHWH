@@ -1,0 +1,5 @@
+## Host Claude login renewal
+
+Before Claude model dispatch, the host checks expiry and renews within five minutes of expiry via the official native Claude Code `auth login --claudeai`, using existing refresh token and scopes. The CLI alone persists credentials. Renewal launches no model, runs hidden with no shell, has a 30-second timeout and a cross-process exclusive lock. Temporary failures cool down for five minutes; rejected refresh credentials require login repair. A process crash may leave a lock: fail closed with PI_AUTH_RENEW_BUSY; verify no auth process remains before manual removal rather than stealing a lock.
+
+For authentication-open circuits, call `renew_claude_auth` once. Success does not clear the circuit: Tifereth then calls `probe_model` with `recovery:true` for the pinned Sonnet route. Resume reviewer work only after that probe passes. Do not automatically generate model probes or provider fallbacks. No refresh credentials enter WSL tasks, logs, task packets or portable packages. Non-default host CLI path can be set by the host administrator with PI_CLAUDE_AUTH_CLI; MCP requests cannot override executable paths.

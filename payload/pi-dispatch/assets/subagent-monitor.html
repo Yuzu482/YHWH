@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: transparent; color: CanvasText; }
+    main { width: 100%; max-width: 736px; padding: 14px; border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); border-radius: 16px; background: color-mix(in srgb, Canvas 96%, transparent); }
+    header, .metrics, .task-head, footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 16px; font-weight: 650; }
+    h2 { font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+    button { min-height: 32px; border: 0; border-radius: 9px; padding: 6px 10px; color: inherit; background: color-mix(in srgb, CanvasText 10%, transparent); cursor: pointer; }
+    button:hover { background: color-mix(in srgb, CanvasText 16%, transparent); }
+    button:disabled { opacity: .5; cursor: default; }
+    .header-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .metrics { margin: 13px 0; align-items: stretch; }
+    .metric { flex: 1; min-width: 0; padding: 9px; border-radius: 11px; background: color-mix(in srgb, CanvasText 6%, transparent); }
+    .label, .meta, footer { font-size: 12px; opacity: .68; }
+    .value { margin-top: 3px; font-size: 18px; font-variant-numeric: tabular-nums; }
+    #tasks { display: grid; gap: 8px; }
+    .task { padding: 11px; border-radius: 12px; background: color-mix(in srgb, CanvasText 5%, transparent); }
+    .task-head { align-items: flex-start; }
+    .state { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; font-size: 11px; background: color-mix(in srgb, CanvasText 10%, transparent); }
+    .state.running, .state.queued, .state.cancelling { color: #2563eb; background: color-mix(in srgb, #2563eb 14%, transparent); }
+    .state.completed { color: #15803d; background: color-mix(in srgb, #15803d 14%, transparent); }
+    .state.failed, .state.cancelled, .state.blocked { color: #b91c1c; background: color-mix(in srgb, #b91c1c 14%, transparent); }
+    .meta { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 5px 12px; }
+    .task-actions { margin-top: 9px; display: flex; justify-content: flex-end; }
+    .empty, .error { padding: 18px 8px; text-align: center; font-size: 13px; opacity: .68; }
+    .error { color: #b91c1c; opacity: 1; }
+    footer { margin-top: 11px; }
+    @media (max-width: 480px) { .metrics { flex-wrap: wrap; } .metric { flex-basis: calc(50% - 5px); } main { padding: 11px; } }
+  </style>
+</head>
+<body>
+  <main id="monitor" aria-live="polite">
+    <header>
+      <div><h1>Pi 子 Agent 监控</h1><p class="label" id="instance">等待 Gateway</p></div>
+      <div class="header-actions"><button id="floating" type="button">悬浮</button><button id="refresh" type="button">刷新</button></div>
+    </header>
+    <section class="metrics" aria-label="Gateway 状态">
+      <div class="metric"><div class="label">运行中</div><div class="value" id="active">—</div></div>
+      <div class="metric"><div class="label">排队</div><div class="value" id="queued">—</div></div>
+      <div class="metric"><div class="label">任务内存</div><div class="value" id="memory">—</div></div>
+      <div class="metric"><div class="label">Gateway RSS</div><div class="value" id="rss">—</div></div>
+    </section>
+    <section id="tasks"><div class="empty">尚无任务状态</div></section>
+    <div id="error" class="error" hidden></div>
+    <footer><span id="status">2 秒自动刷新</span><span id="updated">尚未更新</span></footer>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    let busy = false, nextRefresh = Date.now() + 2000, rpcId = 100;
+    let parentRunId = window.openai?.toolInput?.parentRunId || window.openai?.toolOutput?.parentRunId || null;
+    let limit = window.openai?.toolInput?.limit || 50;
+    let bridgeReady = !!window.openai?.callTool;
+    let displayMode = window.openai?.displayMode || 'inline';
+    function acceptDisplayMode(mode) {
+      if (!['inline','pip','fullscreen'].includes(mode)) return;
+      displayMode = mode;
+      $("floating").textContent = mode === 'inline' ? '悬浮' : '返回对话';
+    }
+    async function toggleFloating() {
+      const button = $("floating"), requested = displayMode === 'inline' ? 'pip' : 'inline';
+      button.disabled = true;
+      try {
+        let result;
+        if (typeof window.openai?.requestDisplayMode === 'function') result = await window.openai.requestDisplayMode({mode:requested});
+        else if (standardBridgeReady) result = await rpc('ui/request-display-mode',{mode:requested});
+        else throw new Error('当前宿主尚未提供悬浮显示接口');
+        if (!['inline','pip','fullscreen'].includes(result?.mode)) throw new Error('宿主未确认显示模式切换');
+        acceptDisplayMode(result.mode);
+        $("error").hidden = true;
+        $("status").textContent = result.mode === requested ? (result.mode === 'pip' ? '悬浮监控 · 2 秒自动刷新' : '2 秒自动刷新') : `宿主采用 ${result.mode === 'fullscreen' ? '全屏' : result.mode} 模式`;
+        reportHeight();
+      } catch (error) {
+        $("error").textContent = error?.message || '当前宿主不支持悬浮显示';
+        $("error").hidden = false;
+        reportHeight();
+      } finally {button.disabled = false;}
+    }
+    let standardBridgeReady = false, lastHeight = null, resizeObserver = null, resizeFrame = null;
+    function reportHeight(force = false) {
+      const root = $("monitor");
+      const height = Math.ceil(Math.max(root?.getBoundingClientRect?.().height || 0, root?.scrollHeight || 0));
+      if (!Number.isFinite(height) || height <= 0 || (!force && height === lastHeight)) return;
+      try {
+        if (typeof window.openai?.notifyIntrinsicHeight === 'function') {
+          lastHeight = height;
+          Promise.resolve(window.openai.notifyIntrinsicHeight(height)).catch(() => { lastHeight = null; });
+        } else if (standardBridgeReady) {
+          lastHeight = height;
+          window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/size-changed',params:{height}}, '*');
+        } else return;
+      } catch { lastHeight = null; }
+    }
+    function scheduleHeight() {
+      if (resizeFrame !== null) return;
+      resizeFrame = requestAnimationFrame(() => {resizeFrame=null;reportHeight();});
+    }
+    const stateLabels = { queued:"排队", running:"运行中", cancelling:"取消中", completed:"已完成", failed:"失败", cancelled:"已取消", blocked:"材料不足" };
+    const waitLabels={concurrency:'并发名额已满',provider_capacity:'Provider 名额已满',memory_capacity:'任务内存预算不足',cpu_capacity:'CPU 配额不足',host_memory:'宿主可用内存不足',dependency:'等待前置任务',write_lock:'等待写入范围锁'};
+
+    function unwrap(value) {
+      const result=value?.result??value;
+      let data=result?.structuredContent??result;
+      if(!result?.structuredContent&&Array.isArray(result?.content)){
+        const text=result.content.find(item=>item.type==='text')?.text;
+        if(text){try{data=JSON.parse(text);}catch{if(result.isError)throw new Error(text);}}
+      }
+      if(result?.isError||data?.ok===false)throw new Error(data?.error||'Gateway 操作失败');
+      return data;
+    }
+    function showError(error){$("error").textContent=error?.message||'无法读取任务状态';$("error").hidden=false;$("status").textContent='刷新失败，稍后重试';reportHeight();}
+    function acceptInput(input){if(!input)return;parentRunId=typeof input.parentRunId==='string'?input.parentRunId:null;limit=Number.isInteger(input.limit)&&input.limit>=1&&input.limit<=100?input.limit:50;}
+    function callTool(name, args) {
+      if (window.openai?.callTool) return window.openai.callTool(name, args);
+      if(!bridgeReady)return Promise.reject(new Error('等待宿主完成卡片连接'));
+      return rpc('tools/call',{name,arguments:args});
+    }
+    function rpc(method,params) {
+      return new Promise((resolve, reject) => {
+        const id = ++rpcId;
+        const timer = setTimeout(() => { window.removeEventListener("message", receive); reject(new Error("操作超时")); }, 15000);
+        function receive(event) {
+          if (event.source!==window.parent||event.data?.jsonrpc!=='2.0'||event.data?.id !== id) return;
+          clearTimeout(timer); window.removeEventListener("message", receive);
+          if (event.data.error) reject(new Error(event.data.error.message || "操作失败")); else resolve(event.data.result);
+        }
+        window.addEventListener("message", receive);
+        window.parent.postMessage({ jsonrpc:"2.0", id, method, params }, "*");
+      });
+    }
+    function duration(ms) {
+      const seconds = Math.max(0, Math.round((ms || 0) / 1000));
+      if (seconds < 60) return `${seconds}s`;
+      return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    }
+    function escapeText(value) { return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+    function taskMarkup(task) {
+      const outcome = task.outcome;
+      const route = task.actualProvider ? `${task.actualProvider}/${task.actualModel}` : `${task.requestedProvider}/${task.requestedModel}`;
+      const tokens = outcome?.tokens?.available ? `${outcome.tokens.totalTokens} tokens` : "token 待定";
+      const tools = outcome ? `${outcome.tools.total} 次工具调用` : `${task.resourceProfile} · P${task.priority}`;
+      const dependencies = task.dependsOnRequestIds?.length ? `<span>依赖 ${task.dependsOnRequestIds.length}</span>` : "";
+      const phase=task.phaseTimings;
+      const phaseText=phase?Object.entries({authenticationMs:'认证',startupMs:'启动',timeToFirstResponseMs:'首次响应（自启动）',generationMs:'生成',cleanupMs:'清理'}).filter(([key])=>Number.isFinite(phase[key])).map(([key,label])=>label+' '+duration(phase[key])).join(' · '):'';
+      const waiting = (task.waitReasons||[]).map(r=>waitLabels[r]||r).join('、');
+      const failure = `<div class="meta"><span>排队 ${duration(task.queueWaitMs)} / 上限 ${task.queueTimeoutSeconds??120}s</span><span>执行 ${duration(task.executionMs)}${task.executionTimeoutSeconds?' / 上限 '+task.executionTimeoutSeconds+'s':''}</span>${waiting?'<span>'+escapeText(waiting)+'</span>':''}${outcome?.reviewDecision?'<span>审查：'+escapeText(outcome.reviewDecision)+'</span>':''}${outcome?.failureReason?'<span>'+escapeText(outcome.failureReason)+'</span>':''}</div>`;
+      const cancel = task.cancellable ? `<div class="task-actions"><button type="button" data-cancel="${escapeText(task.requestId)}">取消任务</button></div>` : "";
+      return `<article class="task"><div class="task-head"><div><h2>${escapeText(task.role)} · ${escapeText(task.requestId)}</h2><div class="meta"><span>${escapeText(route)}</span><span>${escapeText(task.access)}</span>${dependencies}</div></div><span class="state ${escapeText(task.state)}">${stateLabels[task.state] || escapeText(task.state)}</span></div><div class="meta"><span>耗时 ${duration(task.elapsedMs)}</span><span>${escapeText(tools)}</span><span>${escapeText(tokens)}</span></div>${failure}${phaseText?'<div class="meta">'+escapeText(phaseText)+'</div>':''}${cancel}</article>`;
+    }
+    function render(data) {
+      if (!data?.gateway) return;
+      if(Object.prototype.hasOwnProperty.call(data,'parentRunId'))parentRunId=data.parentRunId||null;
+      $("instance").textContent = `${data.gateway.accepting ? "可接收任务" : "正在停机"} · ${data.gateway.instanceId.slice(0, 8)}`;
+      $("active").textContent = `${data.gateway.active}/${data.gateway.maxConcurrency}`;
+      $("queued").textContent = data.gateway.queued;
+      $("memory").textContent = `${data.gateway.activeMemoryMiB} MiB`;
+      $("rss").textContent = `${data.gateway.gatewayRssMiB} MiB`;
+      $("tasks").innerHTML = data.tasks?.length ? data.tasks.map(taskMarkup).join("") : '<div class="empty">当前范围内没有 Pi 子 Agent</div>';
+      $("updated").textContent = new Date(data.refreshedAt || Date.now()).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+      $("error").hidden = true;
+      nextRefresh = Date.now() + ((data.refreshIntervalSeconds || 2) * 1000);
+      reportHeight();
+    }
+    async function refresh() {
+      if (busy || document.hidden) return;
+      busy = true; $("refresh").disabled = true; $("status").textContent = "正在刷新…";
+      try { render(unwrap(await callTool("list_subagents", { ...(parentRunId?{parentRunId}:{}), limit }))); }
+      catch (error) { showError(error); }
+      finally { busy = false; $("refresh").disabled = false; if($("error").hidden)$("status").textContent = "2 秒自动刷新"; nextRefresh = Date.now() + 2000; }
+    }
+    async function cancel(requestId, button) {
+      button.disabled = true;
+      try { unwrap(await callTool("cancel_subagent", { requestId })); await refresh(); }
+      catch (error) { $("error").textContent = error?.message || "取消失败"; $("error").hidden = false; button.disabled = false; }
+    }
+    $("refresh").addEventListener("click", refresh);
+    $("floating").addEventListener("click", toggleFloating);
+    $("tasks").addEventListener("click", event => { const button = event.target.closest("[data-cancel]"); if (button) cancel(button.dataset.cancel, button); });
+    window.addEventListener("openai:set_globals", event => {try{const globals=event.detail?.globals;acceptDisplayMode(globals?.displayMode);acceptInput(globals?.toolInput);if(globals?.toolOutput)render(unwrap(globals.toolOutput));reportHeight();}catch(error){showError(error);}});
+    window.addEventListener('message',event=>{
+      if(event.source!==window.parent||event.data?.jsonrpc!=='2.0')return;
+      try{
+        if(event.data.method==='ui/notifications/tool-input')acceptInput(event.data.params?.arguments??event.data.params);
+        if(event.data.method==='ui/notifications/tool-result')render(unwrap(event.data.params));
+        if(event.data.method==='ui/notifications/host-context-changed')acceptDisplayMode(event.data.params?.displayMode);
+      }catch(error){showError(error);}
+    });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() >= nextRefresh) refresh(); });
+    const timer = setInterval(() => { if (!document.hidden && Date.now() >= nextRefresh) refresh(); }, 500);
+    window.addEventListener("pagehide", () => {clearInterval(timer);resizeObserver?.disconnect();if(resizeFrame!==null)cancelAnimationFrame(resizeFrame);}, { once:true });
+    if (typeof ResizeObserver === 'function') {
+      resizeObserver = new ResizeObserver(scheduleHeight);
+      resizeObserver.observe($("monitor"));
+    }
+    window.addEventListener('resize', scheduleHeight);
+    window.addEventListener('load', () => reportHeight(true), {once:true});
+    try{render(unwrap(window.openai?.toolOutput || window.openai?.structuredContent || null));}catch(error){showError(error);}
+    // The mcp-app MIME type requires initialization even when the host also
+    // supplies window.openai.callTool. Without it Codex keeps the view pending.
+    {
+      rpc('ui/initialize',{protocolVersion:'2026-01-26',appInfo:{name:'pi-subagent-monitor',version:'1.0.2'},appCapabilities:{availableDisplayModes:['inline','pip','fullscreen']}}).then(result=>{
+        acceptDisplayMode(result?.hostContext?.displayMode);
+        bridgeReady=true;standardBridgeReady=true;window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized'},'*');reportHeight(true);
+      }).catch(showError);
+    }
+    reportHeight(true);
+    acceptDisplayMode(displayMode);
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "pi-dispatch",
+  "version": "0.1.0+codex.20260904104257",
+  "description": "Expose Pi as a Kether-governed model, probe, and LSP gateway for Tifereth.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Pi Dispatch",
+    "shortDescription": "Route governed subagents through Pi.",
+    "longDescription": "The mandatory default lower-agent gateway for Tifereth. It dispatches Kether task packets through the approved openai-codex route, runs model probes, and requests read-only LSP evidence.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "\u901a\u8fc7 Pi \u7f51\u5173\u6d3e\u53d1 Kether \u53ea\u8bfb\u5b50 Agent",
+      "\u663e\u793a Pi \u5b50 Agent \u8fd0\u884c\u76d1\u63a7\u5361\u7247",
+      "\u7528 Pi LSP \u68c0\u67e5\u5f53\u524d\u4ee3\u7801",
+      "\u5bf9 Pi \u7684 openai-codex \u8def\u7531\u6267\u884c\u5fc3\u8df3\u6d4b\u8bd5"
+    ]
+  }
+}

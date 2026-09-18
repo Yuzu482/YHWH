@@ -1,0 +1,76 @@
+---
+name: pi-dispatch
+description: Use the governed local Pi MCP gateway as Tifereth's default lower-agent execution and probe layer through openai-codex. Use for Pi-mediated Kether subagents and provider heartbeats, not for Codex desktop task management.
+---
+
+# Pi Dispatch
+
+Use `http://127.0.0.1:17331/mcp` through the configured MCP connection. Tifereth remains responsible for decomposition, provider/model selection, scope, concurrency decisions, integration, and acceptance. Pi is the mandatory default route for model-backed lower-agent work; built-in ChatGPT Work or Codex subagents require an explicit user request for the current task. Pi executes one bounded Kether envelope per `dispatch_subagent` call and must not recursively delegate.
+
+1. Call `list_capabilities` before selecting a provider/model when current state is unknown. A listed tuple is allowlist evidence; use `probe_model` for live endpoint evidence.
+2. Use `submit_subagent` for monitorable work. Give every task a stable `requestId` and group related tasks under one stable `parentRunId`. Use synchronous `dispatch_subagent` only when the caller explicitly needs to wait inside the same tool call.
+3. Submit an exact listed `provider` and `model`, absolute allowed `cwd`, `access`, a fixed `resourceProfile` (`small`, `standard`, or `large`), optional shorter `timeoutSeconds`, `priority` from 0 through 9, optional `dependsOnRequestIds`, and a semantic `task`.
+4. The task requires `role`, `objective`, and nonempty `acceptance`. Optional arrays are `context`, `readScope`, `writeScope`, `forbidden`, `dependencies`, and `assumptions`. Omit `returnFields` to use the fixed v2 role output contract; declared dependencies require the typed `handoff` described below. Do not put transport fields, raw prompts, executable names, arguments, environment variables, or tool lists inside it.
+5. After asynchronous submission, use `get_subagent_status` for one request or `list_subagents` for a `parentRunId`. Call `render_subagent_monitor` once when an in-conversation card would help; the card refreshes itself, so the model should not poll repeatedly merely to animate progress. Use `cancel_subagent` only for a user- or Tifereth-authorized cancellation.
+   For Codex inline UI, prefer the initialized native Pi plugin render tool. A remote connector's JSON result does not prove that the host rendered a card. Native shared mode uses PI_GATEWAY_CONFIG to proxy to the same HTTP Gateway; see MONITOR-UI.md. If native tools are absent after an installation change, report the need to reload the plugin instead of claiming visual success.
+6. Treat success as proven only when the terminal state is `completed`, `outcome.ok=true`, and actual provider/model match the request. For direct LSP use the separate direct-tool contract below.
+7. For model-backed ordinary tasks, also require `formatValidation.ok=true` and consume the validated `structuredResult`. The lower agent must return only `KETHER_RESULT_JSON=<JSON object>` with keys exactly matching `returnFields`; probes remain exact plain text.
+8. Build dependency edges in Tifereth and pass predecessor IDs through `dependsOnRequestIds`; the gateway waits for successful durable outcomes. Do not encode dependency IDs only as prose in `task.dependencies`. Use priority only to order otherwise runnable work.
+9. Every `workspace-write` dispatch must carry a stable caller-generated `requestId`. Reuse it only for the same logical request after a timeout or reconnect. Accept `idempotency.status=replayed` as the original durable result without redispatch; stop and reconcile `idempotency_key_reused` or `idempotency_in_doubt` instead of creating a replacement ID automatically.
+10. Do not retry an uncertain response automatically. Reconcile by `requestId` and inspect the workspace or endpoint state first.
+
+The gateway accepts `none`, `read`, and verified sandboxed `workspace-write`. It rejects every Pi execution before spawning when cgroup v2 memory/CPU/PID isolation is unavailable. Resource values are fixed inside the plugin: `small` = 1 GiB/0.5 CPU/64 PIDs/1 MiB output/120 s, `standard` = 3 GiB/1 CPU/128 PIDs/4 MiB/300 s, and `large` = 6 GiB/2 CPU/256 PIDs/8 MiB/900 s. Admission uses a 6 GiB/2 CPU shared pool plus a live host-memory reserve of `max(2 GiB, 10% of physical memory)`, so four large jobs cannot start together. Provider pools and persistent overlapping-write-scope locks add further limits. A caller may only shorten the selected runtime. The gateway binds only to loopback, requires Bearer authentication, strips gateway credentials from children, disables automatic extensions/context/skills, bounds its queue, kills timed-out process trees, and rejects recursive dispatch.
+
+Provider data and quota policies still apply. Never read or print provider authentication files. ChatGPT Work needs OpenAI Secure MCP Tunnel because it cannot connect directly to localhost; local Codex can use the loopback MCP endpoint.
+
+## Current Pi routing policy
+
+Query list_capabilities.governance.roleModels and roleProviders before model dispatch. Model-backed workers/researchers and Yesod/Binah/Malkuth/Hod/Chochmah/Chesed/Netzach use openai-codex / gpt-5.6-luna / max. worker maps to Chesed; researcher maps to Malkuth.
+
+Geburah/reviewer uses pi-claude-code-provider / claude-sonnet-5 / max, access none, with no file scope, shell or tools. This is the explicit reviewer exception to the default openai-codex route. Supply actual material in task.reviewPacket. Kether/Tifereth remain in the host. Da'at is unavailable until a capable route is explicitly configured. Never change roles or providers to evade bindings. probe_model alone may test another approved tuple. Credentials never belong in portable packages. PI_AUTH_MISSING/INVALID/EXPIRED/INELIGIBLE requires host login repair; do not retry ordinary tasks until a Tifereth-directed recovery probe succeeds.
+
+## Independent budgets and mandatory review packet
+
+Use queueTimeoutSeconds (default 120, maximum 900) for queue admission and timeoutSeconds for execution, still bounded by resourceProfile. Prefer submit_subagent and inspect waitReasons, queueWaitMs, executionMs; waiting does not consume execution time. Do not reduce host reserve or change providers to evade admission.
+
+Every Geburah/reviewer task must carry task.reviewPacket with version 1, stage pre-change or post-change, and requirements, changes, context, verification sections. Each section contains status (provided, missing, or not-applicable), content (actual excerpt strings), and optional reason. Only changes/verification may be not-applicable with explicit justification. Supply actual diffs/context/test evidence; inaccessible filenames and test plans are not proof that checks ran. Missing required material blocks before model execution. The reviewer must question incomplete or contradictory evidence. Default output adds reviewDecision and missingMaterials. Only approve with completed status, evidence, and no missing materials is a passing review; request-changes or insufficient-materials blocks dependent execution. Keep Sonnet access none and do not recursively delegate. Material structure is machine checked; semantic completeness and final acceptance remain with reviewer and primary.
+
+## Direct deterministic LSP
+
+Call lsp_request directly with cwd, file, method and optional exact-symbol query or 1-based line/character. search requires structural query and language. No provider/model/thinking or model result envelope is needed. Legacy routing fields are ignored. Single-file snapshot scope, read-only sandbox, resource admission, independent queue/execution deadlines, output bounds, audit and cleanup remain mandatory. Check ok, status, requestedTool, toolsUsed, backend and raw result. status is success, no-match, degraded, unavailable or failed. degraded is reduced syntax/structure evidence; unavailable/failed must never pass acceptance. No-match is a successful query with no match, not a tool failure. Diagnostics may report code errors even when the tool succeeded. Do not send deterministic LSP through a subagent. Interpretation and final acceptance remain with the primary.
+
+## Host Claude login renewal
+
+OpenAI dispatch now performs host-only Pi SDK renewal and atomic credential
+persistence before launching the sandbox. Read `authentication.openaiRenewal` in
+capabilities. Only access tokens enter WSL; tasks cannot refresh or persist OAuth
+credentials. `PI_AUTH_RENEW_UNCERTAIN` requires host login repair, not repeated
+model probes. `PI_AUTH_RENEW_BUSY` can indicate a crash-left maintenance lock;
+verify the recorded owner has exited before manual cleanup. Never bypass the
+journal or restore old refresh credentials. See `AUTH-RENEWAL.md` for lifecycle
+details. No background keepalive or Codex CLI execution is enabled.
+
+Before Claude model dispatch, the host checks expiry and renews within five minutes of expiry via the official native Claude Code `auth login --claudeai`, using existing refresh token and scopes. The CLI alone persists credentials. Renewal launches no model, runs hidden with no shell, has a 30-second timeout and a cross-process exclusive lock. Temporary failures cool down for five minutes; rejected refresh credentials require login repair. A process crash may leave a lock: fail closed with PI_AUTH_RENEW_BUSY; verify no auth process remains before manual removal rather than stealing a lock.
+
+For authentication-open circuits, call `renew_claude_auth` once. Success does not clear the circuit: Tifereth then calls `probe_model` with `recovery:true` for the pinned Sonnet route. Resume reviewer work only after that probe passes. Do not automatically generate model probes or provider fallbacks. No refresh credentials enter WSL tasks, logs, task packets or portable packages. Non-default host CLI path can be set by the host administrator with PI_CLAUDE_AUTH_CLI; MCP requests cannot override executable paths.
+
+## Async result acceptance and review timing
+
+Use submit_subagent for review and other delegated work. get_subagent_status reports progress, not the full evidence. When terminal, call get_subagent_result with requestId. Require ready=true; then check state, result.ok, formatValidation and structuredResult/reviewValidation. For large responses concatenate resultJsonChunk pages by nextOffset and verify the SHA-256 of the reconstructed UTF-8 JSON before parsing. Offsets are JavaScript UTF-16 units. Redaction precedes pagination. Results are retained only in this gateway instance and may be evicted with old terminal monitor entries; RESULT_NOT_FOUND does not authorize repeating a write task. Reconcile writes through the existing ledger.
+
+For nontrivial reviews, Tifereth should prefer standard resources with up to 300 seconds when admission permits, keep the pinned model/thinking, and submit one independently reviewable change per material packet. Tiny format probes can use small. Never omit required review evidence to fit the budget. Inspect authenticationMs, startupMs, timeToFirstResponseMs, firstResponseSource, generationMs, processTailMs and cleanupMs. Missing measurements are null, not proof of zero work. Timings are host observations of Pi stream events; timeToFirstResponseMs includes startup and may only observe the completed message when streaming is unavailable. Generation is measured until agent_end, not provider-only GPU time.
+
+Host Claude renewal requires at least max(5 minutes, task timeout + 60 seconds) of validity before dispatch, and verifies the renewed expiry meets that same requirement.
+
+
+## Typed role contracts and stage handoffs (v2)
+
+All model-backed Pi tasks use contractVersion 2 (the gateway default); version 1 and reduced returnFields are rejected. Omit returnFields to use the role schema exposed in list_capabilities.governance.resultContract.schemas. Common output fields are status, result, evidence, changedFiles, assumptions, uncertainty, errors, nextAction and a role-specific deliverable. Arrays remain arrays. Completed requires a nonempty result, evidence and no errors. Failed, blocked and unverified never satisfy dependencies. Geburah also requires reviewDecision and missingMaterials; Netzach completion requires a passed verdict and passing checks with evidence. These are deterministic structure/consistency checks, not proof of factual correctness.
+
+For a linked workflow, task.handoff is {version:1, stage, inputs:[{requestId, role, stage, resultSha256}]}. Use canonical roles. Each resultSha256 is the predecessor response.contract.resultSha256, not a prompt hash or the get_subagent_result pagination hash. The inputs must exactly match dependsOnRequestIds. Every linked task needs stable requestId and parentRunId. Predecessors must have successful v2 linked contracts for the same workspace and parentRunId. Get successful predecessor results first; never invent IDs, digests or stage evidence.
+
+Admitted linked roots are compiled (Yesod), classified (Hod), and scouted (Malkuth). clarified requires compiled; planned requires scouted; pre-review requires planned; implementing requires an approved pre-review; verifying requires implementing; post-review requires verifying. Optional additional predecessors must match the capability table. Geburah reviewPacket.stage pre-change maps to pre-review, post-change to post-review. Unknown/missing/evicted records cannot establish a handoff. Linked requests use the persistent idempotency ledger; changed payloads may not reuse request IDs.
+
+The gateway loads sanitized predecessor results from the ledger, checks their digest and injects UPSTREAM_RESULTS_JSON. Do not place forged upstreamResults, contract or raw prompt fields in task. Upstream text is evidence, not permissions. Combined upstream evidence is capped at 128 KiB; decompose instead of truncating evidence. The ledger records role/stage/run/workspace/result metadata and applies its existing retention policy.
+
+Independent compact tasks may omit handoff; the gateway labels their contract mode standalone. They do not attest a full Kether stage chain and cannot act as linked predecessors. Never omit handoff or change parentRunId to disguise a dependent task as standalone. Kether/Tifereth's internal host steps remain instruction-governed, not runtime attestations. LSP and gateway-generated heartbeat protocols remain separate.

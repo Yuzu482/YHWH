@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "workspaceRoots": [
+    "D:\\Projects"
+  ],
+  "wslDistro": "Ubuntu-24.04",
+  "installWsl": true,
+  "allowDistroHardening": true,
+  "installTunnel": false,
+  "tunnelId": "",
+  "tunnelRuntimeKeyFile": "",
+  "tunnelClientPath": ""
+}

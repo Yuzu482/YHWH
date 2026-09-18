@@ -1,0 +1,44 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+
+const pluginRoot=process.argv[2];
+const reportPath=process.argv[3];
+if(!pluginRoot||!reportPath) throw new Error('Expected plugin root and report path');
+const config=JSON.parse(fs.readFileSync(path.join(pluginRoot,'.mcp.json'),'utf8').replace(/^\uFEFF/,''));
+const entry=config.mcpServers['pi-kether-gateway'];
+const gateway=JSON.parse(fs.readFileSync(entry.env.PI_GATEWAY_CONFIG,'utf8').replace(/^\uFEFF/,''));
+const token=fs.readFileSync(gateway.tokenFile,'utf8').trim();
+const native=new Client({name:'pi-monitor-native-verifier',version:'1.0.0'});
+const http=new Client({name:'pi-monitor-shared-verifier',version:'1.0.0'});
+let stderr='';
+assert.ok(entry.args.every(arg=>!arg.includes('${PLUGIN_ROOT}')),'Installed MCP config must contain resolved paths; do not expand unsupported variables in the verifier');
+const transport=new StdioClientTransport({command:entry.command,args:entry.args,env:{...process.env,...entry.env},stderr:'pipe'});
+transport.stderr?.on('data',chunk=>{stderr+=chunk.toString();});
+try{
+ await native.connect(transport);
+ await http.connect(new StreamableHTTPClientTransport(new URL(`http://${gateway.host}:${gateway.port}/mcp`),{requestInit:{headers:{Authorization:`Bearer ${token}`},redirect:'error'}}));
+ const {tools}=await native.listTools();
+ const render=tools.find(tool=>tool.name==='render_subagent_monitor');
+ assert.equal(render._meta.ui.resourceUri,'ui://pi-kether/subagent-monitor.html');
+ assert.equal(tools.find(tool=>tool.name==='list_subagents')._meta['openai/widgetAccessible'],true);
+ const resource=await native.readResource({uri:render._meta.ui.resourceUri});
+ assert.equal(resource.contents[0].mimeType,'text/html;profile=mcp-app');
+ assert.equal(resource.contents[0]._meta['openai/widgetShowCodexWidgetInline'],true);
+ assert.equal(resource.contents[0]._meta['openai/widgetMinFrameHeight'],240);
+ assert.match(resource.contents[0].text,/ui\/notifications\/tool-result/);
+ const local=await native.callTool({name:'render_subagent_monitor',arguments:{limit:10}});
+ const shared=await http.callTool({name:'render_subagent_monitor',arguments:{limit:10}});
+ assert.equal(local.structuredContent.ok,true);
+ assert.equal(local.structuredContent.gateway.instanceId,shared.structuredContent.gateway.instanceId);
+ await native.close();
+ const after=await http.callTool({name:'list_subagents',arguments:{limit:1}});
+ assert.equal(after.structuredContent.ok,true);
+ const report={timestamp:new Date().toISOString(),nativeStartupPassed:true,cardMetadataPassed:true,cardResourcePassed:true,codexInlineRequested:true,sharedGatewayInstance:local.structuredContent.gateway.instanceId,gatewayAliveAfterNativeClose:true,htmlSha256:createHash('sha256').update(resource.contents[0].text).digest('hex'),nativeStderrEmpty:stderr.length===0,actualConversationCardDisplay:'unverified; requires actual host display evidence'};
+ fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');
+ console.log(JSON.stringify(report,null,2));
+}finally{await native.close();await http.close();}

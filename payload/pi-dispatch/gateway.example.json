@@ -1,0 +1,14 @@
+{
+  "host": "127.0.0.1",
+  "port": 17331,
+  "roots": [
+    "E:\\Projects"
+  ],
+  "tokenFile": "C:\\Users\\YOUR_USER\\.pi\\agent\\gateway\\token.txt",
+  "auditFile": "C:\\Users\\YOUR_USER\\.local\\state\\pi-kether\\audit.jsonl",
+  "providerCircuitFile": "C:\\Users\\YOUR_USER\\.local\\state\\pi-kether\\provider-circuit.jsonl",
+  "requestLedgerDir": "C:\\Users\\YOUR_USER\\.local\\state\\pi-kether\\request-ledger",
+  "maxConcurrency": 4,
+  "maxQueue": 16,
+  "maxRequestBytes": 102400
+}

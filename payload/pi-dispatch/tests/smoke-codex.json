@@ -1,0 +1,9 @@
+{
+  "target": "codex-cli",
+  "cwd": "D:\\Projects\\Example\\pi-dispatch\\tests",
+  "model": "gpt-5.6-luna",
+  "prompt": "Reply with exactly PI_CODEX_CLI_OK. Do not use any tools or read any files.",
+  "access": "none",
+  "thinking": "low",
+  "timeoutSeconds": 60
+}
