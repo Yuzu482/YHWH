@@ -1,7 +1,8 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
   [string]$ConfigFile,
   [string[]]$WorkspaceRoots,
+  [string[]]$Hosts,
   [string]$WslDistro,
   [switch]$SkipWsl,
   [switch]$SkipTunnel,
@@ -59,6 +60,10 @@ function Set-ManagedAgents([string]$Path, [string]$Template) {
 }
 
 $config = Read-Config
+if(-not $Hosts){$Hosts=if($config.hosts){@($config.hosts)}else{@('codex')}}
+foreach($hostId in $Hosts){if($hostId -notin @('generic','codex','cherry-studio','opencode','opencode-v2','claude-code','claude-desktop','deepseek-harness','cursor','vscode-copilot','windsurf','cline','roo-code','gemini-cli','kiro','zed','continue','lm-studio')){throw "Unknown host: $hostId"}}
+if (@($Hosts | Select-Object -Unique).Count -ne $Hosts.Count) { throw 'Choose unique host IDs.' }
+$installCodex=$Hosts -contains 'codex'
 if (-not $WorkspaceRoots -and $config.workspaceRoots) { $WorkspaceRoots = @($config.workspaceRoots) }
 if (-not $WslDistro) { $WslDistro = if ($config.wslDistro) { $config.wslDistro } else { 'Ubuntu-24.04' } }
 $script:WslName = $WslDistro
@@ -88,6 +93,7 @@ Say "Target home: $TargetHome"
 Say "Workspace roots: $($roots -join ', ')"
 Say "WSL sandbox: $installWsl ($WslDistro)"
 Say "Secure MCP Tunnel: $installTunnel"
+Say "Primary host profiles: $($Hosts -join ', ')"
 if ($installTunnel) {
   foreach ($key in @('tunnelId','tunnelRuntimeKeyFile','tunnelClientPath')) {
     if ([string]::IsNullOrWhiteSpace([string]$config.$key)) { throw "Tunnel configuration requires $key." }
@@ -97,6 +103,20 @@ if ($installTunnel) {
   }
 }
 if ($PlanOnly) { Say 'Plan validated; no changes made.'; exit 0 }
+
+if($installCodex){
+  $configToml = Join-Path $TargetHome '.codex\config.toml'
+  $tomlText = if (Test-Path -LiteralPath $configToml) { Get-Content -LiteralPath $configToml -Raw } else { '' }
+  $updatedToml = & (Join-Path $PSScriptRoot 'Set-CodexFeatures.ps1') -Text $tomlText
+}
+
+# Fail before changing host files if the requested sandbox cannot be reached.
+if ($installWsl) {
+  $distros = @((& wsl.exe --list --quiet) -replace "`0", '' | ForEach-Object { $_.Trim() })
+  if ($LASTEXITCODE -ne 0 -or $distros -notcontains $WslDistro) { throw "WSL distro '$WslDistro' is not available." }
+  & wsl.exe -d $WslDistro -u root -- true
+  if ($LASTEXITCODE -ne 0) { throw 'WSL cannot start. Host files were not changed.' }
+}
 
 New-Item -ItemType Directory -Force -Path $TargetHome | Out-Null
 $stateRoot = Join-Path $TargetHome '.local\state\pi-kether'
@@ -120,6 +140,8 @@ $mcp = [ordered]@{ mcpServers = [ordered]@{ 'pi-kether-gateway' = [ordered]@{
   command = $nodePath
   args = @((Join-Path $pluginTarget 'scripts\stdio-server.mjs'))
   env = [ordered]@{
+    PATH = ((Split-Path -Parent $nodePath) + ';' + $env:PATH)
+    PI_DISPATCH_PI_ENTRY = (Join-Path $TargetHome '.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js')
     PI_GATEWAY_ROOTS = (ConvertTo-Json -InputObject @($roots) -Compress)
     PI_GATEWAY_AUDIT_FILE = $auditFile
     PI_GATEWAY_PROVIDER_CIRCUIT_FILE = $circuitFile
@@ -128,7 +150,7 @@ $mcp = [ordered]@{ mcpServers = [ordered]@{ 'pi-kether-gateway' = [ordered]@{
     PI_SANDBOX_DISTRO = $WslDistro
   }
   enabled = $true
-  enabled_tools = @('list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','renew_claude_auth')
+  enabled_tools = @('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','renew_claude_auth')
   startup_timeout_sec = 30
 }}}
 $mcp | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $pluginTarget '.mcp.json') -Encoding utf8NoBOM
@@ -151,9 +173,10 @@ $hostPackage = [ordered]@{ private = $true; dependencies = [ordered]@{
   'vscode-languageserver-protocol' = '3.17.5'
 }}
 $hostPackage | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $hostPiRoot 'package.json') -Encoding utf8NoBOM
+Copy-Item -LiteralPath (Join-Path $payload 'wsl-package-lock.json') -Destination (Join-Path $hostPiRoot 'package-lock.json') -Force
 Push-Location $hostPiRoot
 try {
-  & (Join-Path (Split-Path -Parent $nodePath) 'npm.cmd') install --omit=dev --ignore-scripts=false
+  & (Join-Path (Split-Path -Parent $nodePath) 'npm.cmd') ci --omit=dev --ignore-scripts=false
   if ($LASTEXITCODE -ne 0) { throw 'Host Pi dependency installation failed.' }
   & $nodePath (Join-Path $packageRoot 'install\patch-pi-lsp.mjs') (Join-Path $hostPiRoot 'node_modules\pi-lsp-extension')
   if ($LASTEXITCODE -ne 0) { throw 'Host Pi LSP patch failed.' }
@@ -168,6 +191,7 @@ foreach ($extensionName in @('desktop-monitor','unity','blender')) {
 }
 $piSettings | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $piSettingsPath -Encoding utf8NoBOM
 
+if($installCodex){
 $skillsRoot = Join-Path $TargetHome '.agents\skills'
 Get-ChildItem -LiteralPath (Join-Path $payload 'workflow-skills') -Directory | ForEach-Object {
   Copy-WithBackup $_.FullName (Join-Path $skillsRoot $_.Name) $backupRoot
@@ -183,10 +207,7 @@ Set-ManagedAgents $agentsPath (Get-Content -LiteralPath $templatePath -Raw)
 $configToml = Join-Path $TargetHome '.codex\config.toml'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $configToml) | Out-Null
 if (Test-Path -LiteralPath $configToml) { Copy-Item -LiteralPath $configToml -Destination (Join-Path $backupRoot 'config.toml') -Force }
-$tomlText = if (Test-Path -LiteralPath $configToml) { Get-Content -LiteralPath $configToml -Raw } else { '' }
-if ($tomlText -match '(?m)^multi_agent\s*=') { $tomlText = [regex]::Replace($tomlText, '(?m)^multi_agent\s*=.*$', 'multi_agent = false') }
-else { $tomlText = "multi_agent = false`r`n" + $tomlText }
-[IO.File]::WriteAllText($configToml, $tomlText, [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText($configToml, $updatedToml, [Text.UTF8Encoding]::new($false))
 
 $marketplacePath = Join-Path $TargetHome '.agents\plugins\marketplace.json'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marketplacePath) | Out-Null
@@ -194,6 +215,7 @@ $market = if (Test-Path -LiteralPath $marketplacePath) { Get-Content -LiteralPat
 if (-not $market.plugins) { $market.plugins = @() }
 $market.plugins = @($market.plugins | Where-Object { $_.name -ne 'pi-dispatch' }) + @(@{name='pi-dispatch';source=@{source='local';path='./plugins/pi-dispatch'};policy=@{installation='AVAILABLE';authentication='ON_INSTALL'};category='Productivity'})
 $market | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $marketplacePath -Encoding utf8NoBOM
+}
 
 if ($installWsl) {
   $distros = (& wsl.exe --list --quiet) -replace "`0", ''
@@ -226,7 +248,7 @@ if ($installWsl) {
   Start-Sleep -Seconds 2
 }
 
-if (-not $SkipCodexRegistration -and [IO.Path]::GetFullPath($TargetHome) -eq [IO.Path]::GetFullPath($HOME) -and (Get-Command codex.exe -ErrorAction SilentlyContinue)) {
+if ($installCodex -and -not $SkipCodexRegistration -and [IO.Path]::GetFullPath($TargetHome) -eq [IO.Path]::GetFullPath($HOME) -and (Get-Command codex.exe -ErrorAction SilentlyContinue)) {
   & codex.exe plugin add pi-dispatch@personal --json | Out-Host
   if ($LASTEXITCODE -ne 0 -and -not $Force) { throw 'Codex plugin registration failed. Rerun with -Force to keep the installed files for manual registration.' }
 }
@@ -245,8 +267,13 @@ if ($installTunnel) {
   & $runtime
 }
 
+$hostExports=Join-Path $stateRoot ('host-profiles\'+[guid]::NewGuid().ToString('N'))
+& $nodePath (Join-Path $pluginTarget 'scripts\host-profiles.mjs') (Join-Path $pluginTarget '.mcp.json') $hostExports ($Hosts -join ',')
+if($LASTEXITCODE -ne 0){throw 'Host profile generation failed.'}
+@{hosts=@($Hosts);profiles=$hostExports}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $stateRoot 'installation-hosts.json') -Encoding utf8NoBOM
 & (Join-Path $PSScriptRoot 'Protect-PiState.ps1') -TargetHome $TargetHome
-& (Join-Path $packageRoot 'install\Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $WslDistro -SkipWsl:$(-not $installWsl)
+& (Join-Path $packageRoot 'install\Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $WslDistro -Hosts $Hosts -SkipWsl:$(-not $installWsl)
 if ($LASTEXITCODE -ne 0) { throw 'Post-install self-test failed.' }
 Say "Installation complete. Backup: $backupRoot"
 Say 'Sign in with Pi on this Windows account if ~/.pi/agent/auth.json is not already present.'
+Say "Import your selected host's connection and PRIMARY-AGENT.md from: $hostExports"

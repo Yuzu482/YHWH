@@ -3,6 +3,7 @@ param(
   [switch]$Installed,
   [string]$TargetHome = $HOME,
   [string]$WslDistro = 'Ubuntu-24.04',
+  [string[]]$Hosts = @('codex'),
   [switch]$SkipWsl
 )
 $ErrorActionPreference = 'Stop'
@@ -20,7 +21,16 @@ $policy = Get-Content -LiteralPath (Join-Path $packageRoot 'templates\AGENTS.ket
 foreach ($link in [regex]::Matches($policy, '\]\((agent-references/[^)]+)\)')) {
   Check (Test-Path -LiteralPath (Join-Path $packageRoot ('templates/' + $link.Groups[1].Value)) -PathType Leaf) ('policy reference: ' + $link.Groups[1].Value)
 }
-$scanFiles = Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Where-Object { $_.FullName -notmatch '[\\/](release|\.test|\.git|node_modules)[\\/]' -and $_.FullName -ne $PSCommandPath -and $_.Extension -notin '.zip','.sha256' }
+function Get-DistributableFiles([string]$Directory) {
+  foreach ($item in Get-ChildItem -LiteralPath $Directory -Force) {
+    if ($item.PSIsContainer) {
+      if ($item.Name -in @('release','.test','.git','node_modules')) { continue }
+      if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing distribution scan through a link: $($item.FullName)" }
+      Get-DistributableFiles $item.FullName
+    } elseif ($item.FullName -ne $PSCommandPath -and $item.Extension -notin '.zip','.sha256') { $item }
+  }
+}
+$scanFiles = @(Get-DistributableFiles $packageRoot)
 $hostUserPath = 'C:' + '\Users\' + 'asus'
 $hostRepoPath = 'E:' + '\Projects\' + 'DeepSeekHarness'
 $oldTunnel = 'tunnel_' + '6a9aa889406481918ef6a135c41493c7'
@@ -34,24 +44,32 @@ Check (-not $backups) 'no backup files in payload'
 if ($Installed) {
   $plugin = Join-Path $TargetHome 'plugins\pi-dispatch'
   Check (Test-Path -LiteralPath (Join-Path $plugin 'node_modules\@modelcontextprotocol\sdk')) 'plugin dependencies installed'
+  $piEntry = Join-Path $TargetHome '.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js'
+  Check (Test-Path -LiteralPath $piEntry -PathType Leaf) 'host Pi entry installed'
+  Check (Test-Path -LiteralPath (Join-Path $plugin 'workflow\catalog.json')) 'host-neutral workflow catalog installed'
+  if($Hosts -contains 'codex'){
   Check (Test-Path -LiteralPath (Join-Path $TargetHome '.codex\AGENTS.md')) 'Kether policy installed'
   foreach ($link in [regex]::Matches($policy, '\]\((agent-references/[^)]+)\)')) {
     Check (Test-Path -LiteralPath (Join-Path $TargetHome ('.codex/' + $link.Groups[1].Value)) -PathType Leaf) ('installed policy reference: ' + $link.Groups[1].Value)
   }
   Check (Test-Path -LiteralPath (Join-Path $TargetHome '.agents\skills\kether-governance\SKILL.md')) 'Kether skills installed'
+  }
+  $hostState=Get-Content -LiteralPath (Join-Path $TargetHome '.local\state\pi-kether\installation-hosts.json') -Raw|ConvertFrom-Json
+  foreach($hostId in $Hosts){Check (Test-Path -LiteralPath (Join-Path $hostState.profiles "$hostId/connection.json")) ("host profile: $hostId")}
   try {
     $mcp = Get-Content -LiteralPath (Join-Path $plugin '.mcp.json') -Raw | ConvertFrom-Json
     Check ([bool]$mcp.mcpServers.'pi-kether-gateway'.env.PI_GATEWAY_ROOTS) 'MCP workspace scope configured'
+    Check ($mcp.mcpServers.'pi-kether-gateway'.env.PI_DISPATCH_PI_ENTRY -eq $piEntry) 'MCP resolves the installed host Pi entry'
   } catch { Check $false 'MCP workspace scope configured' }
   if (-not $SkipWsl) {
     $probe = & wsl.exe -d $WslDistro -u root -- /usr/local/libexec/pi-kether-sandbox --probe
     $probeObject = try { $probe | ConvertFrom-Json } catch { $null }
     Check ($LASTEXITCODE -eq 0 -and $probeObject.ok -eq $true -and $probeObject.resourceLimits -eq $true) 'WSL isolation and cgroup resource limits'
-    & wsl.exe -d $WslDistro -u root -- sh -c 'command -v pyright-langserver typescript-language-server clangd jdtls csharp-ls >/dev/null'
+    & wsl.exe -d $WslDistro -u root -- sh -c 'export PATH=/opt/node/bin:/opt/pi-kether/node_modules/.bin:/usr/local/bin:/usr/bin:/bin; for tool in pyright-langserver typescript-language-server clangd jdtls csharp-ls; do command -v "$tool" >/dev/null || exit 1; done'
     Check ($LASTEXITCODE -eq 0) 'six-language LSP command set'
   }
   $auth = Join-Path $TargetHome '.pi\agent\auth.json'
-  if (Test-Path -LiteralPath $auth) { Write-Host '[PASS] Pi provider login present' -ForegroundColor Green }
+  if (Test-Path -LiteralPath $auth) { Write-Host '[INFO] Pi credential file exists; validity and model access have not been checked.' -ForegroundColor Yellow }
   else { Write-Host '[ACTION] Run Pi login before model heartbeat tests.' -ForegroundColor Yellow }
 }
 if ($failures.Count) { Write-Error ("Self-test failed: " + ($failures -join ', ')); exit 1 }

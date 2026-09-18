@@ -17,6 +17,7 @@ CSHARP_LS_VERSION="0.26.0"
 HARDEN_DISTRO="${PI_KETHER_HARDEN_DISTRO:-0}"
 
 export DEBIAN_FRONTEND=noninteractive
+export PATH=/opt/node/bin:/opt/pi-kether/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 apt-get update
 apt-get install -y --no-install-recommends python3 ca-certificates curl xz-utils tar unzip bubblewrap util-linux diffutils coreutils openjdk-21-jre-headless clangd
 
@@ -42,7 +43,7 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/wsl-package-lock.json /op
 (cd /opt/pi-kether && /opt/node/bin/npm ci --omit=dev --ignore-scripts=false)
 /opt/node/bin/node /tmp/pi-kether-install/patch-pi-lsp.mjs /opt/pi-kether/node_modules/pi-lsp-extension
 
-install -o root -g root -m 0755 /tmp/pi-kether-install/pi-kether-sandbox /usr/local/libexec/pi-kether-sandbox
+install -D -o root -g root -m 0755 /tmp/pi-kether-install/pi-kether-sandbox /usr/local/libexec/pi-kether-sandbox
 install -o root -g root -m 0644 /tmp/pi-kether-install/validate-write-scope.mjs /opt/pi-kether/scripts/validate-write-scope.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/write-scope-guard.js /opt/pi-kether/extensions/write-scope-guard.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/auth-scrub.js /opt/pi-kether/extensions/auth-scrub.js
@@ -119,5 +120,7 @@ fi
 
 /opt/node/bin/node --version
 /opt/node/bin/node /opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js --version
-command -v pyright-langserver typescript-language-server clangd jdtls csharp-ls >/dev/null
+for tool in pyright-langserver typescript-language-server clangd jdtls csharp-ls; do
+  command -v "$tool" >/dev/null || exit 1
+done
 printf '{"ok":true,"hardened":%s,"node":"%s","pi":"%s"}\n' "$([[ "$HARDEN_DISTRO" == 1 ]] && echo true || echo false)" "$NODE_VERSION" "$PI_VERSION"

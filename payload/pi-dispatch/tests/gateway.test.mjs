@@ -208,7 +208,7 @@ test('gateway requires bearer auth and exposes only governed MCP tools', async (
     assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/readyz`)).json(), { ok: true, service: 'pi-kether-gateway' });
     const tools = await client.listTools();
     assert.deepEqual(tools.tools.map(tool => tool.name).sort(), [
-      'cancel_subagent', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'list_capabilities', 'list_subagents',
+      'cancel_subagent', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'get_workflow', 'list_capabilities', 'list_subagents',
       'lsp_request', 'probe_model', 'render_subagent_monitor', 'renew_claude_auth', 'submit_subagent',
     ]);
     const caps = parsed(await client.callTool({ name: 'list_capabilities', arguments: {} }));

@@ -11,6 +11,7 @@ New-Item -ItemType Directory -Force -Path $release | Out-Null
 & (Join-Path $root 'install\Test-PiKether.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Portable self-test failed.' }
 & (Join-Path $root 'install\Test-WorkflowConfig.ps1')
+& (Join-Path $root 'install\Sync-HostWorkflow.ps1') -Check
 
 $plugin = Join-Path $root 'payload\pi-dispatch'
 if (-not $SkipTests) {
@@ -18,16 +19,10 @@ if (-not $SkipTests) {
   try {
     npm ci --ignore-scripts=false
     if ($LASTEXITCODE -ne 0) { throw 'npm ci failed.' }
-    npm test
+    # Match the documented release baseline; HTTP tests share process resources.
+    node --test --test-concurrency=1 tests/*.test.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Plugin tests failed.' }
-  } finally {
-    Pop-Location
-    $modules = Join-Path $plugin 'node_modules'
-    $resolvedModules = [IO.Path]::GetFullPath($modules)
-    $resolvedPlugin = [IO.Path]::GetFullPath($plugin).TrimEnd('\')
-    if (-not $resolvedModules.StartsWith($resolvedPlugin + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe node_modules cleanup path.' }
-    if (Test-Path -LiteralPath $resolvedModules) { Remove-Item -LiteralPath $resolvedModules -Recurse -Force }
-  }
+  } finally { Pop-Location }
 }
 
 $validator = Join-Path $HOME '.codex\skills\.system\plugin-creator\scripts\validate_plugin.py'
@@ -55,9 +50,18 @@ $stageBase = Join-Path ([IO.Path]::GetTempPath()) ('pi-kether-build-' + [guid]::
 $stage = Join-Path $stageBase 'pi-kether-portable'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 try {
-  Get-ChildItem -LiteralPath $root -Force | Where-Object { $_.Name -in @('install','payload','templates','docs','.readme-assets','Workflow.ps1','Build-Release.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','.gitignore') } | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination $stage -Recurse -Force
+  # Enumerate by allowlist and prune local state even when -SkipTests is used.
+  $allowed = @('install','payload','templates','docs','.readme-assets','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','.gitignore')
+  function Copy-ReleaseTree([string]$Source, [string]$Destination) {
+    $item = Get-Item -LiteralPath $Source -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing release symlink: $Source" }
+    if ($item.Name -match '^(node_modules|\.git|\.test|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { return }
+    if ($item.PSIsContainer) {
+      New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+      foreach ($child in Get-ChildItem -LiteralPath $Source -Force) { Copy-ReleaseTree $child.FullName (Join-Path $Destination $child.Name) }
+    } else { Copy-Item -LiteralPath $Source -Destination $Destination }
   }
+  foreach ($name in $allowed) { Copy-ReleaseTree (Join-Path $root $name) (Join-Path $stage $name) }
   $zip = Join-Path $release "pi-kether-portable-$version.zip"
   if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
   Compress-Archive -LiteralPath $stage -DestinationPath $zip -CompressionLevel Optimal
@@ -69,6 +73,9 @@ try {
   } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $release 'release-manifest.json') -Encoding utf8NoBOM
   Write-Host "Release: $zip"
   Write-Host "SHA256: $hash"
+  & (Join-Path $root 'Build-OneClick.ps1') -PortableZip $zip
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'install\Test-OneClick.ps1') -Installer (Join-Path $release "Install-YHWH-$version.ps1")
+  if ($LASTEXITCODE -ne 0) { throw 'Generated one-click installer validation failed.' }
 } finally {
   $resolvedBase = [IO.Path]::GetFullPath($stageBase)
   $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())

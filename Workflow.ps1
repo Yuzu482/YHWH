@@ -18,7 +18,7 @@ switch($Action) {
   'Build' { & (Join-Path $PSScriptRoot 'Build-Release.ps1') }
   'Verify' {
     $config=& (Join-Path $PSScriptRoot 'install/Read-WorkflowConfig.ps1') -ConfigFile $ConfigFile
-    & (Join-Path $PSScriptRoot 'install/Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $config.wslDistro -SkipWsl:($SkipWsl -or -not $config.installWsl)
+    & (Join-Path $PSScriptRoot 'install/Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $config.wslDistro -Hosts $config.hosts -SkipWsl:($SkipWsl -or -not $config.installWsl)
   }
   default {
     & (Join-Path $PSScriptRoot 'install/Install-PiKether.ps1') -ConfigFile $ConfigFile -TargetHome $TargetHome -PlanOnly:($Action -eq 'Plan') -SkipWsl:$SkipWsl -SkipTunnel:$SkipTunnel -SkipCodexRegistration:$SkipCodexRegistration

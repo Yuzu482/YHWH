@@ -17,6 +17,8 @@ test('native bridge preserves UI metadata/resources and shares the HTTP monitor 
   writeFileSync(join(dir,'token.txt'),token);const configPath=join(dir,'config.json');writeFileSync(configPath,JSON.stringify({host:'127.0.0.1',port:http.address().port,tokenFile:'token.txt'}));
   const [a,b]=InMemoryTransport.createLinkedPair();bridge=await startStdioProxy({configPath,transport:b});await client.connect(a);
   const listed=await client.listTools();assert.ok(listed.tools.find(tool=>tool.name==='render_subagent_monitor')._meta.ui.resourceUri);
+  const workflow=await client.callTool({name:'get_workflow',arguments:{topic:'primary'}});
+  assert.equal(JSON.parse(workflow.content[0].text).topic,'primary');
   assert.equal(listed.tools.find(tool=>tool.name==='list_subagents')._meta['openai/widgetAccessible'],true);
   const resource=await client.readResource({uri:'ui://pi-kether/subagent-monitor.html'});assert.equal(resource.contents[0].mimeType,'text/html;profile=mcp-app');assert.match(resource.contents[0].text,/ui\/notifications\/tool-result/);
   assert.equal(resource.contents[0]._meta['openai/widgetShowCodexWidgetInline'],true);

@@ -10,6 +10,8 @@ Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责
 
 ## 仓库结构
 
+**0.5 多宿主接入：**共 18 个宿主 ID，新增 Cursor、VS Code/Copilot、Windsurf Cascade、Cline、Roo Code、Gemini CLI、Kiro、Zed、Continue 和 LM Studio，保留已有 Codex、Cherry Studio、OpenCode、DeepSeek Harness、Claude 与通用配置。主模型在宿主中选择。见[常见客户端指南](docs/common-clients.md)与[多宿主指南](docs/host-integration.md)；配置和协议测试不等于客户端界面与完整治理链已验证。
+
 - `payload/pi-dispatch/`：网关源码、插件、编辑器桥接、测试和模块生命周期实现。
 - `payload/workflow-skills/`：Kether 角色技能及主代理路由技能。
 - `templates/AGENTS.kether.md`：精简的全局规则入口。
@@ -22,18 +24,51 @@ Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责
 
 ## Pi Kether Portable
 
-这是一个面向 Windows 11 + WSL2 的可复现安装包，把当前 Kether/Tifereth 工作流、Codex/ChatGPT 插件和 Pi 执行环境安装到另一台主机。
+这是一个面向 Windows 11 + WSL2 的安装包，把宿主无关的 Kether/Tifereth 规则和 Pi 执行环境安装到另一台主机，并为所选主代理工具生成接入配置。
 
 安装后得到：
 
-- `pi-dispatch` Codex 插件的直接 Node stdio 入口，以及供 Secure MCP Tunnel 使用的认证 HTTP 入口；
-- Kether 的角色技能、路由技能，以及按需加载 references 的全局 `AGENTS.md` 规则；
+- 通用 Node stdio MCP 入口，以及供 Secure MCP Tunnel 使用的认证 HTTP 入口；Codex 插件可选；
+- 通过 `get_workflow` 按需读取的主代理规则、角色技能和 references；选择 Codex 时另外安装全局规则与技能；
 - 普通低级 Agent 使用 `openai-codex`；Geburah/reviewer 专用 `pi-claude-code-provider` / `claude-sonnet-5`，仅允许无工具、无文件访问审查；
 - 带 CPU、内存、进程数、输出量、运行时间和写入范围限制的 WSL2/Bubblewrap 沙箱；
 - 请求账本、幂等处理、Provider 熔断、审计清洗、结果格式验证、任务队列和监控卡片；
 - Python、Java、JavaScript、TypeScript、C#、C/C++ 的 LSP 服务。
 
 ## 安装
+
+### 一键安装（Windows 11 x64）
+
+构建后的 `YHWH-OneClick-0.5.0.zip` 包含自包含脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1
+```
+
+默认导出通用 MCP 接入配置，不修改 Codex 全局设置。用 `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"` 选择宿主；包含 `codex` 时才执行原有 Codex 集成。接入文件还需按宿主提示导入，并加载主代理规则；已有配置不会被导出器覆盖。
+
+安装器在 `%LOCALAPPDATA%\YHWH` 准备固定版本的 PowerShell 7 和 Node，无需预装它们或 Git，也不要求登录 GitHub。工作流源码已嵌入脚本；运行环境和依赖仍需联网下载。Windows 端运行包和 Ubuntu 镜像使用构建时记录的 SHA256 校验，下载内容变化会停止安装，不会自动接受新校验值。
+
+它会导入专用 `YHWH` WSL2 Ubuntu 24.04 环境，安装 Windows 插件、治理规则和 WSL 沙箱/LSP，再运行安装检查。首次启用 WSL 可能出现 Windows 管理员授权，并需要重启后重新运行脚本；脚本以 `3010` 表示这一步尚待重启，不会声称安装完成。需要启用硬件虚拟化，且组织策略允许 WSL。WSL 安装方式依据 [Microsoft 官方说明](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)。
+
+完成后打开 `%LOCALAPPDATA%\YHWH\Open-Pi.cmd`，通过 `/login` 登录下级 worker 所用的 OpenAI 账号；审核代理的 Claude 账号使用同目录 `Login-Claude.cmd` 单独登录。再按输出目录中的配置接入所选宿主，加载 `PRIMARY-AGENT.md`。选择 Codex 时重启 Codex 并按需启用插件。主模型账号由宿主管理；下级模型登录有效性、真实心跳和 ChatGPT Tunnel 连通性需另外验证。安装器不安装宿主应用、不创建 Tunnel、不迁移凭据；现有受管文件按原安装器规则备份。
+
+已有 Pi 安装默认会被保护。确认任务结束并停止运行时后，显式添加 `-UpgradeExisting` 才允许覆盖并备份；正在运行的 Pi、没有本安装器所有权记录的 `YHWH` WSL 环境都会导致安装停止。不会自动停止进程、删除 WSL 环境或接管其他 Ubuntu 环境。安装不是事务式回滚；失败时保留已完成步骤和备份供诊断，修复原因后可重试。半完成的 WSL 导入或所有权记录异常需要人工检查。
+
+```powershell
+# 只读预览，不下载、不改宿主
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -PlanOnly
+# 固定目录，免交互安装（WSL 必须已经就绪；账号登录另行完成）
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+# 仅校验并解包，目标必须是尚不存在的绝对路径
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+```
+
+维护者运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/` 同时生成便携 ZIP、自包含 PS1、SHA256 和双击安装包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.5.0.ps1`。
+
+本版本已做脚本和包级验证，尚未在全新 Windows 虚拟机完成联网全量安装。Windows 与 WSL 的 Pi 使用同一依赖锁文件，但 Ubuntu 软件源、WSL 系统组件和 .NET 安装脚本仍是外部可变依赖；这不是完全离线或逐字节可复现的系统镜像。
+
+### 高级配置安装
 
 统一入口为 `Workflow.ps1`，配置只维护在 `install.config.json`。默认执行只读预检：
 
@@ -59,7 +94,7 @@ pwsh -NoProfile -File .\Workflow.ps1 -Action Build
    ```
 
 4. 如果目标账户尚未登录 Pi/OpenAI，安装后运行 Pi 的登录流程。凭据只保存在目标机的 `~/.pi/agent/auth.json`，安装包不读取或携带凭据。
-5. 重启 Codex/ChatGPT Work，使插件和全局工作流规则重新载入。
+5. 在所选宿主中导入连接配置并加载主代理规则；使用 Codex/ChatGPT Work 时按需重启或重新连接。
 
 先检查而不修改主机：
 
@@ -107,4 +142,4 @@ LSP 禁止加载项目 `.pi-lsp.json` 和自动发现 Lombok Java agent。工具
 
 依赖版本记录在 `portable.manifest.json`。Node 和 JDT LS 下载会校验上游散列；Pi 的 npm 依赖树由随包 lockfile 固定。安装时仍需要联网访问 Ubuntu、Node.js、npm、Eclipse 和 Microsoft 的官方下载源。模型登录、OpenAI Tunnel、ChatGPT 工作区管理员授权以及目标机策略无法由离线包代替。
 
-所有原有配置在变更前保存到 `~/.local/state/pi-kether/installer-backups/`。安装器只管理带 `PI-KETHER` 标记的 `AGENTS.md` 区块，并把 Codex 内置多 Agent 路由设为关闭，确保低级 Agent 走 Pi。
+受管文件的备份保存到 `~/.local/state/pi-kether/installer-backups/`。选择 Codex 时，安装器管理带 `PI-KETHER` 标记的 `AGENTS.md` 区块，并关闭 Codex 内置多 Agent 路由。其他宿主导出配置和主代理规则，由用户按接入指南合并。

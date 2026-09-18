@@ -8,6 +8,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {registerHostWorkflow,workflowInstructions} from './host-workflow.mjs';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import * as z from 'zod/v4';
 import { dispatch, validateKetherInvocation } from './dispatch.mjs';
@@ -264,7 +265,8 @@ export function createGatewayRuntime(options) {
       modelMismatchRejected: true, thinkingUnchanged: true, probeTargetExemptFromRoleBinding: true,
       acceptanceRequired: true, explicitReadScopeRequired: true,
       enforcementBoundary: 'Pi invocation validation; host-agent review stages are not attested',
-      requiredConnectorTools: ['list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','renew_claude_auth'],
+      primaryHost: {protocol:'MCP',policyTool:'get_workflow',primaryModel:'host-selected',enforcement:'Pi invocation checks; host compliance is not attested',runtimePlatform:'Windows + WSL2'},
+      requiredConnectorTools: ['get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','renew_claude_auth'],
     },
   });
 
@@ -447,7 +449,8 @@ export function createGatewayRuntime(options) {
   }
 
   function makeServer() {
-    const server = new McpServer({ name: 'pi-kether-gateway', version: '1.0.0' });
+    const server = new McpServer({ name: 'pi-kether-gateway', version: '1.0.0' }, {instructions:workflowInstructions});
+    registerHostWorkflow(server);
     server.registerResource('pi-subagent-monitor', MONITOR_RESOURCE_URI, {
       title: 'Pi subagent monitor',
       description: 'Live, privacy-preserving status card for Tifereth-managed Pi subagents.',

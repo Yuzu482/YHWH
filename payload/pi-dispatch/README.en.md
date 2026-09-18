@@ -2,7 +2,9 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
-Pi is the lower-agent execution, model-probe and LSP layer controlled by Tifereth. The default installation uses the local Streamable HTTP MCP endpoint `http://127.0.0.1:17331/mcp`. Model tasks first pass through a Kether execution envelope, then route through an exact allowlist to:
+The primary can run in any host with MCP tool calling and persistent instruction loading. `get_workflow` serves the primary contract, role skills and governance references by topic. `scripts/host-profiles.mjs` exports profiles for Cherry Studio, OpenCode v1/v2, Claude Code/Desktop, DeepSeek Harness, Codex and generic clients. `scripts/common-client-profiles.mjs` additionally exports Cursor, VS Code/Copilot, Windsurf Cascade, Cline, Roo Code, Gemini CLI, Kiro, Zed, Continue and LM Studio profiles, for 18 host IDs in total; new adapter metadata includes official sources and scope. Connection/configuration checks do not establish a complete model-backed governance run in every host. Default stdio owns one runtime per connection; concurrent hosts need `PI_GATEWAY_CONFIG` to share one HTTP gateway. The backend still requires Windows + WSL2.
+
+Pi is the lower-agent execution, model-probe and LSP layer controlled by Tifereth. The default installation uses stdio; an optional shared runtime uses the local Streamable HTTP MCP endpoint `http://127.0.0.1:17331/mcp`. Model tasks first pass through a Kether execution envelope, then route through an exact allowlist to:
 
 - `openai-codex` (workers: `gpt-5.6-luna` / `max`).
 - `pi-claude-code-provider` (Geburah/reviewer: `claude-sonnet-5` / `max`, restricted to `access:none`).

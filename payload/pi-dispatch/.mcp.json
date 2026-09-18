@@ -10,6 +10,7 @@
       },
       "enabled": true,
       "enabled_tools": [
+        "get_workflow",
         "list_capabilities",
         "dispatch_subagent",
         "submit_subagent",

@@ -10,6 +10,8 @@ Every maintained README in this repository has complete Chinese and English vers
 
 ## Repository layout
 
+**0.5 multi-host integration:** 18 host IDs now include Cursor, VS Code/Copilot, Windsurf Cascade, Cline, Roo Code, Gemini CLI, Kiro, Zed, Continue and LM Studio, alongside existing Codex, Cherry Studio, OpenCode, DeepSeek Harness, Claude and generic profiles. Select the primary model in the host. See the [common client guide](docs/common-clients.en.md) and [multi-host guide](docs/host-integration.en.md); configuration and protocol checks do not validate client UIs or the complete governance chain.
+
 - `payload/pi-dispatch/`: gateway source, plugin, editor bridges, tests and module lifecycle implementation.
 - `payload/workflow-skills/`: Kether role skills and primary-agent routing skills.
 - `templates/AGENTS.kether.md`: compact global policy entry point.
@@ -22,18 +24,51 @@ The repository excludes credentials, personal runtime configuration, request led
 
 ## Pi Kether Portable
 
-This reproducible Windows 11 + WSL2 installation package installs the current Kether/Tifereth workflow, Codex/ChatGPT plugin and Pi execution environment on another host.
+This Windows 11 + WSL2 package installs host-neutral Kether/Tifereth rules and Pi execution on another machine, and generates connection profiles for the selected primary-agent tools.
 
 It provides:
 
-- A direct Node stdio entry point for the `pi-dispatch` Codex plugin and an authenticated HTTP entry point for Secure MCP Tunnel.
-- Kether role and routing skills, plus global `AGENTS.md` rules with on-demand references.
+- A generic Node stdio MCP entry and an authenticated HTTP entry for Secure MCP Tunnel; the Codex plugin is optional.
+- Primary rules, role skills and references retrieved through `get_workflow`; selecting Codex additionally installs global rules and skills.
 - `openai-codex` for ordinary lower agents; `pi-claude-code-provider` / `claude-sonnet-5` exclusively for Geburah/reviewer, with no tools or file access.
 - A WSL2/Bubblewrap sandbox with limits on CPU, memory, process count, output, execution time and write scope.
 - Request ledgers, idempotency, provider circuits, audit redaction, result-format validation, task queues and monitor cards.
 - LSP services for Python, Java, JavaScript, TypeScript, C# and C/C++.
 
 ## Installation
+
+### One-click installation (Windows 11 x64)
+
+The generated `YHWH-OneClick-0.5.0.zip` contains a self-contained script, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1
+```
+
+The default exports generic MCP configuration without changing Codex global settings. Select hosts with `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"`; including `codex` enables the original Codex integration. Import the generated connection profile and load the primary instructions in each host. The exporter never overwrites existing host configuration.
+
+The installer prepares pinned PowerShell 7 and Node runtimes under `%LOCALAPPDATA%\YHWH`. Neither runtime nor Git needs to be preinstalled, and GitHub login is not required. Workflow source is embedded; runtimes and dependencies still require network access. Windows runtime archives and the Ubuntu image are checked against SHA256 values recorded at build time. Changed downloads stop installation instead of silently accepting new hashes.
+
+It imports a dedicated `YHWH` WSL2 Ubuntu 24.04 distribution, installs the Windows plugin, governance rules and WSL sandbox/LSP, then runs installation checks. Enabling WSL for the first time may require Windows administrator approval and a restart followed by rerunning the script. Exit code `3010` means this prerequisite step is pending restart, not successful installation. Hardware virtualization must be enabled and organizational policy must permit WSL. WSL setup follows [Microsoft's official commands](https://learn.microsoft.com/en-us/windows/wsl/basic-commands).
+
+After installation, open `%LOCALAPPDATA%\YHWH\Open-Pi.cmd` and use `/login` for the lower worker's OpenAI account. Sign in to the reviewer's Claude account with `Login-Claude.cmd`. Connect the selected host using the generated profile and load `PRIMARY-AGENT.md`. When selecting Codex, restart it and enable the plugin if needed. Primary-model accounts belong to the host; lower-model authentication, real heartbeats and ChatGPT Tunnel connectivity require separate verification. The installer does not install host apps, create a Tunnel or migrate credentials; existing managed files retain the underlying installer's backup behavior.
+
+An existing Pi installation is protected by default. Once tasks have ended and its runtime is stopped, explicitly pass `-UpgradeExisting` to allow replacement with backups. A running Pi or a `YHWH` WSL distribution without matching installer ownership stops installation. The script never automatically stops processes, removes a WSL distribution or takes over another Ubuntu distribution. Installation does not provide transactional rollback: failures retain completed steps and backups for diagnosis, and can be retried after addressing the cause. Partial WSL imports or inconsistent ownership records require manual inspection.
+
+```powershell
+# Read-only preview: no downloads or host changes
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -PlanOnly
+# Unattended installation with a fixed workspace (WSL must be ready; login is separate)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+# Verify and extract only; destination must be a new absolute directory
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+```
+
+Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` to generate the portable ZIP, self-contained PS1, SHA256 file and double-click bundle under `release/`. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.5.0.ps1`.
+
+This version has script and package validation, but a full online installation in a fresh Windows VM has not been performed. Windows and WSL Pi use the same dependency lockfile; Ubuntu repositories, WSL system components and the .NET installer remain mutable external dependencies. This is not a completely offline or byte-for-byte reproducible system image.
+
+### Advanced installation
 
 `Workflow.ps1` is the shared entry point, with configuration maintained in `install.config.json`. The default action is a read-only preflight:
 
@@ -59,7 +94,7 @@ The shared entry point does not modify Codex's bundled plugin cache. Earlier fix
    ```
 
 4. If the destination account is not signed in to Pi/OpenAI, complete Pi login after installation. Credentials remain in the destination host's `~/.pi/agent/auth.json`; the package neither reads nor carries them.
-5. Restart Codex/ChatGPT Work to reload the plugin and global workflow rules.
+5. Import the connection profile and load primary instructions in the selected host; restart or reconnect Codex/ChatGPT Work when applicable.
 
 Inspect without modifying the host:
 
@@ -107,4 +142,4 @@ LSP cannot load project `.pi-lsp.json` files or auto-discover a Lombok Java agen
 
 Dependency versions are recorded in `portable.manifest.json`. Node and JDT LS downloads are checked against upstream hashes; Pi's npm dependency tree is pinned by the included lockfile. Installation still requires network access to official Ubuntu, Node.js, npm, Eclipse and Microsoft distribution sources. An offline package cannot replace model login, OpenAI Tunnel setup, ChatGPT workspace administrator authorization or destination-host policy.
 
-Existing configuration is saved under `~/.local/state/pi-kether/installer-backups/` before changes. The installer manages only the `PI-KETHER`-marked block in `AGENTS.md` and disables Codex's built-in multi-agent route so lower-agent execution goes through Pi.
+Managed-file backups are saved under `~/.local/state/pi-kether/installer-backups/`. When Codex is selected, the installer manages the `PI-KETHER`-marked block in `AGENTS.md` and disables Codex's built-in multi-agent route. Other hosts receive exported connection profiles and primary instructions to merge using the integration guide.
