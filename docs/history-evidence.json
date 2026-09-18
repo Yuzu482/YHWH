@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "compiledOn": "2026-09-18",
+  "timezone": "Asia/Shanghai",
+  "baselineCommit": "698657550a984369adf7718a2a4ecdab4601a013",
+  "method": "Retrospective, primary-agent local source review. SHA-256 values identify original local file bytes at inspection time; summaries are selected, sanitized facts, not raw logs or independent attestations. H11 also has a repository copy. No new runtime tests were performed for this documentation change.",
+  "records": [
+    {
+      "id": "H01",
+      "sourceLabel": "source-manifest.json",
+      "sha256": "9b60a5afa7c2b1f2e61239114ba23decd2082c858b368f90a07915551fb9baf7",
+      "sourceType": "dated-source-manifest",
+      "eventDateOrWindow": "2026-09-04",
+      "summary": "记录用户 Kether 预设、Cordis 配置和协调技能的来源散列；不证明首次开发日期或上游默认配置。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H02",
+      "sourceLabel": "Pi direct migration RESULT.md",
+      "sha256": "1ef0329e5cac9574f413eab4a6466332e16297ea7a3c56e68e2bdadb06dae2f6",
+      "sourceType": "dated-migration-report",
+      "eventDateOrWindow": "2026-09-04",
+      "summary": "报告记录 Pi 直连、禁用 Codex CLI 路径、Luna 无工具成功及 11 个角色技能检查；ChatGPT 账号级指令生效未验证。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H03",
+      "sourceLabel": ".pi-direct-lsp-verification.json",
+      "sha256": "8258c764c05fc1f0301065b90b4a0e57e92566f84abd25ecdcaf69cde61573e4",
+      "sourceType": "verification-summary",
+      "eventDateOrWindow": "2026-09-04/2026-09-15",
+      "summary": "92/92；Python diagnostics 和 hover 使用 LSP、结构搜索使用 Tree-sitter，模型调用为零且清理成功；无有效独立审查。文件未内嵌日期，区间来自归档上下文及文件时间。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H04",
+      "sourceLabel": ".pi-contract-verification.json",
+      "sha256": "49a3f79fd9445b7f73990bcbd61d9554ffd523c81a12b21a080a586abc2ac162",
+      "sourceType": "dated-verification-summary",
+      "eventDateOrWindow": "2026-09-16",
+      "summary": "角色契约 v2，114/114；真实 scout 因 refresh_token_reused 失败，未建立成功的多阶段前驱链；清理成功。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H05",
+      "sourceLabel": ".pi-auth-renewal-verification.json",
+      "sha256": "a35fce76df94bb45ea118586129978894a5ec03209513a928c50655f1a388409",
+      "sourceType": "verification-summary",
+      "eventDateOrWindow": "2026-09-16/2026-09-17",
+      "summary": "102 项通过；Sonnet 恢复心跳通过、认证锁释放；独立审查执行超时。文件未内嵌日期，区间来自历史归档。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H06",
+      "sourceLabel": ".pi-openai-persist-live.json",
+      "sha256": "6723595bb7edb40523f168a7fcaab0fcad69a575cb8954f1aab9b218d460b4cd",
+      "sourceType": "timestamped-verification-summary",
+      "eventDateOrWindow": "2026-09-16",
+      "summary": "checkedAt 为 2026-09-15T19:26:28.419Z，按 Asia/Shanghai 为 9 月 16 日；126 项通过，另有 31 项网关复查；权限及其他 Provider 状态保持；心跳被内存准入阻断且没有模型调用；前后独立审查均超时。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H07",
+      "sourceLabel": ".pi-priority2-verification.json",
+      "sha256": "0377e046a14ea96ae2c1db6e0e3708bb6a21bcc90f6dad0735b79e807e3e39e6",
+      "sourceType": "dated-verification-summary",
+      "eventDateOrWindow": "2026-09-16",
+      "summary": "阶段计时、脱敏完整结果及分页摘要；108/108；分页取回与摘要校验成功，但取回的两次独立审查结果均为超时，不能算审查通过；当时会话工具快照有缺口。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H08",
+      "sourceLabel": "EDITOR-AUTHORIZATION-VERIFICATION.md",
+      "sha256": "115d5c3717411fbf6fc80d93078d16d4bcd8c9b4f1899e945a6ef97cc510feb3",
+      "sourceType": "dated-verification-report",
+      "eventDateOrWindow": "2026-09-18",
+      "summary": "精确编辑器授权、场景条件、IPC、幂等与持久化写入约束；隔离 Blender 11 项检查；真实 WSL 只读查询两编辑器且结果验证和清理通过；Unity 变更模板仅编译；真实 WSL 场景写入未验证，独立预审超时。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H09",
+      "sourceLabel": "lifecycle implementation VERIFICATION.md",
+      "sha256": "aea4a10b29db1e3a739dd55975c60958be609de995f61bb43ed93c93d2df0bb0",
+      "sourceType": "dated-verification-report",
+      "eventDateOrWindow": "2026-09-18",
+      "summary": "生命周期新增 20 项测试，相关套件串行 80/80；此前并行运行 79/80，HTTP fetch 失败根因未定；scout 超时，外部材料审查被拦截；仅主代理本地验收；报告当时尚未部署，后续部署见 H10。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H10",
+      "sourceLabel": "restart-heartbeats.json",
+      "sha256": "cd73341c06c09ea14a509b8aa7cfaa35d3e11b8e3500af1c3b33d728ecb9f047",
+      "sourceType": "dated-live-verification-summary",
+      "eventDateOrWindow": "2026-09-18",
+      "summary": "部署重启后 healthz/readyz 为 200、Tunnel ready、8 模块 ready/running；Luna/max 9837 ms、Sonnet/max 11212 ms 心跳通过，无工具且清理成功；最终无在途/排队任务。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H11",
+      "sourceLabel": "publication VERIFICATION.md",
+      "sha256": "99f23d23788b95e5979f500541950af854ce22e5b191a25c8086a0f580cd8126",
+      "sourceType": "dated-publication-report",
+      "eventDateOrWindow": "2026-09-18",
+      "summary": "发布副本 181/181、配置预检、引用复制与备份保留验证通过；主代理本地核对；未验证新机器完整安装、完整写入治理链或外部图片插件。",
+      "rawRecordIncluded": false,
+      "repositoryCopy": "../VERIFICATION.md"
+    },
+    {
+      "id": "H12",
+      "sourceLabel": "yhwh-publish-tests.log",
+      "sha256": "32ca38c3eb2a4db61ff4e1ca15a73101e9d0220e68de58f8dbeb2e8770591cfa",
+      "sourceType": "test-output",
+      "eventDateOrWindow": "2026-09-18",
+      "summary": "完整发布副本 Node 测试输出：181 passed、0 failed、0 skipped；耗时 29167.8004 ms。日期由本次发布执行记录关联，不由 TAP 输出单独证明。",
+      "rawRecordIncluded": false
+    },
+    {
+      "id": "H13",
+      "sourceLabel": "Historical gateway recovery and desktop monitor recap",
+      "sha256": "c1a6048280303bd2d9bee40d3e7333b97b38c8dca8352ea3a7e2609b73d583e2",
+      "sourceType": "retrospective-summary",
+      "eventDateOrWindow": "2026-09-16/2026-09-17",
+      "summary": "历史摘要记载 7331 保留端口故障、17331 修复、存活检查与 9 月 17 日单任务 Luna 验收，以及 WPF 过渡修复和当时 UI 检查；本次只重读摘要，没有重演旧故障或 UI 测试。",
+      "rawRecordIncluded": false
+    }
+  ]
+}

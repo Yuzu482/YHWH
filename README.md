@@ -2,6 +2,8 @@
 
 Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责意图、授权、任务拆分、整合和验收；Pi 提供受控的模型调用、确定性 LSP、资源限制、结果验证和运行监控。
 
+开发背景、架构演进、关键决策及历史验证边界见 [架构开发历史](docs/architecture-history.md)；对应的脱敏记录见 [历史证据索引](docs/history-evidence.json)。
+
 ## 仓库结构
 
 - `payload/pi-dispatch/`：网关源码、插件、编辑器桥接、测试和模块生命周期实现。
