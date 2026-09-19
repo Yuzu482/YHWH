@@ -33,6 +33,8 @@ if (-not $SkipTests) {
     # Match the documented release baseline; HTTP tests share process resources.
     node --test --test-concurrency=1 tests/*.test.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Plugin tests failed.' }
+    node --expose-gc tests/memory-regression.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Plugin memory regression failed.' }
   } finally { Pop-Location }
 }
 

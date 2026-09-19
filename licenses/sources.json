@@ -36,6 +36,48 @@
       "component": "MIT standard reference; not upstream copyright attribution",
       "source": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MIT.txt",
       "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+    },
+    {
+      "file": "licenses/multilspy-0.0.15-MIT.txt",
+      "component": "multilspy 0.0.15",
+      "source": "https://files.pythonhosted.org/packages/97/4d/b9d3492d6a7a2536498fc7fd49c1cc7bc86a41acf93b0ad967d75dbe5cd6/multilspy-0.0.15-py3-none-any.whl",
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+    },
+    {
+      "file": "licenses/multilspy-OLSP-MIT.txt",
+      "component": "multilspy embedded OLSP notice",
+      "source": "https://files.pythonhosted.org/packages/97/4d/b9d3492d6a7a2536498fc7fd49c1cc7bc86a41acf93b0ad967d75dbe5cd6/multilspy-0.0.15-py3-none-any.whl",
+      "sha256": "cd0e7190809fe6dabbb097237b8c2e673f71f3baefb09df5fa427fa6bf520041"
+    },
+    {
+      "file": "licenses/multilspy-dependency-notices.txt",
+      "component": "Pinned Python wheel notices",
+      "source": "licenses/multilspy-dependencies.json",
+      "sha256": "4c58a52dd50325ffd63ff2ba6c0695122ee3443e99dd1692588872c482958c6e"
+    },
+    {
+      "file": "licenses/go-1.27.1-LICENSE.txt",
+      "component": "go-1.27.1-LICENSE.txt",
+      "source": "https://go.dev/dl/go1.27.1.linux-amd64.tar.gz",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    {
+      "file": "licenses/gopls-0.23.0-LICENSE.txt",
+      "component": "gopls-0.23.0-LICENSE.txt",
+      "source": "https://proxy.golang.org/golang.org/x/tools/gopls/@v/v0.23.0.zip",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    {
+      "file": "licenses/rust-analyzer-1.98.1-LICENSE-MIT.txt",
+      "component": "rust-analyzer-1.98.1-LICENSE-MIT.txt",
+      "source": "https://static.rust-lang.org/dist/2026-09-03/rust-analyzer-1.98.1-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+      "file": "licenses/rust-analyzer-1.98.1-LICENSE-APACHE.txt",
+      "component": "rust-analyzer-1.98.1-LICENSE-APACHE.txt",
+      "source": "https://static.rust-lang.org/dist/2026-09-03/rust-analyzer-1.98.1-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
     }
   ]
 }

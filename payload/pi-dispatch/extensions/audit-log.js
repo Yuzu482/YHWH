@@ -34,7 +34,9 @@ export function redactSensitiveText(value, { compact = true } = {}) {
     .replace(/\b(sk|sess|pat|ghp|glpat)-[A-Za-z0-9._-]{8,}\b/g, '[REDACTED_TOKEN]')
     .replace(/\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b/g, '[REDACTED_JWT]')
     .replace(/\b(api[_-]?key|authorization|access[_-]?token|refresh[_-]?token|password|passwd|secret|credential)\b\s*[:=]\s*([^\s,;]+)/gi, '$1=[REDACTED]')
-    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[REDACTED]@');
+    // Start once per scheme-character run, not once per letter in long output.
+    // Preserve numeric/punctuation prefixes that the old search skipped over.
+    .replace(/(?<![a-z0-9+.-])([0-9+.-]*[a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[REDACTED]@');
   return compact ? redacted.replace(/[\r\n\t]+/g, ' ').slice(0, MAX_FAILURE_LENGTH) : redacted;
 }
 

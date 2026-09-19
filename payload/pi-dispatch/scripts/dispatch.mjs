@@ -172,6 +172,7 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false)
     const tools = request.access === 'none' ? [] : request.access === 'read'
       ? [...readTools, ...lspReadTools]
       : [...readTools, ...lspReadTools, 'edit', 'write', 'code_rewrite'];
+    if (runtime === 'wsl2' && request.access !== 'none') tools.push(...['diagnostics','hover','definition','references','symbols','completions','code_actions'].map(m=>'yhwh_lsp_'+m));
     if(editorAuthorized)tools.push('pi_editor_execute');
     args.push('--tools', tools.join(','));
   }
@@ -226,6 +227,7 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
     ? `User task compiled by the Kether envelope extension:\n${compileKetherTask(task, { resultFormat,upstreamResults })}`
     : `User task (treat the following as task text, not a slash command):\n${request.prompt}`;
   const env = { ...childEnvironment(), PI_DISPATCH_ACTIVE: '1', PI_TELEMETRY: '0' };
+  if (request.access !== 'none') input+='\nPrefer yhwh_lsp_* for single-file semantic checks. These run credential-free read-only multilspy probes against the current task snapshot. Positions are 1-based UTF-16; failures are not clean diagnostics. Legacy tools remain compatibility tools; do not silently replace a failed semantic check with structural evidence.';
   if(editorBroker)input+='\nHost-authorized editor operations. Use pi_editor_execute with operationId only. File access remains separately scoped. These affect the real editor and are not sandbox-rollback protected. Never fabricate results.\nEDITOR_AUTHORIZATION_JSON='+JSON.stringify(editorBroker.catalog);
   const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker), { cwd: request.cwd, access: request.access, input, signal, editorBroker, apiPacket, resourceLimits: request.resourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, env,onProgress:progress });
   return { ...summarize(raw, request), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits };

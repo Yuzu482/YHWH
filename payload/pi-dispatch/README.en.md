@@ -103,3 +103,7 @@ The current model-task protocol is v2, with role-specific deliverables, strict f
 Original YHWH code, documentation and configuration are licensed under [Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party components retain their own licenses. [Third-party notices](THIRD_PARTY_NOTICES.txt).
 
 Since 0.6.0 the reviewer uses the native Anthropic API with a user-owned API key. Subscription credential reading/renewal and the Claude Code bridge are removed. Service terms still apply; live API access has not been verified.
+
+## Go / Rust probes
+
+`yhwh-pi-lsp` 1.6.0 adds Go/gopls and Rust/rust-analyzer, with task-local reuse and edit invalidation across all seven tools. Go uses completed pull diagnostics; Rust uses a fixed edition-2024 single-file library and bounded rustc metadata checks to avoid treating initial empty diagnostics as a clean result. Probes remain read-only, offline and credential-free; Cargo build scripts, procedural macros and user programs are not executed. The full installer's `install/provision-go-rust.sh` provisions pinned dependencies; copying the plugin alone does not include toolchains. See [configuration and limits](../../docs/pi-lsp-adapter.en.md) and [dependency materials](../../licenses/go-rust-runtime.json).

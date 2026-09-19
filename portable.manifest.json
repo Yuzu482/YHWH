@@ -1,6 +1,6 @@
 {
   "name": "pi-kether-portable",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "platform": "Windows 11 + WSL2 Ubuntu 24.04",
   "components": {
     "piDispatch": "0.1.0+codex.20260904104257",
@@ -12,7 +12,14 @@
     "pyright": "1.1.413",
     "jdtls": "1.60.0-202606262232",
     "dotnetSdk": "10.0.400",
-    "csharpLs": "0.26.0"
+    "csharpLs": "0.26.0",
+    "go": "1.27.1",
+    "gopls": "0.23.0",
+    "rust": "1.98.1",
+    "rustAnalyzer": "1.98.1",
+    "multilspy": "0.0.15",
+    "python": "3.12",
+    "typescriptLsp": "6.0.3"
   },
   "containsCredentials": false,
   "license": "Apache-2.0"

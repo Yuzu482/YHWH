@@ -7,11 +7,12 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {startStdioProxy,readProxyConfig} from '../scripts/stdio-proxy.mjs';
 import {createGatewayApp} from '../scripts/gateway.mjs';
+import {listenHttpFixture} from './http-fixture.mjs';
 
 test('native bridge preserves UI metadata/resources and shares the HTTP monitor instance',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'pi-proxy-test-')),token='fixture-private-token-0123456789abcdef';
  const {app,runtime}=createGatewayApp({host:'127.0.0.1',port:0,roots:[resolve('.')],token,sandboxStatus:{ok:true,backend:'fixture',resourceLimits:true}});
- const http=await new Promise(resolveServer=>{const server=app.listen(0,'127.0.0.1',()=>resolveServer(server));});
+ const http=await listenHttpFixture(app);
  let bridge;const client=new Client({name:'fixture-ui-host',version:'1.0.0'});
  try{
   writeFileSync(join(dir,'token.txt'),token);const configPath=join(dir,'config.json');writeFileSync(configPath,JSON.stringify({host:'127.0.0.1',port:http.address().port,tokenFile:'token.txt'}));

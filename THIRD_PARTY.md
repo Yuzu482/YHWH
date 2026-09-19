@@ -8,6 +8,7 @@ YHWH 自有代码、文档和配置采用 [Apache-2.0](LICENSE)。第三方代�
 | --- | --- | --- |
 | Pi Coding Agent / Pi 同仓库组件 | 0.84.4 | MIT；[上游完整文本](licenses/pi-0.84.4-MIT.txt)，Copyright 2025 Mario Zechner |
 | pi-claude-code-provider（历史组件，0.6 已移除） | 0.1.4 | MIT；[上游完整文本](licenses/pi-claude-code-provider-0.1.4-MIT.txt)，Copyright 2026 chem |
+| multilspy（0.9 开发版直接语义探针） | 0.0.15 | [Microsoft MIT](licenses/multilspy-0.0.15-MIT.txt)、[OLSP MIT](licenses/multilspy-OLSP-MIT.txt)；[Python 依赖与散列](licenses/multilspy-dependencies.json) |
 | pi-lsp-extension | 1.3.0 | 包声明 MIT；[原始元数据](licenses/pi-lsp-extension-1.3.0.package.json)；[缺失完整文本的记录](licenses/pi-lsp-extension-NOTICE.txt) |
 | Claude Code（历史组件，0.6 不再下载） | 2.1.250 | [原始版权声明](licenses/claude-code-2.1.250-NOTICE.txt)；受 Anthropic 协议约束，不是 MIT/Apache-2.0 |
 
@@ -34,3 +35,7 @@ Claude Code 接入评估见 [可行性报告](docs/claude-code-feasibility.md)�
 补充核查覆盖固定版本、当前主分支及下载到的历史引用。范围、上游需提供的材料及确认后的接入步骤见 [LSP 许可证补齐记录](docs/lsp-license-remediation.md)。请求已提交为 [上游 Issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14)；本地材料完善不代表已取得上游完整通知。
 
 LSP 的功能、安装依赖和发布边界集中见 [LSP 组件说明](docs/lsp-component.md)。
+
+### Go / Rust 工具链
+
+新增工具链在安装时下载，不包含在本仓库便携包内。Go/gopls 原始 BSD 类许可证及 rust-analyzer 的 MIT/Apache-2.0 原文保存在 `licenses/`，哈希记入 `licenses/sources.json`。Rust 编译器、标准库及其依赖的完整上游版权材料留在已校验的安装归档和运行时 `share/doc/rust/COPYRIGHT*.html` 中；gopls 构建保留所有下载模块的 LICENSE/NOTICE/COPYING 与模块构建清单。固定版本、归档哈希和材料路径见 [清单](licenses/go-rust-runtime.json)。YHWH 的 Apache-2.0 不替换上述许可证；本次不改变已有公开发布门禁，也不声称完成所有系统依赖的许可审计。

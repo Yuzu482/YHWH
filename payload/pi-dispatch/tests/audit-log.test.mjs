@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import {
   buildAuditRecord, createAuditLogger, redactSensitiveText,
   summarizePatch, summarizeTaskEnvelope, summarizeUsage,
@@ -28,6 +29,38 @@ test('audit failure redaction removes common credential forms', () => {
   assert.match(redacted, /REDACTED/);
   const record = buildAuditRecord({ requestId: 'sk-request-secret-12345678', operation: 'probe_model', input: {}, durationMs: 0, failure: 'failed' });
   assert.equal(record.requestId, '[REDACTED_TOKEN]');
+});
+
+test('URL credential redaction preserves prefixes, schemes and noncredential text', () => {
+  const prefixes = ['', '123', '+.-', '0+.-9', '_', '中文', '"', '(', '\n'];
+  const schemes = ['https', 'HTTP', 'git+ssh', 'a.b-c', 'x'];
+  for (const prefix of prefixes) for (const scheme of schemes) {
+    const head = `${prefix}${scheme}://`;
+    assert.equal(redactSensitiveText(`${head}alice:p%40ss@example.test/path`, {compact:false}), `${head}[REDACTED]@example.test/path`);
+    for (const tail of ['example.test/path', 'alice@example.test', 'alice:p%40ss/no-at', '']) {
+      assert.equal(redactSensitiveText(head + tail, {compact:false}), head + tail);
+    }
+  }
+  assert.equal(redactSensitiveText('https://a:b@one.test ssh://c:d@two.test', {compact:false}), 'https://[REDACTED]@one.test ssh://[REDACTED]@two.test');
+});
+
+test('large result redaction finishes within a bounded child process without dropping content', () => {
+  // A process deadline also catches synchronous regexp stalls that a test timeout cannot interrupt.
+  const moduleUrl = new URL('../extensions/audit-log.js', import.meta.url).href;
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import {redactSensitiveText} from ${JSON.stringify(moduleUrl)};
+    const started = performance.now();
+    for (const value of ['x'.repeat(262144), 'x.'.repeat(131072), '9+'.repeat(131072)]) {
+      assert.equal(redactSensitiveText(value, {compact:false}), value);
+      assert.equal(redactSensitiveText(value), value.slice(0, 1000));
+      assert.equal(redactSensitiveText(value + ' https://alice:secret-value@example.test', {compact:false}), value + ' https://[REDACTED]@example.test');
+    }
+    console.log(JSON.stringify({ok:true, milliseconds:performance.now()-started}));
+  `], {encoding:'utf8', timeout:5000, windowsHide:true});
+  assert.equal(child.error, undefined, child.error?.message);
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(JSON.parse(child.stdout).ok, true);
 });
 
 test('audit usage normalizes token counters and logger persists JSONL', () => {

@@ -2,46 +2,61 @@
 
 [简体中文](lsp-component.md)
 
-## Release status
+## Development status
 
-YHWH v0.8.1 is a prerelease in a private repository. This update separately documents LSP functionality, provenance and the outstanding licensing question; it does not replace the LSP implementation or change runtime behavior. These notes do not replace an upstream license or establish clearance for public distribution.
+The 0.9.0 development source integrates Microsoft `multilspy@0.0.15`; it has not been released; its probe layer has been deployed to the maintainer's running service and checked through the live gateway. Published v0.8.1 assets remain unchanged. In addition to the primary agent's deterministic `lsp_request` semantic queries, a first-party Pi adapter now exposes probes to governed workers, retaining model routes, permissions and the single-file probe scope.
 
-## Functionality
+## Operations and actual backends
 
-YHWH exposes code queries through its governed interface. The deterministic `lsp_request` path invokes tools directly without model inference or API keys. Results distinguish a real language server from a Tree-sitter backend.
+| Methods | Backend | Behavior |
+| --- | --- | --- |
+| diagnostics, hover, definition, references, symbols, completions, code_actions | multilspy 0.0.15 official language adapters or controlled protocol profiles + provisioned servers | Model-free, read-only queries; code actions return suggestions only and server-initiated writes are refused |
+| overview, search | pi-lsp-extension 1.3.0 / Tree-sitter | Preserves structural analysis; this is neither multilspy nor a fallback for failed semantic requests |
+| `yhwh_lsp_*` inside Pi model tasks | First-party YHWH Pi adapter + multilspy | Seven read-only semantic tools using isolated snapshots of current task files; [integration notes](pi-lsp-adapter.en.md) |
+| Legacy tool names inside Pi model tasks | Existing pi-lsp-extension | Retained for compatibility; this does not remove the old dependency or resolve its license gap |
 
-| Category | Current methods |
-| --- | --- |
-| Diagnostics and navigation | diagnostics, hover, definition, references, symbols |
-| Coding assistance queries | completions, code_actions; query results only, without executing code actions |
-| Structural information | overview, search; provided by the Tree-sitter-related implementation |
+`list_capabilities.lsp` exposes semantic and structural engines. Results include `engine`, version, `adapter`, `adapterVersion`, `backend` and `modelCalls:0`. Missing dependencies, unsupported methods or initialization failures return unavailable/failed without reverting to the legacy semantic backend.
 
-Installation configuration covers language services for Python, Java, JavaScript, TypeScript, C# and C/C++. A configured service does not establish validation in every project or on every target machine. Results depend on language-server installation, project dependencies, scope and initialization state.
+## Language services and installation
 
-## Provenance and installation
+- Python symbol queries use the official JediServer with locked jedi-language-server 0.41.3; Python diagnostics/code_actions use the controlled Pyright profile. JavaScript/TypeScript (including JSX/TSX) uses the official TypeScriptLanguageServer; Java, C/C++ and C# retain controlled JDT LS, clangd and csharp-ls profiles.
+- The TypeScript 7.0.2 compiler is retained. The new probe pins TypeScript 6.0.3 under a separate `typescript-lsp` alias and explicitly selects its tsserver, with automatic type acquisition and configured plugins disabled. The TypeScript 7 package lacks the tsserver.js required by the older server. This configuration does not claim support for new TypeScript 7 semantics.
+- WSL provisioning creates `/opt/pi-kether/multilspy-venv`, using fixed wheel versions and SHA-256 for Ubuntu 24.04 x86_64 / Python 3.12. The 18 Python dependencies are recorded in the [lockfile](../payload/multilspy-requirements.txt) and [provenance inventory](../licenses/multilspy-dependencies.json).
+- Python uses the official factory to create JediServer; TypeScript subclasses the official adapter, overriding dependency setup to use fixed, preinstalled commands. Neither downloads servers at runtime. Installation still needs PyPI/npm and other distribution sources; deterministic execution retains network and credential isolation.
+- `-SkipWsl` does not install this Python runtime and is not a complete LSP exclusion switch. Upgrades require matching gateway files, WSL scripts and dependencies; copying the gateway alone is insufficient.
 
-- YHWH-owned gateway, scope checks, sandbox invocation and result adapters use Apache-2.0. Third-party code and excerpts retain their own licenses.
-- The underlying dependency is pinned to `pi-lsp-extension@1.3.0`, source commit `5edc932d325b630483f84f7d7f038e88ceba1eba`. Current adapters directly invoke its manager, tool factories and Tree-sitter modules; this is not an independently rewritten implementation.
-- Release assets contain YHWH scripts, lockfiles and provenance materials, without bundling this dependency's complete npm directory or language-server binaries. Installation downloads dependencies upstream and applies patches.
-- Existing installation paths still include LSP. Separate documentation does not make it a fully optional installation module. `-SkipWsl` skips WSL configuration; it is not a complete LSP exclusion switch.
-- Language servers, parsers and transitive dependencies have their own licenses. The lockfile inventory is not a complete license-text audit of all system components.
+## Input, results and cleanup
 
-## Modifications and execution boundaries
+Input positions use **1-based UTF-16** lines/columns; raw LSP results retain **0-based UTF-16**, explicitly labeled in the result. An exact query resolves only when it occurs once in the file. Ambiguous matches require an explicit position rather than guessing a declaration or reference. The symbols query matches symbol names exactly.
 
-Installation patches disable executable configuration from project `.pi-lsp.json` files and automatic Lombok Java agent discovery. The full Windows patch also hides child-process windows and adds C/C++/C# server configuration. The installed dependency includes a `YHWH-PATCH-NOTICE.txt` modification notice.
+The primary agent still supplies a single-file snapshot, so cross-file references and full project dependencies may be unavailable. Files are limited to 4 MiB, with bounded protocol input/output. Missing diagnostics, stale versions, timeouts and unsupported features cannot masquerade as passing checks. Receiving error diagnostics means the tool obtained evidence, not that the code is correct; empty diagnostics describe the observed notification and do not establish a defect-free project.
 
-The deterministic path uses a read-only sandbox with bounded file scope and checks task cleanup. Diagnostics require an actual language-server diagnostic notification; absence of a notification is not treated as an error-free result. Model-free execution does not remove trust in language servers or dependencies, or establish that every language feature has been validated.
+JavaScript/TypeScript diagnostics and code actions cannot use the first notification as an analysis-completion signal: the server may publish empty syntax results before type errors. Through the upstream-supported `typescript.tsserverRequest`, the adapter awaits three fixed read-only responses: `syntacticDiagnosticsSync`, `semanticDiagnosticsSync`, and `suggestionDiagnosticsSync`. It validates responses and normalizes LSP positions. Only after all three finish and a valid diagnostic notification for the current file arrives does it report `diagnosticCompletion.complete:true`, together with `method:tsserver-sync`, the three commands, and the document version. `diagnosticsPublished` still only records an observed notification. Missing capabilities, partial failures, malformed responses and timeouts cannot report a complete check. This adds no new completeness guarantees for other languages.
 
-## Outstanding license notice
+The adapter refuses `workspace/applyEdit`. It uses `workspace/executeCommand` only for these fixed TypeScript read-only diagnostics, never arbitrary commands from users or returned code actions; suggested actions are never executed. Servers run in separate process groups, allowing cleanup with an empty `/proc`; outer cgroup and sandbox cleanup checks remain. The existing `.pi-lsp.json` and Lombok-discovery patches still apply to the retained legacy extension.
 
-Upstream package.json and README declare MIT. As of 2026-09-19, checks of the pinned npm package and repository did not locate the complete copyright and permission notice. YHWH does not guess holders or years, treat the standard MIT template as an upstream notice, or relabel upstream code as Apache-2.0.
+The gateway pins WSL task, cleanup and health-check launches to `--cd /`; explicit scope arguments still select the workspace. This prevents automatic translation of the host working directory into another job's temporary Windows-drive mount, which can block concurrent unmounts. Cleanup failures remain failures; lazy unmount is not used to claim successful cleanup.
 
-[Upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14) requests the complete notice and confirmation of coverage for 1.3.0. See the [audit and remediation record](lsp-license-remediation.en.md), [original evidence](../licenses/pi-lsp-extension-evidence.json) and [third-party inventory](../THIRD_PARTY.en.md).
+## Licensing boundaries
 
-`Build-Release.ps1 -PublicRelease` continues to block. A private prerelease, installation-time downloads and these notes do not replace licensing obligations. Upstream confirmation or an independent replacement requires renewed review, verification and a new release.
+YHWH-owned adapters use Apache-2.0. The [Microsoft MIT text](../licenses/multilspy-0.0.15-MIT.txt) and the protocol client's embedded [OLSP MIT notice](../licenses/multilspy-OLSP-MIT.txt) are preserved. [Python dependency notices](../licenses/multilspy-dependency-notices.txt) come from hash-verified official wheels.
 
-## Verification scope
+The pi-lsp-extension structural backend and model tools remain, so its missing complete upstream notice is still outstanding. [Upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14) and the [remediation record](lsp-license-remediation.en.md) remain applicable; `Build-Release.ps1 -PublicRelease` continues to block. Language servers and dependencies retain their own licenses. This inventory does not certify product-wide compliance.
 
-v0.8.1 updates documentation, license provenance records and version metadata only. Prepublication checks cover documentation links, licensing-material consistency, the public-release hold, installer generation and inclusion of these notes. The v0.8.0 result of 202/202 gateway tests is the earlier runtime baseline, not a suite rerun for this update.
+## Reproducing verification
 
-This update does not rerun language-server feature tests, clean-machine installation, paid model heartbeats or live-service upgrades. Publication does not automatically update the local service or migrate keys.
+Run `python install/Test-Multilspy.py --wheel-dir <locked-wheel-directory> --typescript-archive <typescript-6.0.3.tgz>` on Windows with the existing Ubuntu-24.04 Pi sandbox and language servers. Use `--distro` for another matching distribution. Download the exact files recorded in the Python inventory and npm lock beforehand; the runner checks their hashes and does not download or update the service. `--skip-live` runs only the protocol fixture tests and does not require the TypeScript archive.
+
+The runner uses temporary WSL files, runs 26 protocol/lifecycle tests (including early-empty notifications followed by errors, three-phase completion, and failure/timeout rejection), then real Python and TypeScript queries, three rounds of small/1,000-function/clean TypeScript checks, and six Bubblewrap checks (four semantic and two structural). It exercises a read-only workspace, no network and empty `/proc`, and checks that source fixtures are unchanged. This verifies the adapter/bootstrap chain, not a clean-machine install, deployed gateway request, or cgroup exhaustion. Java, C/C++ and C# profiles are configured but have not been exercised by these checks. See [verification history](../VERIFICATION.md).
+
+## Official adapter integration boundary
+
+This stage uses official classes from the pinned 0.0.15 release. Official JediServer handles Python hover, definition, references, symbols and completions; official TypeScriptLanguageServer handles all seven JS/TS semantic operations. Their startup, handshake and normal shutdown actually execute upstream code. YHWH retains request orchestration, UTF-16 validation, diagnostic evidence checks, read-only capability declarations, process-group cleanup and timeout recovery. This is a governed wrapper, not the unmodified upstream defaults or a Microsoft-provided/endorsed YHWH plugin.
+
+The result's `adapter` is `official-jedi`, `official-typescript` or `controlled-protocol`. Official startup failure never switches engines automatically. Python type diagnostics explicitly select Pyright in advance rather than treating Jedi analysis as equivalent to type checking. The upstream default editor identity is replaced with YHWH and unsupported write capabilities are not advertised.
+
+The 0.0.15 wheel does not contain the clangd adapter found on the newer main branch. Java/C#/C/C++ retain existing controlled profiles in this change. No Serena or third-party MCP adapter was installed; the running service subsequently received a probe-only upgrade. Queries still have the single-file snapshot scope.
+
+## Current Go / Rust routes
+
+Adapter 1.6.0 adds completed Go/gopls pull diagnostics and Rust/rust-analyzer + rustc single-file metadata diagnostics, both on the `controlled-protocol` route. See the [adapter guide](pi-lsp-adapter.en.md) for language settings, isolation exceptions, completion requirements and Cargo/module scope limits. The 26-test count above describes the earlier stage; the current full runner is `install/Test-PiLspAdapter.py`, including 42 protocol tests and real SDK checks across languages. See the [verification record](../VERIFICATION.md) for current local deployment evidence; this is not a clean-machine install or complete project build.

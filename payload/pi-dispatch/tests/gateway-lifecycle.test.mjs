@@ -5,6 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createGatewayApp, createGatewayRuntime, gracefulShutdownHttp } from '../scripts/gateway.mjs';
 import { roleValue } from './contract-fixtures.mjs';
+import { listenHttpFixture } from './http-fixture.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const token = 'lifecycle-fixture-01234567890123456789';
@@ -17,11 +18,13 @@ const baseOptions = () => ({ host:'127.0.0.1', port:0, roots:[root], token, sand
 
 async function withGateway(run, overrides = {}) {
   const { app, runtime } = createGatewayApp({ ...baseOptions(), dispatchFn:async (r, _s, t) => reply(r, t, 'old'), ...overrides });
-  const server = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
+  const server = await listenHttpFixture(app);
   const url = `http://127.0.0.1:${server.address().port}`;
   const client = new Client({ name:'lifecycle-test', version:'1' });
-  await client.connect(new StreamableHTTPClientTransport(new URL(url + '/mcp'), { requestInit:{ headers:{ Authorization:`Bearer ${token}` } } }));
-  try { await run({ runtime, client, url }); }
+  try {
+    await client.connect(new StreamableHTTPClientTransport(new URL(url + '/mcp'), { requestInit:{ headers:{ Authorization:`Bearer ${token}` } } }));
+    await run({ runtime, client, url });
+  }
   finally {
     await client.close();
     await runtime.shutdown({ graceMs:50, abortWaitMs:50 }).catch(() => {});

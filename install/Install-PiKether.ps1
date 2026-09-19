@@ -168,6 +168,7 @@ $hostPackage = [ordered]@{ private = $true; dependencies = [ordered]@{
   pyright = $manifest.components.pyright
   'typescript-language-server' = $manifest.components.typescriptLanguageServer
   typescript = $manifest.components.typescript
+  'typescript-lsp' = "npm:typescript@$($manifest.components.typescriptLsp)"
   'vscode-languageserver-protocol' = '3.17.5'
 }}
 $hostPackage | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $hostPiRoot 'package.json') -Encoding utf8NoBOM
@@ -233,8 +234,16 @@ if ($installWsl) {
     (Join-Path $pluginTarget 'scripts\lsp-result.mjs')='/tmp/pi-kether-install/lsp-result.mjs'
     (Join-Path $pluginTarget 'scripts\prepare-credentials.mjs')='/tmp/pi-kether-install/prepare-credentials.mjs'
     (Join-Path $pluginTarget 'scripts\direct-lsp-bootstrap.mjs')='/tmp/pi-kether-install/direct-lsp-bootstrap.mjs'
+    (Join-Path $pluginTarget 'scripts\legacy-structural-bootstrap.mjs')='/tmp/pi-kether-install/legacy-structural-bootstrap.mjs'
+    (Join-Path $pluginTarget 'scripts\multilspy-probe.py')='/tmp/pi-kether-install/multilspy-probe.py'
+    (Join-Path $payload 'multilspy-requirements.txt')='/tmp/pi-kether-install/multilspy-requirements.txt'
     (Join-Path $pluginTarget 'scripts\secure-pi-bootstrap.mjs')='/tmp/pi-kether-install/secure-pi-bootstrap.mjs'
     (Join-Path $pluginTarget 'scripts\editor-pi-bootstrap.mjs')='/tmp/pi-kether-install/editor-pi-bootstrap.mjs'
+    (Join-Path $pluginTarget 'scripts\lsp-sandbox-broker.mjs')='/tmp/pi-kether-install/lsp-sandbox-broker.mjs'
+    (Join-Path $pluginTarget 'scripts\csharp-probe-project.mjs')='/tmp/pi-kether-install/csharp-probe-project.mjs'
+    (Join-Path $pluginTarget 'scripts\java-probe-launch.py')='/tmp/pi-kether-install/java-probe-launch.py'
+    (Join-Path $PSScriptRoot 'provision-go-rust.sh')='/tmp/pi-kether-install/provision-go-rust.sh'
+    (Join-Path $pluginTarget 'extensions\lsp-proxy.js')='/tmp/pi-kether-install/lsp-proxy.js'
     (Join-Path $pluginTarget 'scripts\editor-rpc.mjs')='/tmp/pi-kether-install/editor-rpc.mjs'
     (Join-Path $pluginTarget 'extensions\editor-proxy.js')='/tmp/pi-kether-install/editor-proxy.js'
     (Join-Path $pluginTarget 'scripts\accept-api-packet.mjs')='/tmp/pi-kether-install/accept-api-packet.mjs'

@@ -1,4 +1,5 @@
 import {roleValue,handoff,ref} from './contract-fixtures.mjs';
+import {listenHttpFixture} from './http-fixture.mjs';
 import {resultDigest} from '../extensions/role-contract.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -135,9 +136,7 @@ async function withGateway(run, options = {}) {
     toolsUsed: task.acceptance?.[0]?.match(/includes ([A-Za-z0-9_]+)/)?.[1] ? [task.acceptance[0].match(/includes ([A-Za-z0-9_]+)/)[1]] : [],
   });
   const { app } = createGatewayApp({ host: '127.0.0.1', port: 0, roots: [root], token, dispatchFn, lspFn:async request=>({ok:true,toolsUsed:[{hover:'lsp_hover',diagnostics:'lsp_diagnostics'}[request.method]],result:{content:[]}}), sandboxStatus: verifiedSandbox, requestLedgerDir: ledgerDir, schedulerOptions: { availableMemoryBytes: () => Number.MAX_SAFE_INTEGER, pollIntervalMs: 5 }, ...options });
-  const http = await new Promise(resolvePromise => {
-    const instance = app.listen(0, '127.0.0.1', () => resolvePromise(instance));
-  });
+  const http = await listenHttpFixture(app);
   const port = http.address().port;
   const client = new Client({ name: 'gateway-test', version: '1.0.0' });
   const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), {
@@ -430,7 +429,7 @@ test('overlapping write scopes are serialized across different requestIds', asyn
 test('dispatch_subagent marks failed execution as an MCP tool error', async () => {
   const dispatchFn = async request => ({ ok: false, failure: 'scope violation', provider: request.provider, model: request.model, toolsUsed: ['write'], toolErrors: 1 });
   const { app } = createGatewayApp({ host: '127.0.0.1', port: 0, roots: [root], token, dispatchFn, lspFn:async request=>({ok:true,toolsUsed:[{hover:'lsp_hover',diagnostics:'lsp_diagnostics'}[request.method]],result:{content:[]}}), sandboxStatus: verifiedSandbox, schedulerOptions: { availableMemoryBytes: () => Number.MAX_SAFE_INTEGER } });
-  const http = await new Promise(resolvePromise => { const instance = app.listen(0, '127.0.0.1', () => resolvePromise(instance)); });
+  const http = await listenHttpFixture(app);
   const client = new Client({ name: 'gateway-failure-test', version: '1.0.0' });
   const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${http.address().port}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } });
   try {

@@ -11,7 +11,9 @@ const fixture=resolve('tests/fixtures/editor-mcp.mjs');
 function setup(options={}){
  const dir=mkdtempSync(join(tmpdir(),'pi-editors-'));
  const path=join(dir,'config.json');
- const config={version:1,enabled:true,allowWrites:true,timeoutMs:1500,maxOutputBytes:8192,transport:{type:'stdio',command:process.execPath,args:[fixture,join(dir,'counter')],cwd:process.cwd()},tools:{fixture_read:'read',fixture_write:'write',fixture_slow:'read',fixture_big:'read'},...options};
+ // Successful cold-start fixtures need room for parallel Node processes on Windows.
+ // The timeout rejection test below keeps its explicit short deadline.
+ const config={version:1,enabled:true,allowWrites:true,timeoutMs:10000,maxOutputBytes:8192,transport:{type:'stdio',command:process.execPath,args:[fixture,join(dir,'counter')],cwd:process.cwd()},tools:{fixture_read:'read',fixture_write:'write',fixture_slow:'read',fixture_big:'read'},...options};
  writeFileSync(path,JSON.stringify(config));
  return {dir,path,config,bridge:new EditorBridge('blender',{path,stateDir:dir}),cleanup:()=>rmSync(dir,{recursive:true,force:true})};
 }
@@ -48,7 +50,7 @@ test('real stdio MCP catalog/read and write ledger replay/conflict',async()=>{
  }finally{s.cleanup();}
 });
 test('schema failure, cancellation, timeout and output bounds reject',async()=>{
- const s=setup();try{
+ const s=setup({timeoutMs:1500});try{
   await assert.rejects(s.bridge.invoke('call',{tool:'fixture_read',args:{unexpected:1}}));
   const c=new AbortController();c.abort();await assert.rejects(s.bridge.invoke('status',{},c.signal),/cancelled/);
   const start=Date.now();await assert.rejects(s.bridge.invoke('call',{tool:'fixture_slow',args:{}}));assert.ok(Date.now()-start<7000);

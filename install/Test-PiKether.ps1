@@ -67,6 +67,12 @@ if ($Installed) {
     Check ($LASTEXITCODE -eq 0 -and $probeObject.ok -eq $true -and $probeObject.resourceLimits -eq $true) 'WSL isolation and cgroup resource limits'
     & wsl.exe -d $WslDistro -u root -- sh -c 'export PATH=/opt/node/bin:/opt/pi-kether/node_modules/.bin:/usr/local/bin:/usr/bin:/bin; for tool in pyright-langserver typescript-language-server clangd jdtls csharp-ls; do command -v "$tool" >/dev/null || exit 1; done'
     Check ($LASTEXITCODE -eq 0) 'six-language LSP command set'
+    & wsl.exe -d $WslDistro -u root --exec sh -c 'test -x /opt/pi-kether/go/bin/go && test -x /opt/pi-kether/gopls/gopls && test -x /opt/pi-kether/rust/bin/rustc && test -x /opt/pi-kether/rust/bin/rust-analyzer && test -d /opt/pi-kether/rust/lib/rustlib/src/rust/library'
+    Check ($LASTEXITCODE -eq 0) 'Go and Rust compiler, analyzer and standard-library source installed'
+    $multilspyVersion = & wsl.exe -d $WslDistro -u root --exec /opt/pi-kether/multilspy-venv/bin/python -I -c 'from importlib.metadata import version; import sys; print(version(sys.argv[1]))' multilspy
+    Check ($LASTEXITCODE -eq 0 -and "$multilspyVersion".Trim() -eq $manifest.components.multilspy) 'pinned multilspy runtime installed'
+    & wsl.exe -d $WslDistro -u root --exec test -f /opt/pi-kether/node_modules/typescript-lsp/lib/tsserver.js
+    Check ($LASTEXITCODE -eq 0) 'separate TypeScript LSP server installed'
   }
   $auth = Join-Path $TargetHome '.pi\agent\auth.json'
   if (Test-Path -LiteralPath $auth) { Write-Host '[INFO] Pi credential file exists; validity and model access have not been checked.' -ForegroundColor Yellow }

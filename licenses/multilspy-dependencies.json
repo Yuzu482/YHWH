@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "platform": "Ubuntu 24.04 x86_64 / CPython 3.12",
+  "source": "https://pypi.org",
+  "packages": [
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "file": "attrs-26.1.0-py3-none-any.whl",
+      "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+      "source": "https://files.pythonhosted.org/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl",
+      "declaredLicense": "MIT",
+      "licenseFiles": [
+        "attrs-26.1.0.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "name": "cattrs",
+      "version": "26.2.0",
+      "file": "cattrs-26.2.0-py3-none-any.whl",
+      "sha256": "c680f17cd1df3a1c038ad1db8d90a9c595568cc54c4e8098e7ceb8d7b9bd826b",
+      "source": "https://files.pythonhosted.org/packages/f5/4d/6b8460462012a52075ba97932197f8c141be71b8e5f7e918af08ee73424b/cattrs-26.2.0-py3-none-any.whl",
+      "declaredLicense": "MIT",
+      "licenseFiles": [
+        "cattrs-26.2.0.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22",
+      "file": "certifi-2026.7.22-py3-none-any.whl",
+      "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+      "source": "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl",
+      "declaredLicense": "MPL-2.0",
+      "licenseFiles": [
+        "certifi-2026.7.22.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.1",
+      "file": "charset_normalizer-3.5.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "sha256": "b9af956078716df40d985fb0dfeb2c2120c5ca92ba4ff4b388acfd01cdc14d08",
+      "source": "https://files.pythonhosted.org/packages/6f/89/bb5108dc6c3651dca963f2b0a3ba19bbcb370c94e1b6d3e0e844a58e6dca/charset_normalizer-3.5.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "declaredLicense": "MIT",
+      "licenseFiles": [
+        "charset_normalizer-3.5.1.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "name": "docstring-to-markdown",
+      "version": "0.17",
+      "file": "docstring_to_markdown-0.17-py3-none-any.whl",
+      "sha256": "fd7d5094aa83943bf5f9e1a13701866b7c452eac19765380dead666e36d3711c",
+      "source": "https://files.pythonhosted.org/packages/56/7b/af3d0da15bed3a8665419bb3a630585756920f4ad67abfdfef26240ebcc0/docstring_to_markdown-0.17-py3-none-any.whl",
+      "declaredLicense": "LGPL-2.1-or-later",
+      "licenseFiles": [
+        "docstring_to_markdown-0.17.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "file": "idna-3.20-py3-none-any.whl",
+      "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "source": "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl",
+      "declaredLicense": "BSD-3-Clause",
+      "licenseFiles": [
+        "idna-3.20.dist-info/licenses/LICENSE.md"
+      ]
+    },
+    {
+      "name": "importlib_metadata",
+      "version": "9.0.1",
+      "file": "importlib_metadata-9.0.1-py3-none-any.whl",
+      "sha256": "bba5600596a7e21f3eef53281cf28d6a5195634d2f2b78ff9501a3272c6eaab0",
+      "source": "https://files.pythonhosted.org/packages/b3/55/ecca97ae19075f1fac62def77731e7f535e6c1fb8f92ff08160c5e6dade8/importlib_metadata-9.0.1-py3-none-any.whl",
+      "declaredLicense": "Apache-2.0",
+      "licenseFiles": [
+        "importlib_metadata-9.0.1.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "name": "jedi",
+      "version": "0.19.2",
+      "file": "jedi-0.19.2-py2.py3-none-any.whl",
+      "sha256": "a8ef22bde8490f57fe5c7681a3c83cb58874daf72b4784de3cce5b6ef6edb5b9",
+      "source": "https://files.pythonhosted.org/packages/c0/5a/9cac0c82afec3d09ccd97c8b6502d48f165f9124db81b4bcb90b4af974ee/jedi-0.19.2-py2.py3-none-any.whl",
+      "declaredLicense": "MIT",
+      "licenseFiles": [
+        "jedi-0.19.2.dist-info/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "jedi-language-server",
+      "version": "0.41.3",
+      "file": "jedi_language_server-0.41.3-py3-none-any.whl",
+      "sha256": "7411f7479cdc9e9ea495f91e20b182a5d00170c0a8a4a87d3a147462282c06af",
+      "source": "https://files.pythonhosted.org/packages/b6/67/2cf4419a8c418b0e5cba0b43dc1ea33a0bb42907694d6a786a3644889f32/jedi_language_server-0.41.3-py3-none-any.whl",
+      "declaredLicense": "MIT",
+      "licenseFiles": [
+        "jedi_language_server-0.41.3.dist-info/LICENSE"
+      ]
+    },
+    {
+      "name": "lsprotocol",
+      "version": "2023.0.1",
+      "file": "lsprotocol-2023.0.1-py3-none-any.whl",
+      "sha256": "c75223c9e4af2f24272b14c6375787438279369236cd568f596d4951052a60f2",
+      "source": "https://files.pythonhosted.org/packages/8d/37/2351e48cb3309673492d3a8c59d407b75fb6630e560eb27ecd4da03adc9a/lsprotocol-2023.0.1-py3-none-any.whl",
+      "declaredLicense": null,
+      "licenseFiles": [
+        "lsprotocol-2023.0.1.dist-info/LICENSE"
+      ]
+    },
+    {
+      "name": "multilspy",
+      "version": "0.0.15",
+      "file": "multilspy-0.0.15-py3-none-any.whl",
+      "sha256": "3fa88939b953ed5d39aba4688a34105ec1e5cf2b2f778167fee2b78b3c0e1427",
+      "source": "https://files.pythonhosted.org/packages/97/4d/b9d3492d6a7a2536498fc7fd49c1cc7bc86a41acf93b0ad967d75dbe5cd6/multilspy-0.0.15-py3-none-any.whl",
+      "declaredLicense": null,
+      "licenseFiles": [
+        "multilspy-0.0.15.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "name": "parso",
+      "version": "0.8.7",
+      "file": "parso-0.8.7-py2.py3-none-any.whl",
+      "sha256": "a8926eb2a1b915486941fdbd31e86a4baf88fe8c210f25f2f35ecec5b574ca1c",
+      "source": "https://files.pythonhosted.org/packages/99/5d/8268b644392ee874ee82a635cd0df1773de230bde356c38de28e298392cc/parso-0.8.7-py2.py3-none-any.whl",
+      "declaredLicense": "MIT",
+      "licenseFiles": [
+        "parso-0.8.7.dist-info/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "psutil",
+      "version": "7.2.2",
+      "file": "psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl",
+      "sha256": "076a2d2f923fd4821644f5ba89f059523da90dc9014e85f8e45a5774ca5bc6f9",
+      "source": "https://files.pythonhosted.org/packages/b5/70/5d8df3b09e25bce090399cf48e452d25c935ab72dad19406c77f4e828045/psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl",
+      "declaredLicense": "BSD-3-Clause",
+      "licenseFiles": [
+        "psutil-7.2.2.dist-info/LICENSE"
+      ]
+    },
+    {
+      "name": "pygls",
+      "version": "1.3.1",
+      "file": "pygls-1.3.1-py3-none-any.whl",
+      "sha256": "6e00f11efc56321bdeb6eac04f6d86131f654c7d49124344a9ebb968da3dd91e",
+      "source": "https://files.pythonhosted.org/packages/11/19/b74a10dd24548e96e8c80226cbacb28b021bc3a168a7d2709fb0d0185348/pygls-1.3.1-py3-none-any.whl",
+      "declaredLicense": "Apache-2.0",
+      "licenseFiles": [
+        "pygls-1.3.1.dist-info/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "requests",
+      "version": "2.32.3",
+      "file": "requests-2.32.3-py3-none-any.whl",
+      "sha256": "70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6",
+      "source": "https://files.pythonhosted.org/packages/f9/9b/335f9764261e915ed497fcdeb11df5dfd6f7bf257d4a6a2a686d80da4d54/requests-2.32.3-py3-none-any.whl",
+      "declaredLicense": "Apache-2.0",
+      "licenseFiles": [
+        "requests-2.32.3.dist-info/LICENSE"
+      ]
+    },
+    {
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "file": "typing_extensions-4.16.0-py3-none-any.whl",
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "source": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+      "declaredLicense": "PSF-2.0",
+      "licenseFiles": [
+        "typing_extensions-4.16.0.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "name": "urllib3",
+      "version": "2.8.0",
+      "file": "urllib3-2.8.0-py3-none-any.whl",
+      "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "source": "https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl",
+      "declaredLicense": "MIT",
+      "licenseFiles": [
+        "urllib3-2.8.0.dist-info/licenses/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "zipp",
+      "version": "4.1.0",
+      "file": "zipp-4.1.0-py3-none-any.whl",
+      "sha256": "25ad4e16390cd314347dd8f1de67a2ac538ae658ed4ab9db16029c07c188e97f",
+      "source": "https://files.pythonhosted.org/packages/3a/13/547360d81e6d88d58492968ffda9f9542854f11310ee556fef14260cc886/zipp-4.1.0-py3-none-any.whl",
+      "declaredLicense": "MIT",
+      "licenseFiles": [
+        "zipp-4.1.0.dist-info/licenses/LICENSE"
+      ]
+    }
+  ]
+}

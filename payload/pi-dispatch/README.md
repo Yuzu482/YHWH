@@ -105,3 +105,7 @@ Tifereth 是唯一的任务分解和派发决策层。每次 `dispatch_subagent`
 YHWH 自有代码、文档与配置采用 [Apache-2.0](LICENSE)，版权说明见 [NOTICE](NOTICE)。第三方组件保留原许可证。[第三方通知](THIRD_PARTY_NOTICES.txt)。
 
 自 0.6.0 起，reviewer 使用用户自备 API key，通过 Pi 原生 Anthropic API 调用；已移除订阅令牌读取、续期和 Claude Code 桥接。服务条款仍适用，实际 API 访问尚未验证。
+
+## Go / Rust 探针
+
+`yhwh-pi-lsp` 1.6.0 新增 Go/gopls 和 Rust/rust-analyzer，七项工具均支持任务内复用及编辑后失效。Go 使用完整拉取诊断；Rust 使用固定 edition 2024 单文件库及有界 rustc 元数据检查，避免初始空诊断误判。保持只读、无网络、无凭据，不执行 Cargo 构建脚本、过程宏或用户程序。固定依赖由完整安装包的 `install/provision-go-rust.sh` 安装；单独复制插件不包含工具链。详见[配置和限制](../../docs/pi-lsp-adapter.md)及[依赖材料](../../licenses/go-rust-runtime.json)。

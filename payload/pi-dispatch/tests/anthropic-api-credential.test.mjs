@@ -29,5 +29,15 @@ test('review launch preserves no-tools and removes ambient Claude/API credential
  assert.throws(()=>validateRequest({...route,provider:'pi-claude-code-provider'}));
  assert.ok(!redactSensitiveText(key).includes(key));
  const sandbox=readFileSync(new URL('../sandbox/pi-kether-sandbox',import.meta.url),'utf8');
- assert.ok(sandbox.includes('PI_AUTH_ENCRYPTED_PIPE_REQUIRED'));assert.ok(!sandbox.includes('anthropic-api-key.json'));assert.ok(!sandbox.includes('.claude/'));assert.ok(!sandbox.includes('--proc /proc'));
+ assert.ok(sandbox.includes('PI_AUTH_ENCRYPTED_PIPE_REQUIRED'));assert.ok(!sandbox.includes('anthropic-api-key.json'));assert.ok(!sandbox.includes('.claude/'));
+ // Only credential-free, direct single-file C# and Go probes receive private proc.
+ const procBlock=sandbox.slice(sandbox.indexOf('  local proc_bind='),sandbox.indexOf('\n  fi',sandbox.indexOf('  local proc_bind='))+5);
+ assert.ok(procBlock.startsWith('  local proc_bind=(--dir /proc)'));
+ assert.ok(procBlock.includes('if [[ "$direct_lsp" == true ]]'));
+ assert.ok(procBlock.includes('r.length===1'));assert.ok(procBlock.includes('/\\.cs$/i'));
+ assert.ok(procBlock.includes('proc_bind=(--proc /proc --remount-ro /proc)'));
+ const goBlock=sandbox.slice(sandbox.indexOf('\n  fi',sandbox.indexOf('  local proc_bind='))+5,sandbox.indexOf('  [[ "$access" == workspace-write ]] && workspace_bind='));
+ assert.ok(goBlock.includes('if [[ "$direct_lsp" == true ]]'));assert.ok(goBlock.includes('r.length===1'));assert.ok(goBlock.includes('/\\.go$/i'));
+ assert.ok(goBlock.includes('proc_bind=(--proc /proc --remount-ro /proc)'));
+ assert.equal(sandbox.match(/--proc \/proc/g)?.length,2);assert.ok(sandbox.includes('--unshare-pid'));
 });

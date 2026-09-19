@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createGatewayApp } from '../scripts/gateway.mjs';
+import {listenHttpFixture} from './http-fixture.mjs';
+import {roleValue} from './contract-fixtures.mjs';
 
 if (typeof global.gc !== 'function') throw new Error('run with node --expose-gc');
 
@@ -17,11 +19,13 @@ const ledgerDir = mkdtempSync(join(tmpdir(), 'pi-memory-regression-'));
 const verifiedSandbox = { ok: true, backend: 'wsl2-bwrap', hostMountVisible: false, windowsInterop: false, bubblewrap: true, pi: true, resourceLimits: true };
 const largeText = 'x'.repeat(256 * 1024);
 
-function resultText(summary = 'ok') {
-  return `KETHER_RESULT_JSON=${JSON.stringify({ status: 'completed', summary, evidence: [], changedFiles: [], errors: [] })}`;
+function resultText(result = 'ok') {
+  return `KETHER_RESULT_JSON=${JSON.stringify(roleValue('Chesed', result))}`;
 }
 
+let largeDispatches = 0;
 const dispatchFn = async (request, signal, task) => {
+  if (task.objective.startsWith('large')) largeDispatches += 1;
   if (task.objective.startsWith('delay')) {
     await new Promise((resolveDelay, rejectDelay) => {
       const timer = setTimeout(resolveDelay, 250);
@@ -39,9 +43,7 @@ const { app } = createGatewayApp({
   sandboxStatus: verifiedSandbox, requestLedgerDir: ledgerDir,
   schedulerOptions: { availableMemoryBytes: () => Number.MAX_SAFE_INTEGER, pollIntervalMs: 2 },
 });
-const http = await new Promise(resolveListen => {
-  const instance = app.listen(0, '127.0.0.1', () => resolveListen(instance));
-});
+const http = await listenHttpFixture(app);
 const port = http.address().port;
 const client = new Client({ name: 'memory-regression', version: '1.0.0' });
 const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), {
@@ -59,7 +61,7 @@ const collect = async () => {
 
 const taskArguments = objective => ({
   cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'read', resourceProfile: 'small', timeoutSeconds: 30,
-  task: { role: 'worker', objective, readScope: ['package.json'], returnFields: ['status', 'summary', 'evidence', 'changedFiles', 'errors'] },
+  task: { contractVersion: 2, role: 'Chesed', objective, readScope: ['package.json'], acceptance: ['Return the complete synthetic fixture result.'] },
 });
 
 function slopePerHundred(samples, field) {
@@ -94,10 +96,18 @@ try {
     await client.callTool({ name: 'list_capabilities', arguments: {} });
     if ((i + 1) % 100 === 0) samples.push({ requests: i + 1, ...await collect() });
   }
+  const largeDurations = [];
   for (let i = 0; i < 40; i += 1) {
+    const started = performance.now();
     const result = await client.callTool({ name: 'dispatch_subagent', arguments: taskArguments(`large ${i}`) });
+    largeDurations.push(performance.now() - started);
     assert.equal(result.isError, false);
+    const response = JSON.parse(result.content[0].text);
+    assert.equal(response.ok, true);
+    assert.equal(response.roleValidation.ok, true);
+    assert.equal(response.structuredResult.result, largeText, 'large results must not be truncated');
   }
+  assert.equal(largeDispatches, 40, 'every large fixture must reach the dispatcher');
   let cancelled = 0;
   for (let i = 0; i < 40; i += 1) {
     const controller = new AbortController();
@@ -121,7 +131,7 @@ try {
   assert.ok(growth.rss <= 96 * 1024 * 1024, `RSS growth ${growth.rss} exceeds 96 MiB`);
   assert.ok(growth.handles <= 8, `active handle growth ${growth.handles} exceeds 8`);
   assert.ok(trend.heapBytesPerHundred <= 4 * 1024 * 1024, `recent heap slope ${trend.heapBytesPerHundred} exceeds 4 MiB/100 requests`);
-  console.log(JSON.stringify({ ok: true, requests: { warmup: 25, ordinary: 400, largeOutput: 40, cancelled, disconnected: 40 }, samples, baseline, final, growth, trend, thresholds: { heapUsed: 20 * 1024 * 1024, rss: 96 * 1024 * 1024, handles: 8, recentHeapPerHundred: 4 * 1024 * 1024 } }, null, 2));
+  console.log(JSON.stringify({ ok: true, requests: { warmup: 25, ordinary: 400, largeOutput: largeDispatches, cancelled, disconnected: 40 }, largeOutputMs: { max: Math.max(...largeDurations), mean: largeDurations.reduce((a, b) => a + b, 0) / largeDurations.length }, samples, baseline, final, growth, trend, thresholds: { heapUsed: 20 * 1024 * 1024, rss: 96 * 1024 * 1024, handles: 8, recentHeapPerHundred: 4 * 1024 * 1024 } }, null, 2));
 } catch (error) {
   const snapshot = writeHeapSnapshot(join(tmpdir(), `pi-gateway-memory-failure-${Date.now()}.heapsnapshot`));
   console.error(JSON.stringify({ ok: false, error: error.message, heapSnapshot: snapshot }));

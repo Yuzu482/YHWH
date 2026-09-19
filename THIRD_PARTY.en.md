@@ -8,6 +8,7 @@ Original YHWH code, documentation and configuration use [Apache-2.0](LICENSE). T
 | --- | --- | --- |
 | Pi Coding Agent / Pi components from the same repository | 0.84.4 | MIT; [full upstream text](licenses/pi-0.84.4-MIT.txt), Copyright 2025 Mario Zechner |
 | pi-claude-code-provider (historical, removed in 0.6) | 0.1.4 | MIT; [full upstream text](licenses/pi-claude-code-provider-0.1.4-MIT.txt), Copyright 2026 chem |
+| multilspy (0.9 development direct semantic probe) | 0.0.15 | [Microsoft MIT](licenses/multilspy-0.0.15-MIT.txt), [OLSP MIT](licenses/multilspy-OLSP-MIT.txt); [Python dependencies and hashes](licenses/multilspy-dependencies.json) |
 | pi-lsp-extension | 1.3.0 | Package declares MIT; [original metadata](licenses/pi-lsp-extension-1.3.0.package.json); [missing full text record](licenses/pi-lsp-extension-NOTICE.txt) |
 | Claude Code (historical, no longer downloaded in 0.6) | 2.1.250 | [Original notice](licenses/claude-code-2.1.250-NOTICE.txt); governed by Anthropic agreements, not MIT/Apache-2.0 |
 
@@ -34,3 +35,7 @@ The [verified package evidence](licenses/pi-lsp-extension-evidence.json) pins th
 The follow-up audit covers the pinned version, current main and fetched historical refs. See the [LSP license remediation record](docs/lsp-license-remediation.en.md) for scope, required upstream materials and integration steps. The request was submitted as [upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14); improved local records do not establish receipt of a complete upstream notice.
 
 See the [LSP component notes](docs/lsp-component.en.md) for functionality, installation dependencies and release boundaries.
+
+### Go / Rust toolchains
+
+The added toolchains are downloaded during installation and are not bundled as binaries in this portable archive. Original Go/gopls BSD-style licenses and rust-analyzer MIT/Apache-2.0 texts are preserved under `licenses/`, with hashes in `licenses/sources.json`. Full upstream Rust compiler, standard-library and dependency copyright materials remain in verified installation archives and runtime `share/doc/rust/COPYRIGHT*.html`; gopls builds retain downloaded modules' LICENSE/NOTICE/COPYING files and build-module inventory. See [pinned versions, archive hashes and notice locations](licenses/go-rust-runtime.json). YHWH's Apache-2.0 does not replace these licenses. This change preserves existing public-release gates and does not claim a complete system-dependency license audit.

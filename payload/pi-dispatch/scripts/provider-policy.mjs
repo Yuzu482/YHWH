@@ -36,6 +36,7 @@ export function resolveControlledExtensions(provider, access, env = process.env,
     // Native Pi Anthropic provider; no Claude Code bridge.
   }
   if (runtime === 'wsl2' && access !== 'none') paths.push('/opt/pi-kether/extensions/read-scope-guard.js');
+  if (runtime === 'wsl2' && access !== 'none') paths.push('/opt/pi-kether/extensions/lsp-proxy.js');
   if (access !== 'none') paths.push(joinPath(agentModules, 'pi-lsp-extension', 'src', 'index.ts'));
   if (access === 'workspace-write') {
     paths.push(runtime === 'wsl2'

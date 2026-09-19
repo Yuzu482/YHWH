@@ -1,58 +1,45 @@
-// Trusted model-free adapter for the installed pi-lsp-extension tool factories.
-import {readFileSync,realpathSync,closeSync} from 'node:fs';
-import {classifyLspResult} from './lsp-result.mjs';
-import {createRequire} from 'node:module';
-const require=createRequire('/opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/package.json');
-const {createJiti}=require('jiti');
-const jiti=createJiti(import.meta.url,{moduleCache:true});
-const base='/opt/pi-kether/node_modules/pi-lsp-extension/src/';
-const load=path=>jiti.import(base+path);
-const factories={lsp_diagnostics:['diagnostics','createDiagnosticsTool'],lsp_hover:['hover','createHoverTool'],lsp_definition:['definition','createDefinitionTool'],lsp_references:['references','createReferencesTool'],lsp_symbols:['symbols','createSymbolsTool'],lsp_completions:['completions','createCompletionsTool'],lsp_code_actions:['code-actions','createCodeActionsTool'],code_overview:['code-overview','createCodeOverviewTool'],ast_search:['code-search','createCodeSearchTool']};
-const pause=()=>new Promise(resolve=>setTimeout(resolve,100));
-let manager,tree,response;
-const startupErrors=[];
+// SPDX-License-Identifier: Apache-2.0
+// Semantic queries use multilspy; structural queries retain the explicit legacy backend.
+import {readFileSync, closeSync} from 'node:fs';
+import {spawn} from 'node:child_process';
+const structural = new Set(['code_overview','ast_search']);
+const semantic = new Set(['lsp_diagnostics','lsp_hover','lsp_definition','lsp_references','lsp_symbols','lsp_completions','lsp_code_actions']);
+const failure = reason => ({ok:false,status:'failed',reason,modelCalls:0,toolsUsed:[]});
+let response;
 try {
-  closeSync(3); // The direct branch receives an empty descriptor, never provider auth.
-  const input=JSON.parse(readFileSync(0,'utf8'));
-  if(!Object.hasOwn(factories,input.tool)||!input.params||typeof input.params.path!=='string')throw new Error('Invalid direct LSP request');
-  const path=realpathSync(input.params.path);
-  if(!path.startsWith('/workspace/'))throw new Error('LSP file outside scoped workspace');
-  input.params.path=path;
-  const {LspManager}=await load('lsp-manager.ts');
-  const {TreeSitterManager}=await load('tree-sitter/parser-manager.ts');
-  const {WorkspaceIndex}=await load('tree-sitter/workspace-index.ts');
-  manager=new LspManager('/workspace',undefined,{onServerError:(_language,error)=>startupErrors.push(error)});
-  tree=new TreeSitterManager();await tree.init();
-  const index=new WorkspaceIndex('/workspace',tree);
-  const structural=['code_overview','ast_search'].includes(input.tool);
-  let client,diagnosticsPublished=false;
-  if(!structural){
-    client=await manager.getClientForFile(path);
-    const language=manager.getLanguageId(path),deadline=Date.now()+60000;
-    while(!client&&language&&manager.isServerStarting(language)&&Date.now()<deadline){await pause();client=manager.getRunningClient(language);}
-    if(client){
-      const uri=manager.getFileUri(path);
-      client.didOpen(uri,language,1,readFileSync(path,'utf8'));
-      if(input.tool==='lsp_diagnostics'){
-        const deadline=Date.now()+15000;
-        while(!client.getAllDiagnostics().has(uri)&&Date.now()<deadline)await pause();
-        diagnosticsPublished=client.getAllDiagnostics().has(uri);
-        if(!diagnosticsPublished)throw new Error('Language server has not published diagnostics; clean result is unverified');
-      }
-    }
-  }
-  const [module,name]=factories[input.tool];
-  const factory=(await load('tools/'+module+'.ts'))[name];
-  let args=[manager,tree,index];
-  if(structural)args=['/workspace',tree,index];
-  if(input.tool==='lsp_completions')args=[manager,{getTrackedVersion:()=>1,setTrackedVersion(){},isSyntheticDotActive:()=>false},tree];
-  const tool=factory(...args);
-  const result=await tool.execute('direct-lsp',input.params,new AbortController().signal);
-  const backend=client?'lsp':structural||result.content?.some(item=>/tree-sitter/i.test(item.text??''))?'tree-sitter':'unavailable';
-  response={...classifyLspResult(result,{tool:input.tool,backend,diagnosticsPublished}),requestedTool:input.tool,toolsUsed:[input.tool],unexpectedTools:[],backend,diagnosticsPublished,startupErrors,result};
-}catch(error){response={ok:false,status:'failed',error:error.message,startupErrors,toolsUsed:[]};}
-finally{
-  try{if(manager)await manager.shutdownAll();tree?.shutdown();}
-  catch(error){response={...response,ok:false,status:'failed',error:'LSP shutdown failed: '+error.message};}
-}
+  closeSync(3);
+  const raw=readFileSync(0);
+  if(raw.length>65536) throw new Error('request-size-limit');
+  const input=JSON.parse(raw);
+  if(structural.has(input.tool)) {
+    const {runStructural}=await import('./legacy-structural-bootstrap.mjs');
+    response=await runStructural(input);
+  } else if(semantic.has(input.tool)) {
+    response=await new Promise(resolve=>{
+      const child=spawn('/opt/pi-kether/multilspy-venv/bin/python',
+        ['-I','/opt/pi-kether/scripts/multilspy-probe.py'],
+        {stdio:['pipe','pipe','pipe'],windowsHide:true});
+      const chunks=[];let bytes=0,oversized=false,settled=false;
+      const done=value=>{if(!settled){settled=true;resolve(value);}};
+      child.on('error',()=>done(failure('multilspy-runtime-unavailable')));
+      child.stdin.on('error',()=>{});
+      child.stdout.on('data',chunk=>{
+        bytes+=chunk.length;
+        if(bytes>2*1024*1024){oversized=true;child.kill('SIGKILL');return;}
+        chunks.push(chunk);
+      });
+      child.stderr.on('data',()=>{});
+      child.on('close',code=>{
+        if(oversized)return done(failure('multilspy-output-size-limit'));
+        try {
+          const result=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          if((code!==0&&result.ok===true)||result.engine!=='multilspy'||result.requestedTool!==input.tool)
+            return done(failure('invalid-multilspy-result'));
+          done(result);
+        } catch {done(failure('invalid-multilspy-result'));}
+      });
+      child.stdin.end(raw);
+    });
+  } else response=failure('unsupported-lsp-operation');
+} catch {response=failure('invalid-lsp-request');}
 process.stdout.write(JSON.stringify(response),()=>process.exit(response.ok?0:1));

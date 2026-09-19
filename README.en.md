@@ -4,7 +4,7 @@
 
 A private source repository for Kether governance rules and the Pi execution workflow. The primary agent owns intent, authorization, task decomposition, integration and acceptance. Pi provides governed model calls, deterministic LSP, resource limits, result validation and runtime monitoring.
 
-**v0.8.1 private prerelease:** LSP functionality, third-party dependencies and the outstanding license notice are described separately in the [LSP component notes](docs/lsp-component.en.md). Existing installation paths still configure LSP; the complete upstream notice remains pending and the public-release check still blocks.
+**0.9.0 development version, not released:** Deterministic semantic LSP queries now use multilspy, preferring its official language adapters for Python symbol queries and JS/TS; structural queries and extensions inside Pi model tasks retain the legacy backend. See [LSP component notes](docs/lsp-component.en.md) for installation, capability differences and licensing boundaries. The maintainer's running service has received the probe-only deployment and passed live gateway checks; other service configuration was not upgraded.
 
 See the [architecture development history (Chinese)](docs/architecture-history.md) for the background, evolution, key decisions and historical verification limits. The [history evidence index (Chinese)](docs/history-evidence.json) contains the corresponding sanitized records.
 
@@ -39,16 +39,17 @@ It provides:
 - `openai-codex` for ordinary lower agents; `anthropic` / `claude-sonnet-5` exclusively for Geburah/reviewer, with no tools or file access.
 - A WSL2/Bubblewrap sandbox with limits on CPU, memory, process count, output, execution time and write scope.
 - Request ledgers, idempotency, provider circuits, audit redaction, result-format validation, task queues and monitor cards.
-- LSP services for Python, Java, JavaScript, TypeScript, C# and C/C++.
+- LSP services for Python, Java, JavaScript, TypeScript, C#, C/C++, Go and Rust.
+- A first-party [Pi LSP adapter](docs/pi-lsp-adapter.en.md): governed workers call isolated multilspy probes through seven `yhwh_lsp_*` tools, reusing servers for unchanged files within one task. Python retains Pyright and Jedi on demand to accelerate alternating queries; servers are reclaimed on idle expiry or task completion. C/C++ and C# use actual exit checks to reduce cleanup waits. C# uses a fixed single-file .NET project and a private read-only process view, failing immediately on early server exit. Java uses a JIT profile for short tasks, one reusable server and disposable indexes. The old extension remains for compatibility.
 
 ## Installation
 
 ### One-click installation (Windows 11 x64)
 
-The generated `YHWH-OneClick-0.8.1.zip` contains a self-contained script, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
+The generated `YHWH-OneClick-0.9.0.zip` contains a self-contained script, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.8.1.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.9.0.ps1
 ```
 
 The default exports generic MCP configuration without changing Codex global settings. Select hosts with `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"`; including `codex` enables the original Codex integration. Import the generated connection profile and load the primary instructions in each host. The exporter never overwrites existing host configuration.
@@ -63,14 +64,14 @@ An existing Pi installation is protected by default. Once tasks have ended and i
 
 ```powershell
 # Read-only preview: no downloads or host changes
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.8.1.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.9.0.ps1 -PlanOnly
 # Unattended installation with a fixed workspace (WSL must be ready; login is separate)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.8.1.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.9.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
 # Verify and extract only; destination must be a new absolute directory
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.8.1.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.9.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` to generate the portable ZIP, self-contained PS1, SHA256 file and double-click bundle under `release/`. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.8.1.ps1`.
+Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` to generate the portable ZIP, self-contained PS1, SHA256 file and double-click bundle under `release/`. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.9.0.ps1`.
 
 This version has script and package validation, but a full online installation in a fresh Windows VM has not been performed. Windows and WSL Pi use the same dependency lockfile; Ubuntu repositories, WSL system components and the .NET installer remain mutable external dependencies. This is not a completely offline or byte-for-byte reproducible system image.
 
@@ -131,6 +132,8 @@ The installer generates launch scripts that reference key files, creates a logon
 
 ## Verification and removal
 
+Run `npm test` and `npm run test:memory` separately under `payload/pi-dispatch` for source regression checks. The latter checks complete 256 KiB results, cancellation, disconnection and memory growth; it is not included in the ordinary test count. `Build-Release.ps1` requires both by default. Use `-SkipTests` only for local packaging with existing verification of the same source; it does not establish a test pass. A built package and a running service are separate snapshots; a partial deployment is not a full package upgrade.
+
 The logon task uses a console-free `wscript.exe` launcher to hide the window when creating the PowerShell process, avoiding flashes that may occur with `-WindowStyle Hidden` alone. Windows Script Host must be available. Gateway, WSL child processes and LSP launches also use hidden-window process options.
 
 ```powershell
@@ -142,7 +145,7 @@ Removal archives plugin and workflow files while retaining the WSL distribution 
 
 ## Reproducibility and security boundaries
 
-Default ordinary execution uses `openai-codex`; optional controlled API routes require explicit host configuration and selection. Geburah/reviewer may use Claude Sonnet 5 with `access:none` and review materials supplied by the primary agent. Claude requires a user-owned API key; credentials are excluded from the package. All execution tasks retain an empty `/proc`. Task snapshots contain only the union of `readScope` and `writeScope`, using relative file paths or directory `/**` entries. `.env`, credentials, private keys and project Pi configuration are denied by default. Snapshots are limited to 128 MiB and 10,000 files, with a 30-second preparation scan limit. Each task's temporary filesystem is limited to 512 MiB and 30,000 inodes. Both the resulting file tree and patches are checked against write scope; binary patches are rejected.
+Default ordinary execution uses `openai-codex`; optional controlled API routes require explicit host configuration and selection. Geburah/reviewer may use Claude Sonnet 5 with `access:none` and review materials supplied by the primary agent. Claude requires a user-owned API key; credentials are excluded from the package. Model execution tasks retain an empty `/proc`; credential-free C# and Go probes use a read-only `/proc` in a private PID namespace. Task snapshots contain only the union of `readScope` and `writeScope`, using relative file paths or directory `/**` entries. `.env`, credentials, private keys and project Pi configuration are denied by default. Snapshots are limited to 128 MiB and 10,000 files, with a 30-second preparation scan limit. Each task's temporary filesystem is limited to 512 MiB and 30,000 inodes. Both the resulting file tree and patches are checked against write scope; binary patches are rejected.
 
 LSP cannot load project `.pi-lsp.json` files or auto-discover a Lombok Java agent. Tools cannot read credential files. A single route's credential enters the trusted Pi process through a one-time file descriptor that is then closed. The installer tightens Windows credential and state-directory permissions. OpenAI OAuth refresh and persistence occur on the host; its sandbox receives a temporary access token. The reviewer receives its API key only in trusted Pi memory through FD3. Network access remains available for model and language services; no outbound domain allowlist is enforced. These scope checks do not protect against compromise of trusted Pi/LSP dependencies or the operating system itself.
 
@@ -161,3 +164,13 @@ Since 0.6.0 the reviewer uses the native Anthropic API with a user-owned API key
 After installation run `Configure-Claude-API.cmd`, or from source run `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`. Input is hidden; the file allows only the current Windows user. Credentials are stored in `~/.local/state/pi-kether/anthropic-api-key.json`. Claude subscription login is never read; environment keys and custom endpoints are not fallback sources. `check_claude_auth` checks local configuration only. Actual key validity, balance and model availability require a separately authorized heartbeat. Claude Code primary clients still use their own official user login.
 
 Existing users should wait for tasks to finish before upgrading and configure an API key. The old `pi-claude-code-provider` route and `renew_claude_auth` tool are no longer accepted. This change did not update the running service. `Build-Release.ps1 -PublicRelease` currently rejects publication because the LSP upstream copyright notice awaits confirmation; ordinary builds create local previews only.
+
+### Go and Rust single-file support
+
+Go automatically selects pinned Go 1.27.1 / gopls 0.23.0; Rust selects Rust 1.98.1 / rust-analyzer 1.98.1. Both provide diagnostics, hover, definitions, references, symbols, completion and code-action previews, with task-local server reuse, edit invalidation and final cleanup. No model or API key is required.
+
+Go returns a completed `textDocument/diagnostic` pull response and also requires independent diagnostic publication. The pinned gopls may leave `kind` empty on a full response; only its completed response containing `items` is accepted, never `unchanged`. Module downloads, automatic toolchain downloads, workspace configuration, cgo, external package drivers and telemetry are disabled. A read-only private PID view lets gopls read its own executable. External dependencies and multi-file modules are outside the snapshot scope.
+
+Rust uses a fixed edition-2024 single-file library crate and standard library, without reading Cargo projects. Build scripts, procedural macros, Cargo checks and experimental analyzer diagnostics are disabled. Diagnostics and code actions additionally run a bounded `rustc --emit=metadata` check, await compiler termination and cleanup, and require language-server publication. Every diagnostic request checks again; an initial empty notification cannot prove a clean file. Only temporary metadata is generated: user programs are neither linked nor executed, and this does not establish a successful Cargo workspace build. UTF-8 compiler byte offsets are converted to LSP UTF-16 positions.
+
+Probes have no network or credentials and read only their source snapshot; Rust retains an empty `/proc`. Initial installation downloads official Go/Rust archives with pinned SHA-256 checks and builds gopls using the official module proxy and checksum database. Toolchains are installed only into the managed runtime, without replacing host PATH, rustup or Go settings. See the [Go/Rust materials](./licenses/go-rust-runtime.json). The normal `install/Test-PiLspAdapter.py` suite covers real seven-tool calls, corrected errors, reuse, cleanup and Rust ownership errors. Timings are local small-fixture observations, not large-project performance guarantees.

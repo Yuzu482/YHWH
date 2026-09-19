@@ -125,6 +125,11 @@ run_job() {
     direct_lsp=true
     bootstrap=/opt/pi-kether/scripts/direct-lsp-bootstrap.mjs
   fi
+  local lsp_bridge=false
+  if [[ "$direct_lsp" == false && "$access" != none ]]; then
+    lsp_bridge=true
+    bootstrap=/opt/pi-kether/scripts/editor-pi-bootstrap.mjs
+  fi
   local provider="" config_digest="" previous="" arg
   for arg in "$@"; do
     if [[ "$previous" == --provider ]]; then
@@ -252,24 +257,40 @@ run_job() {
   local workspace_bind=(--ro-bind "$workspace" /workspace)
   local network_args=()
   [[ "$direct_lsp" == true ]] && network_args=(--unshare-net)
+  local java_bind=()
+  if [[ "$direct_lsp" == true ]] && /opt/node/bin/node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1])).read;process.exit(Array.isArray(r)&&r.length===1&&typeof r[0]==="string"&&/\.java$/i.test(r[0])?0:1)' "$jobdir/scopes.json"; then
+    java_bind=(--ro-bind /etc/java-21-openjdk/security /etc/java-21-openjdk/security)
+  fi
   local proc_bind=(--dir /proc)
+  if [[ "$direct_lsp" == true ]] && /opt/node/bin/node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1])).read;process.exit(Array.isArray(r)&&r.length===1&&typeof r[0]==="string"&&/\.cs$/i.test(r[0])?0:1)' "$jobdir/scopes.json"; then
+    /opt/node/bin/node /opt/pi-kether/scripts/csharp-probe-project.mjs "$workspace" "$jobdir/scopes.json"
+    proc_bind=(--proc /proc --remount-ro /proc)
+  fi
+  if [[ "$direct_lsp" == true ]] && /opt/node/bin/node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1])).read;process.exit(Array.isArray(r)&&r.length===1&&typeof r[0]==="string"&&/\.go$/i.test(r[0])?0:1)' "$jobdir/scopes.json"; then
+    proc_bind=(--proc /proc --remount-ro /proc)
+  fi
   [[ "$access" == workspace-write ]] && workspace_bind=(--bind "$workspace" /workspace)
 
   install -d -o pi-sandbox -g pi-sandbox -m 0700 "$jobdir/tmp"
   set +e
   ( printf '%s\n' "$BASHPID" >"$cgroup_dir/cgroup.procs"
-  exec setpriv --reuid=pi-sandbox --regid=pi-sandbox --init-groups bwrap --die-with-parent --new-session \
+  local model_command=(/usr/bin/setpriv --reuid=pi-sandbox --regid=pi-sandbox --init-groups bwrap --die-with-parent --new-session \
     "${network_args[@]}" --unshare-user --unshare-pid --unshare-uts --unshare-ipc --unshare-cgroup-try --cap-drop ALL \
     --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 --ro-bind /opt /opt \
     --ro-bind /etc/ssl /etc/ssl --ro-bind /etc/resolv.conf /etc/resolv.conf --ro-bind /etc/hosts /etc/hosts \
-    --ro-bind /etc/nsswitch.conf /etc/nsswitch.conf --dev /dev "${proc_bind[@]}" --bind "$jobdir/tmp" /tmp --dir /home/pi-sandbox \
+    --ro-bind /etc/nsswitch.conf /etc/nsswitch.conf "${java_bind[@]}" --dev /dev "${proc_bind[@]}" --bind "$jobdir/tmp" /tmp --dir /home/pi-sandbox \
     --bind "$home" /home/pi-sandbox --ro-bind "$home/agent/write-scope.json" /home/pi-sandbox/agent/write-scope.json "${workspace_bind[@]}" --chdir /workspace --clearenv \
     --setenv HOME /home/pi-sandbox --setenv PI_CODING_AGENT_DIR /home/pi-sandbox/agent \
     --setenv PI_DISPATCH_ACTIVE 1 --setenv PI_TELEMETRY 0 \
     --setenv PI_WRITE_SCOPE_FILE /home/pi-sandbox/agent/write-scope.json \
     --setenv PATH /opt/node/bin:/opt/pi-kether/node_modules/.bin:/opt/pi-kether/dotnet-tools:/usr/local/bin:/usr/bin:/bin \
     --setenv SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt \
-    -- timeout --signal=TERM --kill-after=5s "${timeout_seconds}s" /opt/node/bin/node "$bootstrap" "$@" )
+    -- timeout --signal=TERM --kill-after=5s "${timeout_seconds}s" /opt/node/bin/node "$bootstrap" "$@")
+  if [[ "$lsp_bridge" == true ]]; then
+    exec /opt/node/bin/node /opt/pi-kether/scripts/lsp-sandbox-broker.mjs "$workspace" "$editor_bridge" -- "${model_command[@]}"
+  else
+    exec "${model_command[@]}"
+  fi )
   local status=$?
   set -e
 

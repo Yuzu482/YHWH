@@ -25,6 +25,16 @@ requireTrue(json(plugin+'package-lock.json').packages[''].license === 'Apache-2.
 for (const material of json('licenses/sources.json').materials) {
   requireTrue(createHash('sha256').update(read(material.file)).digest('hex') === material.sha256, `Original material changed: ${material.file}`);
 }
+const pythonPackages=json('licenses/multilspy-dependencies.json').packages;
+const toolchains=json('licenses/go-rust-runtime.json');
+const provision=read('install/provision-go-rust.sh').toString('utf8').replace(/\r\n/g,'\n');
+for(const [name,version] of Object.entries(toolchains.versions)) requireTrue(json('portable.manifest.json').components[name]===version, `Toolchain manifest mismatch: ${name}`);
+for(const item of toolchains.artifacts) requireTrue(provision.includes(item.sha256), `Toolchain checksum missing: ${item.url}`);
+for(const [name,value] of [['GO_VERSION',toolchains.versions.go],['GOPLS_VERSION','v'+toolchains.versions.gopls],['RUST_VERSION',toolchains.versions.rust]]) requireTrue(provision.includes(`${name}=${value}\n`), `Toolchain version mismatch: ${name}`);
+const pythonLock=read('payload/multilspy-requirements.txt').toString('utf8').split(/\r?\n/).filter(line=>line&&!line.startsWith('#'));
+requireTrue(pythonLock.length===pythonPackages.length, 'Python lock/inventory package count mismatch');
+for(const entry of pythonPackages) requireTrue(pythonLock.includes(`${entry.name}==${entry.version} --hash=sha256:${entry.sha256}`), `Python dependency pin mismatch: ${entry.name}`);
+requireTrue(pythonPackages.find(entry=>entry.name==='multilspy')?.version===json('portable.manifest.json').components.multilspy, 'multilspy manifest mismatch');
 const locks = [plugin+'package-lock.json', 'payload/wsl-package-lock.json'];
 const packages = locks.flatMap(lockfile => Object.entries(json(lockfile).packages).filter(([key]) => key).sort(([a],[b])=> a < b ? -1 : a > b ? 1 : 0).map(([packagePath, entry]) => ({
   lockfile, packagePath, name: entry.name ?? packagePath.split('node_modules/').at(-1),
@@ -33,7 +43,7 @@ const packages = locks.flatMap(lockfile => Object.entries(json(lockfile).package
   optional: entry.optional === true,
 })));
 const inventory = {schemaVersion:1, scope:'npm lockfile declarations only; includes optional/transitive packages; excludes system dependencies; not a license-text or provenance audit', packages};
-const notices = ['licenses/pi-0.84.4-MIT.txt','licenses/pi-claude-code-provider-0.1.4-MIT.txt','licenses/MIT-standard-reference.txt','licenses/pi-lsp-extension-NOTICE.txt','licenses/claude-code-2.1.250-NOTICE.txt'];
+const notices = ['licenses/multilspy-dependency-notices.txt','licenses/pi-0.84.4-MIT.txt','licenses/pi-claude-code-provider-0.1.4-MIT.txt','licenses/MIT-standard-reference.txt','licenses/pi-lsp-extension-NOTICE.txt','licenses/claude-code-2.1.250-NOTICE.txt'];
 const standalone = 'Third-party notices for the YHWH Pi integration\n\nDependencies retain their own licenses. These notices do not license Claude services.\nThe complete source distribution also contains THIRD_PARTY.md and a lockfile inventory.\n\n'+notices.map(file => `${path.basename(file)}\n${'='.repeat(60)}\n${read(file).toString('utf8').trim()}\n`).join('\n');
 const outputs = new Map([
   ['licenses/dependency-inventory.json', Buffer.from(JSON.stringify(inventory,null,2)+'\n')],
