@@ -7,7 +7,7 @@ The primary can run in any host with MCP tool calling and persistent instruction
 Pi is the lower-agent execution, model-probe and LSP layer controlled by Tifereth. The default installation uses stdio; an optional shared runtime uses the local Streamable HTTP MCP endpoint `http://127.0.0.1:17331/mcp`. Model tasks first pass through a Kether execution envelope, then route through an exact allowlist to:
 
 - `openai-codex` (workers: `gpt-5.6-luna` / `max`).
-- `pi-claude-code-provider` (Geburah/reviewer: `claude-sonnet-5` / `max`, restricted to `access:none`).
+- `anthropic` (Geburah/reviewer: `claude-sonnet-5` / `max`, restricted to `access:none`).
 
 The gateway provides synchronous execution, asynchronous monitoring, model probes and LSP tools. Monitoring uses `submit_subagent`, `get_subagent_status`, `get_subagent_result`, `list_subagents`, `cancel_subagent` and `render_subagent_monitor`. The last tool returns an MCP Apps conversation card that refreshes the task tree by `parentRunId`. Callers cannot supply raw Pi arguments, environment variables or arbitrary tool lists. Pi starts with automatic extension discovery disabled and loads only controlled provider and LSP extensions for the task. Actual provider, model and `toolsUsed` are returned for Tifereth's acceptance checks.
 
@@ -19,11 +19,15 @@ Tifereth must supply a stable, unique `requestId` for `workspace-write` calls. T
 
 `provider-circuit-state` appends infrastructure outcomes from probes and actual calls to a separate JSONL state cache and exposes each provider/model route as `closed / open / half-open`. It does not create agents, schedule probes, select fallback models, rewrite envelopes, automatically retry or run background heartbeats. Authentication failures immediately enter `open` without timed expiry; after login repair, Tifereth must explicitly submit a recovery probe with `recovery: true`. HTTP 429 follows the provider's retry-after interval. Three consecutive network, timeout, route-mismatch or provider failures trigger a five-minute cooldown. After cooldown, `half-open` permits a single two-minute recovery-probe lease. Model refusals, poor answers, invalid arguments, scope violations and tool/LSP failures do not count as provider infrastructure failures.
 
+Optional `yhwh-worker-api` / `yhwh-reviewer-api` routes support OpenCode Go, CommandCode, OpenRouter and custom HTTPS platforms. Fixed host configuration, separate credential storage, launch digest checks, max and role/access restrictions remain enforced. Defaults are unchanged with no automatic fallback. See [platform configuration](../../docs/provider-configuration.en.md). Live platform calls are unverified.
+
+Since 0.8 API keys are encrypted with Windows DPAPI CurrentUser. Windows decrypts into private pipes / FD3 without plaintext API temporary files. After upgrading code, migrate legacy plaintext using `Migrate-API-Keys.cmd` or `install/Migrate-ApiCredentials.ps1`; plaintext fallback is rejected.
+
 ## Runtime boundaries
 
 - Listens on loopback only. `/mcp` requires a Bearer token; the default request limit is 100 KiB.
 - Concurrency remains capped at four, with admission constrained by a shared 6 GiB / 2 CPU pool: at most four `small`, two `standard` or one `large` task. Admission also preserves a host-memory reserve of at least `max(2 GiB, 10% of host RAM)`. The default queue holds 16 tasks. Queue and execution deadlines are separate; cancellation terminates the Pi process tree.
-- Active provider pools are `openai-codex=2` and `pi-claude-code-provider=1`. Other provider capacity entries retained by the scheduler do not authorize those routes. Scheduling uses `priority` (0..9), waiting-time aging and FIFO, skipping entries blocked by dependencies, resource limits or write locks to run other eligible tasks.
+- Active provider pools are `openai-codex=2` and `anthropic=1`. Other provider capacity entries retained by the scheduler do not authorize those routes. Scheduling uses `priority` (0..9), waiting-time aging and FIFO, skipping entries blocked by dependencies, resource limits or write locks to run other eligible tasks.
 - Each task selects a hardcoded `small`, `standard` or `large` resource profile; the default is `standard`. Callers may only shorten its deadline through `timeoutSeconds`, not specify arbitrary memory, CPU, process or output limits.
 - `cwd` must resolve within a configured real-path root; LSP files must also be within the selected `cwd`.
 - Gateway credentials are not passed to Pi child processes. Recursive Pi dispatch is rejected.
@@ -93,3 +97,9 @@ See [REVIEW-AND-TIMEOUTS.md](REVIEW-AND-TIMEOUTS.md) for independent queue deadl
 `lsp_request` executes without a model and requires neither model-service login nor provider/model fields. It retains read-only single-file snapshots, WSL isolation, resource limits, auditing and cleanup. Positions use 1-based line/character values; `query` is a symbol name, and `search` takes a structural pattern plus `language`. Responses include the raw tool result and backend. See [Pi LSP](skills/pi-lsp/SKILL.md).
 
 The current model-task protocol is v2, with role-specific deliverables, strict field types, failure-state rejection and ledger-backed stage handoffs. See [ROLE-CONTRACTS-V2.md](ROLE-CONTRACTS-V2.md). Reduced legacy `returnFields` are rejected; standalone tasks do not attest completion of the full governance chain.
+
+## License
+
+Original YHWH code, documentation and configuration are licensed under [Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party components retain their own licenses. [Third-party notices](THIRD_PARTY_NOTICES.txt).
+
+Since 0.6.0 the reviewer uses the native Anthropic API with a user-owned API key. Subscription credential reading/renewal and the Claude Code bridge are removed. Service terms still apply; live API access has not been verified.

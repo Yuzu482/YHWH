@@ -8,7 +8,7 @@ YHWH 0.4 把主代理宿主与 Pi 执行层分开。满足「MCP 工具调用、
 
 ```powershell
 # 单文件安装器：宿主列表使用一个逗号分隔的字符串
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -Hosts "cherry-studio,opencode,deepseek-harness,claude-code"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.6.0.ps1 -Hosts "cherry-studio,opencode,deepseek-harness,claude-code"
 ```
 
 新的一键入口默认 `generic`。只有显式选择 `codex` 才安装 Codex 全局规则、技能、插件注册和多代理设置。高级配置增加 `hosts` 数组；旧配置未提供该字段时仍按 `codex` 处理，保持兼容。不要同时配置 `opencode` 和 `opencode-v2` 到同一客户端，它们对应不同的配置版本。

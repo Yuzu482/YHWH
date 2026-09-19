@@ -108,13 +108,13 @@ test('MCP stage chain injects ledger evidence and blocks cross-run/hash/review b
     const plan=await run('typed-plan','Chochmah','planned',[scoutRef]);assert.equal(plan.ok,true);
     assert.equal(invoked[1].upstream[0].result.result,'typed-scout');
     const planRef=ref('typed-plan','Chochmah','planned',plan.contract.resultSha256);
-    const review=await run('typed-review','Geburah','pre-review',[planRef],{provider:'pi-claude-code-provider',model:'claude-sonnet-5'});assert.equal(review.ok,true);
+    const review=await run('typed-review','Geburah','pre-review',[planRef],{provider:'anthropic',model:'claude-sonnet-5'});assert.equal(review.ok,true);
     const reviewRef=ref('typed-review','Geburah','pre-review',review.contract.resultSha256);
     const worker=await run('typed-worker','Chesed','implementing',[reviewRef]);assert.equal(worker.ok,true);
     const replay=await run('typed-worker','Chesed','implementing',[reviewRef]);assert.equal(replay.idempotency.status,'replayed');assert.equal(invoked.length,4);
     const conflict=await run('typed-worker','Chesed','implementing',[reviewRef],{priority:8});assert.equal(conflict.ok,false);assert.equal(invoked.length,4);
     rejectReview=true;
-    const rejected=await run('typed-review-reject','Geburah','pre-review',[planRef],{provider:'pi-claude-code-provider',model:'claude-sonnet-5'});assert.equal(rejected.ok,false);
+    const rejected=await run('typed-review-reject','Geburah','pre-review',[planRef],{provider:'anthropic',model:'claude-sonnet-5'});assert.equal(rejected.ok,false);
     const blocked=await run('typed-blocked','Chesed','implementing',[ref('typed-review-reject','Geburah','pre-review')]);assert.equal(blocked.ok,false);assert.match(blocked.error,/dependency failed/);assert.equal(invoked.length,5);
   },{dispatchFn:async(request,_signal,task,options)=>{
     invoked.push({role:task.role,upstream:options.upstreamResults});
@@ -172,7 +172,7 @@ test('review material gate blocks before dispatch and rejects non-approval outco
  let calls=0;
  const reviewPacket={version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['Synthetic evidence for '+k]}]))};
  const task={role:'reviewer',objective:'Review fixture',acceptance:['Evidence based decision'],reviewPacket};
- const base={cwd:root,provider:'pi-claude-code-provider',model:'claude-sonnet-5',access:'none',resourceProfile:'small',task};
+ const base={cwd:root,provider:'anthropic',model:'claude-sonnet-5',access:'none',resourceProfile:'small',task};
  await withGateway(async({client})=>{
   const missing=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,task:{...task,reviewPacket:undefined}}}));
   assert.equal(missing.status,'blocked');assert.equal(missing.code,'REVIEW_MATERIALS_MISSING');assert.equal(calls,0);
@@ -208,8 +208,8 @@ test('gateway requires bearer auth and exposes only governed MCP tools', async (
     assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/readyz`)).json(), { ok: true, service: 'pi-kether-gateway' });
     const tools = await client.listTools();
     assert.deepEqual(tools.tools.map(tool => tool.name).sort(), [
-      'cancel_subagent', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'get_workflow', 'list_capabilities', 'list_subagents',
-      'lsp_request', 'probe_model', 'render_subagent_monitor', 'renew_claude_auth', 'submit_subagent',
+      'cancel_subagent', 'check_claude_auth', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'get_workflow', 'list_capabilities', 'list_subagents',
+      'lsp_request', 'probe_model', 'render_subagent_monitor', 'submit_subagent',
     ]);
     const caps = parsed(await client.callTool({ name: 'list_capabilities', arguments: {} }));
     assert.equal(caps.writeEnabled, true);
@@ -609,14 +609,14 @@ test('queued cancellation removes work before it can start', async () => {
   },{sandboxStatus:{ok:false},lspFn:()=>{throw new Error('must not launch');}});
  });
 
- test('auth renewal tool uses host maintenance only and does not clear circuit',async()=>{
+ test('API key check uses local validation only and does not clear circuit',async()=>{
   const circuitState=createMemoryProviderCircuitState();
-  circuitState.record({provider:'pi-claude-code-provider',model:'claude-sonnet-5',healthy:false,category:'authentication'});
+  circuitState.record({provider:'anthropic',model:'claude-sonnet-5',healthy:false,category:'authentication'});
   await withGateway(async({client})=>{
-   const result=parsed(await client.callTool({name:'renew_claude_auth',arguments:{}}));
+   const result=parsed(await client.callTool({name:'check_claude_auth',arguments:{}}));
    assert.equal(result.ok,true);assert.equal(result.modelCalls,0);assert.equal(result.recoveryProbeRequired,true);
-   assert.throws(()=>circuitState.assertTaskAllowed('pi-claude-code-provider','claude-sonnet-5'));
-  },{circuitState,renewAuthFn:async()=>({ok:true,status:'renewed'}),dispatchFn:()=>{throw new Error('must not dispatch');}});
+   assert.throws(()=>circuitState.assertTaskAllowed('anthropic','claude-sonnet-5'));
+  },{circuitState,checkAuthFn:async()=>({ok:true,status:'configured'}),dispatchFn:()=>{throw new Error('must not dispatch');}});
  });
 
 

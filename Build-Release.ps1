@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$SkipTests)
+param([switch]$SkipTests,[switch]$PublicRelease)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $manifest = Get-Content -LiteralPath (Join-Path $root 'portable.manifest.json') -Raw | ConvertFrom-Json
@@ -12,6 +12,17 @@ New-Item -ItemType Directory -Force -Path $release | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Portable self-test failed.' }
 & (Join-Path $root 'install\Test-WorkflowConfig.ps1')
 & (Join-Path $root 'install\Sync-HostWorkflow.ps1') -Check
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'install/Test-ClaudeApiSetup.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'API setup validation failed.' }
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'install/Test-ProviderSetup.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Provider setup validation failed.' }
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'install/Test-ApiEncryption.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'DPAPI encryption validation failed.' }
+
+$licenseArgs=@('--check')
+if($PublicRelease){$licenseArgs+='--public'}
+node (Join-Path $root 'install/license-inventory.mjs') @licenseArgs
+if ($LASTEXITCODE -ne 0) { throw 'License inventory validation failed.' }
 
 $plugin = Join-Path $root 'payload\pi-dispatch'
 if (-not $SkipTests) {
@@ -51,11 +62,11 @@ $stage = Join-Path $stageBase 'pi-kether-portable'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 try {
   # Enumerate by allowlist and prune local state even when -SkipTests is used.
-  $allowed = @('install','payload','templates','docs','.readme-assets','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','.gitignore')
+  $allowed = @('install','payload','templates','docs','.readme-assets','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','THIRD_PARTY.en.md','LICENSE','NOTICE','licenses','.gitignore')
   function Copy-ReleaseTree([string]$Source, [string]$Destination) {
     $item = Get-Item -LiteralPath $Source -Force
     if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing release symlink: $Source" }
-    if ($item.Name -match '^(node_modules|\.git|\.test|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { return }
+    if ($item.Name -match '^(node_modules|\.git|\.test|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { return }
     if ($item.PSIsContainer) {
       New-Item -ItemType Directory -Force -Path $Destination | Out-Null
       foreach ($child in Get-ChildItem -LiteralPath $Source -Force) { Copy-ReleaseTree $child.FullName (Join-Path $Destination $child.Name) }

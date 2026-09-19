@@ -24,10 +24,10 @@ foreach ($link in [regex]::Matches($policy, '\]\((agent-references/[^)]+)\)')) {
 function Get-DistributableFiles([string]$Directory) {
   foreach ($item in Get-ChildItem -LiteralPath $Directory -Force) {
     if ($item.PSIsContainer) {
-      if ($item.Name -in @('release','.test','.git','node_modules')) { continue }
+      if ($item.Name -in @('release','.test','.git','node_modules','__pycache__')) { continue }
       if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing distribution scan through a link: $($item.FullName)" }
       Get-DistributableFiles $item.FullName
-    } elseif ($item.FullName -ne $PSCommandPath -and $item.Extension -notin '.zip','.sha256') { $item }
+    } elseif ($item.FullName -ne $PSCommandPath -and $item.Extension -notin '.zip','.sha256','.pyc') { $item }
   }
 }
 $scanFiles = @(Get-DistributableFiles $packageRoot)

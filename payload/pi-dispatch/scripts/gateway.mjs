@@ -1,6 +1,6 @@
 import {validateRoleResult,ROLE_SCHEMAS} from '../extensions/role-contract.js';
 import {prepareHandoff,completedContract,collectHandoffResults,HANDOFF_POLICY} from '../extensions/stage-handoff.js';
-import {ensureClaudeAuth,AUTH_RENEWAL_POLICY} from './claude-auth-renewal.mjs';
+import {checkClaudeAuth,CLAUDE_API_POLICY} from './claude-api-auth.mjs';
 import {OPENAI_AUTH_POLICY} from './openai-auth-store.mjs';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
@@ -107,7 +107,7 @@ const taskSchema = z.object({
   reviewPacket: reviewPacketSchema.optional(),
 }).strict();
 const routeSchema = {
-  provider: z.enum(['openai-codex', 'pi-claude-code-provider']),
+  provider: z.enum(['openai-codex', 'anthropic', 'yhwh-worker-api', 'yhwh-reviewer-api']),
   model: z.string().min(1).max(200), cwd: z.string().min(3).max(1024),
   thinking: z.enum(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   timeoutSeconds: z.number().int().min(1).max(900).optional(),
@@ -187,7 +187,7 @@ export function createGatewayRuntime(options) {
     editors: EDITOR_POLICY,
     authentication: {
       openaiRenewal:{enabled:true,hostOnly:true,piSdk:true,automaticBeforeDispatch:true,atomicPersistence:true,sharedPiFileLock:true,sandboxRefresh:false,sandboxCredential:"access-token-only",validity:"execution budget plus 360 seconds",policy:OPENAI_AUTH_POLICY,clearsCircuit:false},
-      claudeRenewal:{enabled:true,hostOnly:true,officialCli:true,automaticBeforeDispatch:true,tool:"renew_claude_auth",policy:AUTH_RENEWAL_POLICY,clearsCircuit:false}
+      claudeApi:{enabled:true,hostOnly:true,automaticBeforeDispatch:true,tool:"check_claude_auth",policy:CLAUDE_API_POLICY,clearsCircuit:false}
     },
     lsp: {executionMode:"direct", modelRequired:false, credentialsRequired:false, sandboxRequired:true, scope:"single-file snapshot", methods:Object.keys(LSP_METHODS), positions:"1-based", query:"exact symbol or structural pattern; no natural-language interpretation"},
     ...executor.state,
@@ -257,7 +257,7 @@ export function createGatewayRuntime(options) {
     },
     governance: {
       resultContract:{version:2,enforced:true,schemas:ROLE_SCHEMAS}, handoff:HANDOFF_POLICY,
-      roleModels: ROLE_MODELS, roleProviders: ROLE_PROVIDERS, roleAliases: ROLE_ALIASES, unknownRolesRejected: true,
+      roleModels: ROLE_MODELS, roleProviders: ROLE_PROVIDERS, controlledRoleProviders:{workers:'yhwh-worker-api',reviewer:'yhwh-reviewer-api',activation:'explicit provider selection after host configuration'}, roleAliases: ROLE_ALIASES, unknownRolesRejected: true,
       providerMismatchRejected: true, claudeReviewAccess: 'none',
       reviewExecution:{recommendedProfile:'standard',recommendedTimeoutSeconds:300,thinkingUnchanged:true,materialStrategy:'one independently reviewable change per packet; Tifereth chooses the budget'},
       reviewContract: {version:1,requiredFor:['Geburah','reviewer'],sections:['requirements','changes','context','verification'],missingMaterials:'blocked-before-model',semanticCompleteness:'reviewer-and-primary'},
@@ -266,7 +266,7 @@ export function createGatewayRuntime(options) {
       acceptanceRequired: true, explicitReadScopeRequired: true,
       enforcementBoundary: 'Pi invocation validation; host-agent review stages are not attested',
       primaryHost: {protocol:'MCP',policyTool:'get_workflow',primaryModel:'host-selected',enforcement:'Pi invocation checks; host compliance is not attested',runtimePlatform:'Windows + WSL2'},
-      requiredConnectorTools: ['get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','renew_claude_auth'],
+      requiredConnectorTools: ['get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth'],
     },
   });
 
@@ -546,19 +546,19 @@ export function createGatewayRuntime(options) {
         'openai/toolInvocation/invoked': 'Pi 子 Agent 监控已更新',
       },
     }, async input => structuredResult(monitorPayload(input.parentRunId, input.limit)));
-    server.registerTool('renew_claude_auth', {
-      description:'Renew the host Claude Code login through its official CLI, if near expiry. Does not call a model or clear provider circuit state. After repair, Tifereth must explicitly request probe_model with recovery=true.',
+    server.registerTool('check_claude_auth', {
+      description:'Check local Anthropic API-key configuration without network access. Does not renew credentials, verify account access, call a model or clear circuit state. After repair, request probe_model with recovery=true.',
       inputSchema:{...traceSchema},
-      annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:true},
+      annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     },admitted(async(input,extra)=>{
       const requestId=ensureRequestId(input.requestId),started=Date.now();
       try{
-        const result=await (options.renewAuthFn??ensureClaudeAuth)({signal:extra.signal});
-        audit?.record(buildAuditRecord({requestId,operation:'renew_claude_auth',input:{access:'none'},result,durationMs:Date.now()-started}));
+        const result=await (options.checkAuthFn??checkClaudeAuth)({signal:extra.signal});
+        audit?.record(buildAuditRecord({requestId,operation:'check_claude_auth',input:{access:'none'},result,durationMs:Date.now()-started}));
         return textResult({...result,requestId,recoveryProbeRequired:true,modelCalls:0});
       }catch(error){
         const failureCode=error.code??'PI_AUTH_RENEW_FAILED';
-        audit?.record(buildAuditRecord({requestId,operation:'renew_claude_auth',input:{access:'none'},result:{ok:false,failureCode},failure:failureCode,durationMs:Date.now()-started}));
+        audit?.record(buildAuditRecord({requestId,operation:'check_claude_auth',input:{access:'none'},result:{ok:false,failureCode},failure:failureCode,durationMs:Date.now()-started}));
         return textResult({ok:false,requestId,failureCode,error:failureCode,modelCalls:0},true);
       }
     }));

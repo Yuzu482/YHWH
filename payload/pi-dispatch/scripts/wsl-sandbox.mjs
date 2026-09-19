@@ -78,7 +78,7 @@ function stripPatch(stdout) {
   return { stdout: stdout.slice(0, index), patch: Buffer.from(encoded, 'base64').toString('utf8') };
 }
 
-export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, env = process.env, signal, onProgress, editorBroker } = {}) {
+export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, env = process.env, signal, onProgress, editorBroker, apiPacket } = {}) {
   return new Promise((done) => {
     if (!resourceLimits?.profile || !Number.isInteger(resourceLimits.timeoutSeconds) || !Number.isInteger(resourceLimits.outputBytes)) {
       done({ exitCode: null, failure: 'invalid-resource-limits', stdout: '', stderr: '', sandbox: 'wsl2-bwrap' });
@@ -92,7 +92,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     if (!/^[a-f0-9-]{36}$/.test(gatewayInstanceId)) throw new Error('Invalid gateway instance id');
     if (!Number.isInteger(gatewayWindowsPid) || gatewayWindowsPid < 1) throw new Error('Invalid gateway Windows pid');
     const scopeManifest = Buffer.from(JSON.stringify({ read: readScope, write: writeScope }), 'utf8').toString('base64');
-    const commandArgs = ['-d', distro, '-u', 'root', '--', '/usr/local/libexec/pi-kether-sandbox', 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...(editorBroker?['--editor-bridge']:[]), ...args];
+    const commandArgs = ['-d', distro, '-u', 'root', '--', '/usr/local/libexec/pi-kether-sandbox', 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args];
     const timeline=createExecutionTimeline({onProgress});
     let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false;
     const child = spawn('wsl.exe', commandArgs, { env, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -141,6 +141,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     child.on('error', (error) => { failure = error.message; finish(null); });
     child.on('close', finish);
     child.stdin.on('error', () => {});
+    if(apiPacket)child.stdin.write('YHWH_API_CREDENTIAL_V1\n'+JSON.stringify(apiPacket)+'\n');
     if(editorBroker)child.stdin.write(JSON.stringify({prompt:input})+'\n');else child.stdin.end(input);
   });
 }

@@ -1,0 +1,103 @@
+Third-party notices for the YHWH Pi integration
+
+Dependencies retain their own licenses. These notices do not license Claude services.
+The complete source distribution also contains THIRD_PARTY.md and a lockfile inventory.
+
+pi-0.84.4-MIT.txt
+============================================================
+MIT License
+
+Copyright (c) 2025 Mario Zechner
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+pi-claude-code-provider-0.1.4-MIT.txt
+============================================================
+MIT License
+
+Copyright (c) 2026 chem
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+MIT-standard-reference.txt
+============================================================
+MIT License
+
+Copyright (c) <year> <copyright holders>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+pi-lsp-extension-NOTICE.txt
+============================================================
+pi-lsp-extension 1.3.0
+Upstream: https://github.com/samfoy/pi-lsp-extension
+Package: https://registry.npmjs.org/pi-lsp-extension/-/pi-lsp-extension-1.3.0.tgz
+Declared license: MIT (package.json and README).
+
+The inspected npm package and upstream repository tree did not supply a
+standalone LICENSE/NOTICE file as of 2026-09-19. The actual package metadata
+is preserved in pi-lsp-extension-1.3.0.package.json. No upstream copyright
+holder, year or missing license text has been invented.
+
+YHWH downloads this dependency at installation time and applies the changes
+in install/patch-pi-lsp.mjs (disabling repository executable configuration
+and Lombok discovery; hidden child windows and additional language support).
+Source excerpts remain subject to their upstream terms. Obtain the complete
+upstream notice before redistributing a modified dependency package. This
+record documents the evidence gap; it is not a replacement license.
+
+Additional evidence: pi-lsp-extension-evidence.json records the verified npm
+archive integrity, source gitHead and complete archive file list. The standard
+MIT grant text is supplied as MIT-standard-reference.txt from SPDX. Its
+copyright placeholder is deliberately not filled: it is a reference text,
+not an upstream-authored copyright notice or proof of maintainer confirmation.
+Public-release validation remains blocked pending the complete upstream notice.
+
+claude-code-2.1.250-NOTICE.txt
+============================================================
+© Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements outlined here: https://code.claude.com/docs/en/legal-and-compliance.

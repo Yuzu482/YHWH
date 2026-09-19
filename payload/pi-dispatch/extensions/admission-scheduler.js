@@ -7,7 +7,7 @@ export const SCHEDULER_POLICY = Object.freeze({
   memoryCapacityBytes: 6 * GIB,
   cpuCapacity: 2,
   hostReserveBytes: Math.max(2 * GIB, Math.ceil(totalmem() * 0.10)),
-  providerCapacity: Object.freeze({ 'openai-codex': 2, 'pi-claude-code-provider': 1, 'opencode-go': 2 }),
+  providerCapacity: Object.freeze({ 'openai-codex': 2, 'anthropic': 1, 'opencode-go': 2, 'yhwh-worker-api': 2, 'yhwh-reviewer-api': 1 }),
   pollIntervalMs: 500,
   agingIntervalMs: 30_000,
   queueTimeoutMs: 120_000,

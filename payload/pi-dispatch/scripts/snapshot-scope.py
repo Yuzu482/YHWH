@@ -4,7 +4,7 @@ import os, sys, json, pathlib, stat, time, hashlib
 MAX_BYTES = 128 * 1024 * 1024
 MAX_FILES = 10000
 MAX_ENTRIES = 50000
-DENY = {'.git', '.hg', '.svn', 'node_modules', 'library', 'temp', 'obj', 'bin', '.ssh', '.aws', '.azure', '.gnupg', '.pi', '.pi-lsp.json', 'auth.json', 'models.json', 'models-store.json', '.npmrc', '.pypirc', 'credentials.json', '.credentials.json'}
+DENY = {'.git', '.hg', '.svn', 'node_modules', 'library', 'temp', 'obj', 'bin', '.ssh', '.aws', '.azure', '.gnupg', '.pi', '.pi-lsp.json', 'auth.json', 'models.json', 'models-store.json', '.npmrc', '.pypirc', 'credentials.json', '.credentials.json', 'anthropic-api-key.json', 'provider-config.json', 'provider-credentials.json'}
 def forbidden(path):
     return any(p.lower() in DENY or p.lower().startswith('.env') or p.lower().endswith(('.pem', '.key', '.p12', '.pfx')) for p in pathlib.PurePosixPath(path).parts)
 def compile_scope(values):

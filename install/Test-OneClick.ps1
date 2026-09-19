@@ -114,8 +114,16 @@ if($Installer) {
   foreach($required in @('Workflow.ps1','payload/pi-dispatch/.codex-plugin/plugin.json','payload/wsl-package-lock.json','templates/agent-references/pi-routing.md','README.md','README.en.md','.readme-assets/en.svg','install/bootstrap-dependencies.json','templates/host-primary.md','payload/pi-dispatch/workflow/catalog.json','payload/pi-dispatch/scripts/host-profiles.mjs','payload/pi-dispatch/scripts/check-host-connection.mjs','install/Export-HostProfiles.ps1','docs/host-integration.md','docs/host-integration.en.md','payload/pi-dispatch/scripts/common-client-profiles.mjs','docs/common-clients.md','docs/common-clients.en.md')) {
     Check (Test-Path -LiteralPath (Join-Path $package $required)) "Release contains $required"
   }
+  foreach($licenseFile in @('LICENSE','NOTICE','THIRD_PARTY.md','THIRD_PARTY.en.md','licenses/sources.json','licenses/MIT-standard-reference.txt','licenses/pi-lsp-extension-evidence.json','install/Set-ClaudeApiKey.ps1','payload/pi-dispatch/scripts/anthropic-api-credential.mjs','payload/pi-dispatch/scripts/claude-api-auth.mjs','licenses/dependency-inventory.json','licenses/pi-0.84.4-MIT.txt','licenses/pi-claude-code-provider-0.1.4-MIT.txt','licenses/pi-lsp-extension-NOTICE.txt','licenses/pi-lsp-extension-1.3.0.package.json','licenses/claude-code-2.1.250-NOTICE.txt','payload/pi-dispatch/LICENSE','payload/pi-dispatch/NOTICE','payload/pi-dispatch/THIRD_PARTY_NOTICES.txt','docs/claude-code-feasibility.md','docs/claude-code-feasibility.en.md')) {
+    $packedFile=Join-Path $package $licenseFile
+    Check ((Test-Path -LiteralPath $packedFile) -and ((Get-FileHash -LiteralPath $packedFile).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo $licenseFile)).Hash)) "Release preserves $licenseFile"
+  }
+  foreach($providerFile in @('install/Migrate-ApiCredentials.ps1','install/Test-ApiEncryption.ps1','payload/pi-dispatch/scripts/ApiCredentialStore.ps1','payload/pi-dispatch/scripts/Read-ApiCredential.ps1','payload/pi-dispatch/scripts/windows-api-credential.mjs','payload/pi-dispatch/scripts/accept-api-packet.mjs','install/Set-ProviderConfig.ps1','install/Set-ProviderApiKey.ps1','install/Open-YhwhProviders.ps1','install/provider-config.mjs','templates/provider-config.example.json','payload/pi-dispatch/scripts/controlled-provider.mjs','payload/pi-dispatch/scripts/provider-transport.mjs','payload/pi-dispatch/extensions/controlled-provider.js','docs/provider-configuration.md','docs/provider-configuration.en.md')) {
+    $packed=Join-Path $package $providerFile
+    Check ((Test-Path -LiteralPath $packed) -and ((Get-FileHash -LiteralPath $packed).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo $providerFile)).Hash)) "Release preserves $providerFile"
+  }
   $files=@(Get-ChildItem -LiteralPath $package -Recurse -Force -File)
-  $badFiles=@($files|Where-Object{$_.FullName -match '[\\/](node_modules|\.git|\.runtime)[\\/]|[\\/]auth\.json$|[\\/]\.env[^\\/]*$'})
+  $badFiles=@($files|Where-Object{$_.FullName -match '[\\/](node_modules|\.git|\.runtime)[\\/]|[\\/]auth\.json$|[\\/](anthropic-api-key|provider-config|provider-credentials)\.json$|[\\/]\.env[^\\/]*$'})
   Check ($badFiles.Count -eq 0) 'Release excludes dependencies, credentials and runtime state'
   & $engine -NoProfile -ExecutionPolicy Bypass -File $Installer -PlanOnly -InstallRoot (Join-Path $test 'generated plan')
   Check ($LASTEXITCODE -eq 0 -and -not(Test-Path -LiteralPath (Join-Path $test 'generated plan'))) 'Generated installer plan remains read-only'

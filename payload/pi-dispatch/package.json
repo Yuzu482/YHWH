@@ -13,5 +13,6 @@
     "@modelcontextprotocol/sdk": "1.30.0",
     "express": "5.2.1",
     "zod": "4.5.4"
-  }
+  },
+  "license": "Apache-2.0"
 }

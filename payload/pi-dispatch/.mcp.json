@@ -21,7 +21,7 @@
         "probe_model",
         "lsp_request",
         "get_subagent_result",
-        "renew_claude_auth"
+        "check_claude_auth"
       ],
       "startup_timeout_sec": 30
     }

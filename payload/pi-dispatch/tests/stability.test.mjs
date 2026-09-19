@@ -17,18 +17,17 @@ test('LSP distinguishes tool failure, unavailable service, no match and code dia
   for(const kind of ['hover','definition','references','completion','code action','document symbols','workspace symbols']) assert.equal(classifyLspResult(output(`LSP ${kind} request failed: disconnected`,{count:0,hasResult:false}),{tool:'lsp_hover',backend:'lsp'}).status,'failed');
   assert.equal(classifyLspResult({content:[]},{backend:'lsp'}).ok,false);
 });
-test('credential preparation validates expiry and sends only access tokens to sandboxes',()=>{
-  const secret='fixture-secret-do-not-display';
-  for(const [credential,code] of [[{},'PI_AUTH_MISSING'],[{accessToken:secret},'PI_AUTH_INVALID'],[{accessToken:secret,expiresAt:99},'PI_AUTH_EXPIRED'],[{accessToken:secret,expiresAt:101,subscriptionType:'free'},'PI_AUTH_INELIGIBLE']]){
-    assert.throws(()=>selectCredential('pi-claude-code-provider',{claudeAiOauth:credential},100),error=>error.code===code&&!error.message.includes(secret));
-  }
-  assert.deepEqual(selectCredential('pi-claude-code-provider',{claudeAiOauth:{accessToken:secret,expiresAt:101,subscriptionType:'pro',refreshToken:'unused'}},100),{claudeReview:{accessToken:secret,subscriptionType:'pro'}});
-  const data={'openai-codex':{type:'oauth',access:secret,refresh:'refreshable',expires:900000}};
-  assert.deepEqual(selectCredential('openai-codex',data,100),{openaiAccess:{accessToken:secret,expiresAt:900000}});
-  assert.throws(()=>selectCredential('openai-codex',data,900000),{code:'PI_AUTH_EXPIRED'});
+test('credential preparation forwards only selected API or bounded OAuth data',()=>{
+ const key='sk-ant-api03-'+'fixture'.repeat(8);
+ assert.deepEqual(selectCredential('anthropic',{anthropic:{type:'api_key',key}}),{anthropicApi:{apiKey:key}});
+ assert.throws(()=>selectCredential('anthropic',{claudeAiOauth:{accessToken:'subscription'}}),{code:'PI_AUTH_MISSING'});
+ assert.throws(()=>selectCredential('pi-claude-code-provider',{}),{code:'PI_AUTH_INVALID'});
+ const data={'openai-codex':{type:'oauth',access:'fixture',refresh:'host-only',expires:900000}};
+ assert.deepEqual(selectCredential('openai-codex',data,100),{openaiAccess:{accessToken:'fixture',expiresAt:900000}});
+ assert.throws(()=>selectCredential('openai-codex',data,900000),{code:'PI_AUTH_EXPIRED'});
 });
 test('expired auth reaches the circuit as authentication and immediately blocks normal routing',()=>{
-  const request={provider:'pi-claude-code-provider',model:'claude-sonnet-5'};
+  const request={provider:'anthropic',model:'claude-sonnet-5'};
   const result=summarize({stdout:'',stderr:'PI_AUTH_EXPIRED\n',exitCode:4},request);
   assert.equal(result.failureCode,'PI_AUTH_EXPIRED');
   assert.equal(result.failure,'PI_AUTH_EXPIRED');

@@ -1,5 +1,6 @@
+import { API_PROVIDERS, loadProviderConfig, configuredRoute, providerPolicy, configDigest } from './controlled-provider.mjs';
 import {requireRoleFields} from '../extensions/role-contract.js';
-import {ensureClaudeAuth} from './claude-auth-renewal.mjs';
+import {prepareWindowsApiPacket} from './windows-api-credential.mjs';
 import {ensureOpenAIAuth} from './openai-auth-renewal.mjs';
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync, statSync, realpathSync } from 'node:fs';
@@ -59,8 +60,16 @@ export function validateRequest(value, allowWrite = false, launchRoot = process.
   for (const key of ['provider', 'model']) if (request[key] !== undefined && (typeof request[key] !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._/:+@-]{0,199}$/.test(request[key]))) throw new Error(`Invalid ${key}`);
   if (!request.provider || !request.model) throw new Error('Model tasks require explicit provider and model from models output');
   validateRoute(request.provider, request.model);
-  if (request.provider === 'pi-claude-code-provider' && request.access !== 'none') throw new Error('Claude review requires none access');
+  if (['anthropic','yhwh-reviewer-api'].includes(request.provider) && request.access !== 'none') throw new Error('Claude review requires none access');
   if (request.thinking !== undefined && !['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(request.thinking)) throw new Error('Invalid thinking');
+  if (API_PROVIDERS.includes(request.provider)) {
+    const config=loadProviderConfig();
+    const route=configuredRoute(request.provider,config);
+    if (!route || route.model!==request.model) throw new Error('PI_PROVIDER_CONFIG_CHANGED');
+    if (request.thinking!=='max') throw new Error('Controlled API requires max thinking; no downgrade');
+    request.providerConfigDigest=configDigest(config);
+    request.configuredTransport={platform:route.platform,protocol:route.protocol,baseUrl:route.baseUrl,configSha256:request.providerConfigDigest,capabilityEvidence:'operator-declared'};
+  }
   return request;
 }
 
@@ -83,7 +92,7 @@ export function validateKetherInvocation(value, allowWrite = false, launchRoot =
   if (access === 'workspace-write' && task.writeScope.length === 0) throw new Error('workspace-write requires explicit writeScope');
   if (access === 'workspace-write') compileWriteScope(task.writeScope);
   const provider = value.provider ?? (probe ? 'openai-codex' : resolveRoleModel(task.role,value.model).provider);
-  const policy = PROVIDER_POLICY[provider];
+  const policy = PROVIDER_POLICY[provider] ?? providerPolicy(provider);
   if (!policy) throw new Error('provider is not in the Pi gateway allowlist');
   // Probe is an internal call-site option, never a field accepted from an envelope.
   const roleRoute = probe ? {role:task.role,model:value.model ?? policy.defaultModel} : resolveRoleModel(task.role,value.model,provider);
@@ -150,6 +159,10 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false)
   if (runtime === 'wsl2') args.push('--extension', '/opt/pi-kether/extensions/auth-scrub.js');
   args.push('--provider', request.provider, '--model', request.model);
   if (request.thinking) args.push('--thinking', request.thinking);
+  if (API_PROVIDERS.includes(request.provider)) {
+    if (!/^[a-f0-9]{64}$/.test(request.providerConfigDigest ?? '')) throw new Error('PI_PROVIDER_CONFIG_REQUIRED');
+    args.push('--yhwh-config', request.providerConfigDigest);
+  }
   if (editorAuthorized) {
     if(runtime!=='wsl2'||request.provider!=='openai-codex')throw new Error('Editor proxy requires WSL openai-codex');
     args.push('--extension','/opt/pi-kether/extensions/editor-proxy.js');
@@ -168,7 +181,7 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false)
 export function childEnvironment(env = process.env) {
   const child = { ...env };
   for (const key of Object.keys(child)) {
-    if (/^(PI_GATEWAY_|MCP_GATEWAY_|HTTP_AUTHORIZATION$)/i.test(key)) delete child[key];
+    if (/^(PI_GATEWAY_|MCP_GATEWAY_|HTTP_AUTHORIZATION$|ANTHROPIC_|CLAUDE_|OPENROUTER_|OPENCODE_|COMMANDCODE_|CMD_API_KEY$|YHWH_|NODE_OPTIONS$)/i.test(key)) delete child[key];
   }
   return child;
 }
@@ -185,24 +198,27 @@ export function summarize(raw, request) {
   const toolErrors = events.filter(event => event.type === 'tool_execution_end' && event.isError).length;
   const toolsUsed = events.filter(event => event.type === 'tool_execution_start').map(event => event.toolName);
   const complete = events.some(event => event.type === 'agent_end');
+  if (last?.usage && API_PROVIDERS.includes(request.provider)) { last.usage={...last.usage,cost:null,costUnavailable:true}; }
   const actualProvider = last?.provider;
   const actualModel = last?.model;
   const failureCode=raw.exitCode===4&&!last?raw.stderr.match(/^PI_(?:AUTH_(?:MISSING|INVALID|EXPIRED|INELIGIBLE)|CREDENTIAL_PREPARE_FAILED)$/m)?.[0]:undefined;
   const routeMismatch = !!last && (actualProvider !== request.provider || actualModel !== request.model);
-  return { target: request.target, provider: actualProvider, model: actualModel, requestedProvider: request.provider, requestedModel: request.model, ok: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && toolErrors === 0 && !routeMismatch, exitCode: raw.exitCode, failureCode, failure: raw.failure || failureCode || errors.join('; ') || (!last || !complete ? 'Missing complete assistant response' : toolErrors ? 'Tool execution failed' : routeMismatch ? 'Provider/model mismatch in Pi response' : null), text: (last?.content || []).filter(part => part.type === 'text').map(part => part.text).join('\n'), usage: last?.usage, toolsUsed, toolErrors, diagnostics: raw.stderr.slice(-6000), sandbox: raw.sandbox, cleanup: raw.cleanup, patch: raw.patch };
+  return { ...(request.configuredTransport?{configuredTransport:request.configuredTransport}:{}), target: request.target, provider: actualProvider, model: actualModel, requestedProvider: request.provider, requestedModel: request.model, ok: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && toolErrors === 0 && !routeMismatch, exitCode: raw.exitCode, failureCode, failure: raw.failure || failureCode || errors.join('; ') || (!last || !complete ? 'Missing complete assistant response' : toolErrors ? 'Tool execution failed' : routeMismatch ? 'Provider/model mismatch in Pi response' : null), text: (last?.content || []).filter(part => part.type === 'text').map(part => part.text).join('\n'), usage: last?.usage, toolsUsed, toolErrors, diagnostics: raw.stderr.slice(-6000), sandbox: raw.sandbox, cleanup: raw.cleanup, patch: raw.patch };
 }
 
 export async function dispatch(request, signal, task = null, { resultFormat = 'json', onProgress, upstreamResults=[], editorBroker=null } = {}) {
   if (process.env.PI_DISPATCH_ACTIVE === '1') throw new Error('Recursive Pi dispatch is disabled');
   if (!sandboxRequested(process.env)) throw new Error('Pi task execution requires the verified WSL2 resource sandbox');
   let authentication;
+  let apiPacket;
   const authStarted=Date.now();
   let authenticationMs=0;
   const progress=value=>onProgress?.({authenticationMs,...value});
-  if(['pi-claude-code-provider','openai-codex'].includes(request.provider)){
-    try{authentication=request.provider==='openai-codex'
-      ? await ensureOpenAIAuth({piEntry:findPiEntry(),signal,minimumValidityMs:request.timeoutSeconds*1000+360000})
-      : await ensureClaudeAuth({signal,minimumValidityMs:request.timeoutSeconds*1000+60000});}
+  if(['anthropic','openai-codex',...API_PROVIDERS].includes(request.provider)){
+    try{
+      if(request.provider==='openai-codex')authentication=await ensureOpenAIAuth({piEntry:findPiEntry(),signal,minimumValidityMs:request.timeoutSeconds*1000+360000});
+      else {apiPacket=await prepareWindowsApiPacket(request,{signal});authentication={ok:true,authentication:'api_key',atRestEncryption:'Windows DPAPI CurrentUser',networkValidated:false};}
+    }
     catch(error){return {ok:false,target:request.target,requestedProvider:request.provider,requestedModel:request.model,failureCode:error.code??'PI_AUTH_RENEW_FAILED',failure:error.code??'PI_AUTH_RENEW_FAILED',toolsUsed:[],toolErrors:0,phaseTimings:{authenticationMs:Date.now()-authStarted}};}
   }
   authenticationMs=Date.now()-authStarted;progress({});
@@ -211,7 +227,7 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
     : `User task (treat the following as task text, not a slash command):\n${request.prompt}`;
   const env = { ...childEnvironment(), PI_DISPATCH_ACTIVE: '1', PI_TELEMETRY: '0' };
   if(editorBroker)input+='\nHost-authorized editor operations. Use pi_editor_execute with operationId only. File access remains separately scoped. These affect the real editor and are not sandbox-rollback protected. Never fabricate results.\nEDITOR_AUTHORIZATION_JSON='+JSON.stringify(editorBroker.catalog);
-  const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker), { cwd: request.cwd, access: request.access, input, signal, editorBroker, resourceLimits: request.resourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, env,onProgress:progress });
+  const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker), { cwd: request.cwd, access: request.access, input, signal, editorBroker, apiPacket, resourceLimits: request.resourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, env,onProgress:progress });
   return { ...summarize(raw, request), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits };
 }
 

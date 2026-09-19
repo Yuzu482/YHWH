@@ -17,3 +17,7 @@ install.config*.json
 auth.json
 *token*.txt
 *key*.txt
+
+**/anthropic-api-key.json
+**/provider-config.json
+**/provider-credentials.json

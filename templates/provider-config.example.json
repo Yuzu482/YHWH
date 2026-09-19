@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "routes": {
+    "yhwh-worker-api": {
+      "platform": "opencode-go",
+      "baseUrl": "https://opencode.ai/zen/go/v1",
+      "model": "gpt-5.6-luna",
+      "semanticModel": "gpt-5.6-luna",
+      "protocol": "openai-responses",
+      "credentialRef": "opencode-go",
+      "contextWindow": 128000,
+      "maxTokens": 8192,
+      "capabilities": {
+        "maxThinking": false,
+        "tools": true,
+        "streaming": true
+      }
+    },
+    "yhwh-reviewer-api": {
+      "platform": "commandcode",
+      "baseUrl": "https://api.commandcode.ai/provider",
+      "model": "claude-sonnet-5",
+      "semanticModel": "claude-sonnet-5",
+      "protocol": "anthropic-messages",
+      "credentialRef": "commandcode",
+      "contextWindow": 128000,
+      "maxTokens": 8192,
+      "capabilities": {
+        "maxThinking": false,
+        "tools": false,
+        "streaming": true
+      }
+    }
+  }
+}

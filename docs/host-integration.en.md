@@ -8,7 +8,7 @@ YHWH 0.4 separates the primary host from Pi execution. A host needs MCP tool cal
 
 ```powershell
 # Pass the host selection as one comma-separated string
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -Hosts "cherry-studio,opencode,deepseek-harness,claude-code"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.6.0.ps1 -Hosts "cherry-studio,opencode,deepseek-harness,claude-code"
 ```
 
 The new one-click entry defaults to `generic`. Only explicit `codex` selection installs Codex global rules, skills, plugin registration and multi-agent settings. Advanced configuration gains a `hosts` array; older configurations that omit it retain the `codex` default for compatibility. Do not configure both `opencode` and `opencode-v2` in one client: they target different configuration versions.

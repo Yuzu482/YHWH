@@ -45,12 +45,13 @@ and unchanged Windows auth-file DACL. This does not guarantee permanent entitlem
 or survival of every power-loss/storage failure; rejected sessions still need login.
 
 
-## Host Claude login renewal
+## Host Claude API credentials
 
-Before Claude model dispatch, the host checks expiry and renews within five minutes of expiry via the official native Claude Code `auth login --claudeai`, using existing refresh token and scopes. The CLI alone persists credentials. Renewal launches no model, runs hidden with no shell, has a 30-second timeout and a cross-process exclusive lock. Temporary failures cool down for five minutes; rejected refresh credentials require login repair. A process crash may leave a lock: fail closed with PI_AUTH_RENEW_BUSY; verify no auth process remains before manual removal rather than stealing a lock.
+The released reviewer uses the native Pi `anthropic / claude-sonnet-5 / max` route with user-owned API billing. Configure the key through `Configure-Claude-API.cmd`, or run `install/Set-ClaudeApiKey.ps1 -TargetHome <Windows user home>`. Only `.local/state/pi-kether/anthropic-api-key.json` is used. Never read, renew or forward Claude subscription credentials; environment keys, custom endpoints and CLI-token fallbacks are not accepted.
 
-For authentication-open circuits, call `renew_claude_auth` once. Success does not clear the circuit: Tifereth then calls `probe_model` with `recovery:true` for the pinned Sonnet route. Resume reviewer work only after that probe passes. Do not automatically generate model probes or provider fallbacks. No refresh credentials enter WSL tasks, logs, task packets or portable packages. Non-default host CLI path can be set by the host administrator with PI_CLAUDE_AUTH_CLI; MCP requests cannot override executable paths.
+`check_claude_auth` validates local configuration only and makes no network/model call. It does not establish key validity, quota or model availability and does not clear an open circuit. After the user repairs configuration, Tifereth must explicitly authorize `probe_model` with `recovery:true` for the pinned route. Only a successful probe permits resuming ordinary work. Keys enter trusted Pi memory through FD3, never prompts, logs, CLI arguments, environment variables or portable packages. The reviewer retains `access:none` and no tools.
 
-Official reference: https://code.claude.com/docs/en/env-vars#claude-code-oauth-refresh-token
 
-This extends the credential lifecycle; it does not make login permanent. Revocation, missing refresh scopes or an invalid refresh token still require a host login. No authenticated reviewer success is inferred from a successful renewal alone.
+## API key encryption (0.8)
+
+YHWH-managed Anthropic and aggregator API key files require api_key_dpapi envelopes using Windows DPAPI CurrentUser. Decrypt only in the fixed Windows helper, capture into private pipes, validate the route/config digest in WSL, and pass through kernel pipe FD3. API routes must never use plaintext credential files, argv, environment, prompt or log fallback. Legacy plaintext raises PI_AUTH_MIGRATION_REQUIRED; the operator upgrades the gateway and WSL files, then explicitly runs Migrate-API-Keys.cmd or install/Migrate-ApiCredentials.ps1. No plaintext backup is created. Migration does not erase old backups or freed disk blocks. Existing Pi OpenAI OAuth storage is outside this API-key change. Runtime memory and same-user/OS compromise remain outside the encryption guarantee.

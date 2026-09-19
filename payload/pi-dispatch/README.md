@@ -7,7 +7,7 @@
 Pi 作为受 Tifereth 控制的下级 Agent 执行层、模型探针层和 LSP 层。默认安装使用 stdio；可选共享运行时使用本机 Streamable HTTP MCP 端点 `http://127.0.0.1:17331/mcp`。模型任务先经过 Kether 运行信封，再按精确 allowlist 路由到：
 
 - `openai-codex`（worker：`gpt-5.6-luna` / `max`）
-- `pi-claude-code-provider`（Geburah/reviewer：`claude-sonnet-5` / `max`，仅限 `access:none`）
+- `anthropic`（Geburah/reviewer：`claude-sonnet-5` / `max`，仅限 `access:none`）
 
 网关提供同步执行、异步监控、模型探针和 LSP 工具。监控路径使用 `submit_subagent`、`get_subagent_status`、`get_subagent_result`、`list_subagents`、`cancel_subagent` 和 `render_subagent_monitor`；最后一个工具返回 MCP Apps 对话内卡片，按 `parentRunId` 自动刷新任务树。调用方不能提交原始 Pi 参数、环境变量或自由工具列表；Pi 启动时禁用自动扩展发现，只按任务加载受控 provider 与 LSP extension。实际响应中的 provider、model 和 `toolsUsed` 会返回给 Tifereth 验收。
 
@@ -19,11 +19,15 @@ Pi 作为受 Tifereth 控制的下级 Agent 执行层、模型探针层和 LSP �
 
 `provider-circuit-state` 只把探针和实际调用产生的基础设施结果追加到独立 JSONL 状态缓存，并向 Tifereth 暴露每条 provider/model 路由的 `closed / open / half-open` 状态。它不创建 Agent、不决定何时探测、不选择备用模型、不改写信封，也不自动重试或后台运行心跳。认证失败立即进入无定时过期的 `open`，修复登录后需要 Tifereth 显式提交 `recovery: true` 的恢复探针；429 按 provider 的 retry-after 冷却；网络、超时、路由不匹配或 provider 故障连续三次后冷却 5 分钟。冷却结束进入 `half-open`，组件只发放一个两分钟恢复探针租约。模型拒答、回答不合格、参数错误、写入越界及工具/LSP 失败不计为 provider 基础设施故障。
 
+可选受控 API 路由 `yhwh-worker-api` / `yhwh-reviewer-api` 支持 OpenCode Go、CommandCode、OpenRouter 与自定义 HTTPS 平台。固定宿主配置与独立密钥存储、启动摘要校验、max 与角色权限限制均生效；默认路由不变，不自动回退。详见[平台配置](../../docs/provider-configuration.md)。真实平台调用未验证。
+
+API key 自 0.8 起以 Windows DPAPI CurrentUser 密文保存，Windows 解密后经私有管道 / FD3 传递，不生成 API 明文临时文件。旧明文格式必须在代码升级后使用 `Migrate-API-Keys.cmd` 或 `install/Migrate-ApiCredentials.ps1` 迁移；不接受明文回退。
+
 ## 运行边界
 
 - 只监听 loopback；`/mcp` 强制 Bearer token，默认请求上限 100 KiB。
 - 最大进程数仍为 4，但准入按 6 GiB/2 CPU 的共享资源池计算：最多四个 `small`、两个 `standard` 或一个 `large`；同时要求主机在启动新任务后仍保留至少 `max(2 GiB, 宿主总内存的 10%)` 的内存预留。默认队列 16，排队期限与执行期限独立，取消会终止 Pi 进程树。
-- Provider 并发池为 `openai-codex=2`、`pi-claude-code-provider=1`（调度器保留的其他 Provider 容量项不代表路由已获准）。队列按 `priority`（0..9）、等待老化和 FIFO 排序，并跳过依赖未满足、资源不足或写锁冲突的条目，继续运行其他可执行任务。
+- Provider 并发池为 `openai-codex=2`、`anthropic=1`（调度器保留的其他 Provider 容量项不代表路由已获准）。队列按 `priority`（0..9）、等待老化和 FIFO 排序，并跳过依赖未满足、资源不足或写锁冲突的条目，继续运行其他可执行任务。
 - 每个任务必须选择 Pi 内硬编码的 `small`、`standard` 或 `large` 资源档位，默认 `standard`。调用方只能用 `timeoutSeconds` 缩短档位时限，不能提交任意内存、CPU、进程数或输出上限。
 - `cwd` 必须位于配置的真实路径根目录内；LSP 文件还必须位于所选 `cwd` 内。
 - 网关凭据不会传入 Pi 子进程；递归 Pi 分发会被拒绝。
@@ -95,3 +99,9 @@ Tifereth 是唯一的任务分解和派发决策层。每次 `dispatch_subagent`
 
 
 当前模型任务协议为 v2：角色专属 deliverable、严格字段类型、失败状态拦截和账本支持的阶段交接。详见 [ROLE-CONTRACTS-V2.md](ROLE-CONTRACTS-V2.md)。旧的精简 returnFields 将被拒绝；独立任务不代表完成整条治理链。
+
+## 许可证
+
+YHWH 自有代码、文档与配置采用 [Apache-2.0](LICENSE)，版权说明见 [NOTICE](NOTICE)。第三方组件保留原许可证。[第三方通知](THIRD_PARTY_NOTICES.txt)。
+
+自 0.6.0 起，reviewer 使用用户自备 API key，通过 Pi 原生 Anthropic API 调用；已移除订阅令牌读取、续期和 Claude Code 桥接。服务条款仍适用，实际 API 访问尚未验证。

@@ -4,8 +4,6 @@ set -euo pipefail
 NODE_VERSION="22.23.1"
 PI_VERSION="0.84.4"
 LSP_VERSION="1.3.0"
-CLAUDE_PROVIDER_VERSION="0.1.4"
-CLAUDE_CODE_VERSION="2.1.250"
 PYRIGHT_VERSION="1.1.413"
 TSLS_VERSION="6.0.0"
 TYPESCRIPT_VERSION="7.0.2"
@@ -37,7 +35,7 @@ mv /opt/node.new /opt/node
 id pi-sandbox >/dev/null 2>&1 || useradd --system --create-home --home-dir /home/pi-sandbox --shell /usr/sbin/nologin pi-sandbox
 install -d -o root -g root -m 0755 /opt/pi-kether /opt/pi-kether/extensions /opt/pi-kether/scripts /opt/pi-kether/dotnet-tools
 cat >/opt/pi-kether/package.json <<JSON
-{"private":true,"dependencies":{"@earendil-works/pi-coding-agent":"${PI_VERSION}","@anthropic-ai/claude-code":"${CLAUDE_CODE_VERSION}","pi-claude-code-provider":"${CLAUDE_PROVIDER_VERSION}","pi-lsp-extension":"${LSP_VERSION}","pyright":"${PYRIGHT_VERSION}","typescript-language-server":"${TSLS_VERSION}","typescript":"${TYPESCRIPT_VERSION}","vscode-languageserver-protocol":"${VSCODE_LSP_VERSION}"}}
+{"private":true,"dependencies":{"@earendil-works/pi-coding-agent":"${PI_VERSION}","pi-lsp-extension":"${LSP_VERSION}","pyright":"${PYRIGHT_VERSION}","typescript-language-server":"${TSLS_VERSION}","typescript":"${TYPESCRIPT_VERSION}","vscode-languageserver-protocol":"${VSCODE_LSP_VERSION}"}}
 JSON
 install -o root -g root -m 0644 /tmp/pi-kether-install/wsl-package-lock.json /opt/pi-kether/package-lock.json
 (cd /opt/pi-kether && /opt/node/bin/npm ci --omit=dev --ignore-scripts=false)
@@ -56,7 +54,11 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/secure-pi-bootstrap.mjs /
 install -o root -g root -m 0644 /tmp/pi-kether-install/editor-pi-bootstrap.mjs /opt/pi-kether/scripts/editor-pi-bootstrap.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/editor-rpc.mjs /opt/pi-kether/scripts/editor-rpc.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/editor-proxy.js /opt/pi-kether/extensions/editor-proxy.js
-install -o root -g root -m 0644 /tmp/pi-kether-install/claude-review.ts /opt/pi-kether/extensions/claude-review.ts
+install -o root -g root -m 0644 /tmp/pi-kether-install/accept-api-packet.mjs /opt/pi-kether/scripts/accept-api-packet.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/controlled-provider.mjs /opt/pi-kether/scripts/controlled-provider.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/provider-transport.mjs /opt/pi-kether/scripts/provider-transport.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/controlled-provider.js /opt/pi-kether/extensions/controlled-provider.js
+install -o root -g root -m 0644 /tmp/pi-kether-install/anthropic-api-credential.mjs /opt/pi-kether/scripts/anthropic-api-credential.mjs
 install -d -o root -g root -m 0711 /var/lib/pi-kether/jobs
 
 jdtls_archive="jdt-language-server-${JDTLS_VERSION}-${JDTLS_BUILD}.tar.gz"

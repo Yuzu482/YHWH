@@ -17,7 +17,7 @@ function fixture(grant=makeGrant(),overrides={}){
 }
 test('only trusted exact bounded grants and admitted roles',()=>{
  assert.ok(authorizeEditors(makeGrant(),context));
- for(const change of [{provider:'pi-claude-code-provider'},{role:'Geburah'},{ledgerEnabled:false},{parentRunId:null},{requestId:null}])assert.throws(()=>authorizeEditors(makeGrant(),{...context,...change}));
+ for(const change of [{provider:'anthropic'},{role:'Geburah'},{ledgerEnabled:false},{parentRunId:null},{requestId:null}])assert.throws(()=>authorizeEditors(makeGrant(),{...context,...change}));
  const bad=[{...makeGrant(),expiresAt:new Date(0).toISOString()},{...makeGrant(),expiresAt:new Date(Date.now()+901000).toISOString()},{...makeGrant(),extra:true}];
  for(const v of bad)assert.throws(()=>authorizeEditors(v,context));
  const g=makeGrant();g.operations.push({...g.operations[0]});assert.throws(()=>authorizeEditors(g,context));
@@ -71,7 +71,7 @@ test('editor-only task has no filesystem tools; ordinary tasks keep no-tools',()
  const request={provider:'openai-codex',model:'gpt-5.6-luna',access:'none'};
  const args=buildPiArgs(request,'wsl2',true);assert.equal(args[args.indexOf('--tools')+1],'pi_editor_execute');assert.ok(!args.includes('--no-tools'));
  assert.ok(buildPiArgs(request,'wsl2').includes('--no-tools'));
- assert.throws(()=>buildPiArgs({...request,provider:'pi-claude-code-provider'},'wsl2',true));
+ assert.throws(()=>buildPiArgs({...request,provider:'anthropic'},'wsl2',true));
 });
 test('Unity scene precondition executes inside the same typed command',()=>{
  const r=compileOperation('unity_create_object',{name:'Bound',primitive:'Cube',_piScene:{name:'Sample',path:'Assets/Sample.unity'}},{transport:{cwd:process.cwd()}});

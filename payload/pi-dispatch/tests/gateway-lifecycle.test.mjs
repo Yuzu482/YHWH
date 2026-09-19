@@ -122,7 +122,7 @@ test('shutdown aggregates failures while closing owned resources and preserving 
 test('shutdown defers disposal while a non-scheduler operation is still using resources', async () => {
   const entered = deferred(), release = deferred(); let closed = 0;
   await withGateway(async ({ runtime, client }) => {
-    const call = client.callTool({ name:'renew_claude_auth', arguments:{} });
+    const call = client.callTool({ name:'check_claude_auth', arguments:{} });
     await entered.promise;
     const first = await runtime.shutdown({ graceMs:0, abortWaitMs:1 });
     assert.equal(first.disposed, false);
@@ -133,7 +133,7 @@ test('shutdown defers disposal while a non-scheduler operation is still using re
     const second = await runtime.shutdown({ graceMs:0, abortWaitMs:1 });
     assert.equal(second.disposed, true);
     assert.equal(closed, 1);
-  }, { renewAuthFn:async () => { entered.resolve(); await release.promise; return { ok:true }; }, auditLogger:{ enabled:true, record:() => {}, close:() => closed++ }, ownedModules:['audit'] });
+  }, { checkAuthFn:async () => { entered.resolve(); await release.promise; return { ok:true }; }, auditLogger:{ enabled:true, record:() => {}, close:() => closed++ }, ownedModules:['audit'] });
 });
 
 test('startup factory failure releases earlier owned resources; invalid factory configuration is side-effect free', async () => {

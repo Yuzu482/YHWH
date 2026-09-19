@@ -7,7 +7,7 @@ YHWH 0.5 adds 10 client profiles, bringing the total to 18 host IDs. These expor
 ## Select and export
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -Hosts "cursor,vscode-copilot,cline,gemini-cli,lm-studio"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.6.0.ps1 -Hosts "cursor,vscode-copilot,cline,gemini-cli,lm-studio"
 
 # Existing 0.5 installation: export every profile to a new directory
 pwsh -NoProfile -File .\install\Export-HostProfiles.ps1 -Hosts all -OutputDirectory D:\YHWH-Connections

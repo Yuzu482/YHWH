@@ -112,6 +112,8 @@ run_job() {
   local job="$1" drive="$2" relative_path="$3" access="$4" resource_profile="$5" timeout_seconds="$6" host_user="$7" scope_b64="$8" gateway_instance="$9" windows_pid="${10}"
   shift 10
   local direct_lsp=false bootstrap=/opt/pi-kether/scripts/secure-pi-bootstrap.mjs
+  local api_pipe=false api_packet=""
+  if [[ "${1:-}" == --api-pipe ]]; then api_pipe=true; shift; fi
   local editor_bridge=false
   if [[ "${1:-}" == --editor-bridge ]]; then
     editor_bridge=true
@@ -123,17 +125,26 @@ run_job() {
     direct_lsp=true
     bootstrap=/opt/pi-kether/scripts/direct-lsp-bootstrap.mjs
   fi
-  local provider="" previous="" arg
+  local provider="" config_digest="" previous="" arg
   for arg in "$@"; do
     if [[ "$previous" == --provider ]]; then
       [[ -z "$provider" ]] || { echo "duplicate provider" >&2; exit 2; }
       provider="$arg"
     fi
+    if [[ "$previous" == --yhwh-config ]]; then
+      [[ -z "$config_digest" && "$arg" =~ ^[a-f0-9]{64}$ ]] || { echo "invalid provider config digest" >&2; exit 2; }
+      config_digest="$arg"
+    fi
     previous="$arg"
   done
-  [[ "$direct_lsp" == true || "$provider" == openai-codex || "$provider" == pi-claude-code-provider ]] || { echo "invalid provider" >&2; exit 2; }
+  [[ "$direct_lsp" == true || "$provider" == openai-codex || "$provider" == anthropic || "$provider" == yhwh-worker-api || "$provider" == yhwh-reviewer-api ]] || { echo "invalid provider" >&2; exit 2; }
+  if [[ "$provider" == anthropic || "$provider" == yhwh-worker-api || "$provider" == yhwh-reviewer-api ]]; then
+    [[ "$api_pipe" == true ]] || { echo "PI_AUTH_ENCRYPTED_PIPE_REQUIRED" >&2; exit 4; }
+  else
+    [[ "$api_pipe" == false ]] || { echo "invalid API pipe" >&2; exit 2; }
+  fi
   [[ "$editor_bridge" == false || "$provider" == openai-codex ]] || { echo "editor bridge requires openai-codex" >&2; exit 2; }
-  if [[ "$provider" == pi-claude-code-provider && "$access" != none ]]; then echo "Claude review requires none access" >&2; exit 2; fi
+  if [[ ( "$provider" == anthropic || "$provider" == yhwh-reviewer-api ) && "$access" != none ]]; then echo "Claude review requires none access" >&2; exit 2; fi
   [[ "$job" =~ ^[a-f0-9-]{36}$ ]] || { echo "invalid job id" >&2; exit 2; }
   [[ "$drive" =~ ^[A-Z]$ ]] || { echo "invalid drive" >&2; exit 2; }
   [[ "$relative_path" != /* && "$relative_path" != *".."* ]] || { echo "invalid relative path" >&2; exit 2; }
@@ -185,7 +196,7 @@ run_job() {
   printf '%s\n' "$pids_max" >"$cgroup_dir/pids.max"
   install -d -o root -g root -m 0700 "$baseline"
   install -d -o root -g root -m 0755 "$workspace"
-  install -d -o pi-sandbox -g pi-sandbox -m 0700 "$home" "$home/agent" "$home/.claude"
+  install -d -o pi-sandbox -g pi-sandbox -m 0700 "$home" "$home/agent"
   install -d -o root -g root -m 0700 "$mount_root/host-work" "$mount_root/host-c"
   printf '%s' "$scope_b64" | base64 -d -i >"$jobdir/scopes.json"
   /opt/node/bin/node -e 'const fs=require("fs"); fs.writeFileSync(process.argv[2],JSON.stringify(JSON.parse(fs.readFileSync(process.argv[1])).write))' "$jobdir/scopes.json" "$home/agent/write-scope.json"
@@ -203,16 +214,31 @@ run_job() {
     cp -a --reflink=auto "$baseline/." "$workspace/"
   fi
 
-  if [[ "$direct_lsp" == true ]]; then
+  if [[ "$api_pipe" == true ]]; then
+    local api_header=""
+    IFS= read -r -n 64 api_header || { echo "PI_AUTH_INVALID" >&2; exit 4; }
+    [[ "$api_header" == YHWH_API_CREDENTIAL_V1 ]] || { echo "PI_AUTH_INVALID" >&2; exit 4; }
+    IFS= read -r -n 32769 api_packet || { echo "PI_AUTH_INVALID" >&2; exit 4; }
+    (( ${#api_packet} <= 32768 )) || { echo "PI_AUTH_INVALID" >&2; exit 4; }
+    local config_source=""
+    if [[ "$provider" != anthropic ]]; then
+      mount -t drvfs C: "$mount_root/host-c" -o ro,metadata
+      config_source="$mount_root/host-c/Users/$host_user/.local/state/pi-kether/provider-config.json"
+    fi
+    api_packet=$(printf '%s' "$api_packet" | /opt/node/bin/node /opt/pi-kether/scripts/accept-api-packet.mjs "$provider" "$config_source" "$config_digest") || exit 4
+    if [[ "$provider" != anthropic ]]; then umount "$mount_root/host-c"; fi
+    # A kernel pipe supplies FD3. API plaintext is never written to a credential file.
+    exec 3< <(printf '%s' "$api_packet")
+    unset api_packet
+  elif [[ "$direct_lsp" == true ]]; then
     printf '{}' >"$jobdir/credentials.json"
+    exec 3<"$jobdir/credentials.json"
   else
-  mount -t drvfs C: "$mount_root/host-c" -o ro,metadata
-  local auth_source="$mount_root/host-c/Users/$host_user/.pi/agent/auth.json"
-  if [[ "$provider" == pi-claude-code-provider ]]; then
-    auth_source="$mount_root/host-c/Users/$host_user/.claude/.credentials.json"
-  fi
-  /opt/node/bin/node /opt/pi-kether/scripts/prepare-credentials.mjs "$provider" "$auth_source" "$jobdir/credentials.json"
-  umount "$mount_root/host-c"
+    mount -t drvfs C: "$mount_root/host-c" -o ro,metadata
+    local auth_source="$mount_root/host-c/Users/$host_user/.pi/agent/auth.json"
+    /opt/node/bin/node /opt/pi-kether/scripts/prepare-credentials.mjs "$provider" "$auth_source" "$jobdir/credentials.json"
+    umount "$mount_root/host-c"
+    exec 3<"$jobdir/credentials.json"
   fi
 
   if [[ "$access" == workspace-write ]]; then
@@ -227,9 +253,6 @@ run_job() {
   local network_args=()
   [[ "$direct_lsp" == true ]] && network_args=(--unshare-net)
   local proc_bind=(--dir /proc)
-  # Bun needs /proc/self/exe. Only the no-tools reviewer gets a procfs
-  # belonging to its own PID namespace; host processes are never visible.
-  [[ "$provider" == pi-claude-code-provider ]] && proc_bind=(--proc /proc)
   [[ "$access" == workspace-write ]] && workspace_bind=(--bind "$workspace" /workspace)
 
   install -d -o pi-sandbox -g pi-sandbox -m 0700 "$jobdir/tmp"
@@ -246,11 +269,10 @@ run_job() {
     --setenv PI_WRITE_SCOPE_FILE /home/pi-sandbox/agent/write-scope.json \
     --setenv PATH /opt/node/bin:/opt/pi-kether/node_modules/.bin:/opt/pi-kether/dotnet-tools:/usr/local/bin:/usr/bin:/bin \
     --setenv SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt \
-    -- timeout --signal=TERM --kill-after=5s "${timeout_seconds}s" /opt/node/bin/node "$bootstrap" "$@" ) 3<"$jobdir/credentials.json"
+    -- timeout --signal=TERM --kill-after=5s "${timeout_seconds}s" /opt/node/bin/node "$bootstrap" "$@" )
   local status=$?
   set -e
 
-  rm -f -- "$home/.claude/.credentials.json"
 
   if (( status == 0 )) && [[ -e "$home/agent/auth.json" ]]; then
     echo "sandbox credential was not scrubbed after the model stream started" >&2

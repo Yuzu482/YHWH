@@ -1,5 +1,8 @@
 # Security hardening verification — 2026-09-05
 
+Current 0.6.0 note: the Claude reviewer uses native Anthropic API credentials via an isolated host key file and FD3 in-memory storage, with no subscription bridge or CLI. OpenAI refresh remains host-owned. All model sandboxes now have an empty /proc. The dated evidence below is historical and does not validate the new API route; see VERIFICATION.md for current checks.
+
+
 Implemented in the source plugin, installed Gateway, WSL runtime and portable payload:
 
 - Disabled automatic repository `.pi-lsp.json` executable configuration and Lombok Java-agent discovery.

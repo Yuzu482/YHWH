@@ -7,7 +7,7 @@ test('Claude review is pinned and cannot gain tools or filesystem scope',()=>{
  const reviewPacket={version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['fixture evidence']}]))};
  const value={cwd:process.cwd(),access:'none',task:{role:'reviewer',objective:'Review supplied material',acceptance:['Return findings'],reviewPacket}};
  const {request,task}=validateKetherInvocation(value);
- assert.equal(request.provider,'pi-claude-code-provider');
+ assert.equal(request.provider,'anthropic');
  assert.equal(request.model,'claude-sonnet-5');
  assert.equal(task.role,'Geburah');
  assert.equal(request.thinking,'max');
@@ -15,7 +15,7 @@ test('Claude review is pinned and cannot gain tools or filesystem scope',()=>{
  assert.throws(()=>validateKetherInvocation({...value,model:'sonnet'}),/requires model/);
  assert.throws(()=>validateKetherInvocation({...value,access:'read',task:{...value.task,readScope:['package.json']}}),/none access/);
  assert.throws(()=>validateKetherInvocation({...value,access:'workspace-write',task:{...value.task,writeScope:['package.json']}},true),/none access/);
- assert.throws(()=>validateKetherInvocation({...value,provider:'pi-claude-code-provider',task:{...value.task,role:'worker'}}),/requires provider/);
+ assert.throws(()=>validateKetherInvocation({...value,provider:'anthropic',task:{...value.task,role:'worker'}}),/requires provider/);
 });
 test('every admitted role and alias resolves only its pinned model',()=>{
  for(const role of [...Object.keys(ROLE_MODELS),...Object.keys(ROLE_ALIASES)]) {

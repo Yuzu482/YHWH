@@ -150,7 +150,7 @@ $mcp = [ordered]@{ mcpServers = [ordered]@{ 'pi-kether-gateway' = [ordered]@{
     PI_SANDBOX_DISTRO = $WslDistro
   }
   enabled = $true
-  enabled_tools = @('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','renew_claude_auth')
+  enabled_tools = @('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth')
   startup_timeout_sec = 30
 }}}
 $mcp | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $pluginTarget '.mcp.json') -Encoding utf8NoBOM
@@ -164,8 +164,6 @@ $hostPiRoot = Join-Path $TargetHome '.pi\agent\npm'
 New-Item -ItemType Directory -Force -Path $hostPiRoot | Out-Null
 $hostPackage = [ordered]@{ private = $true; dependencies = [ordered]@{
   '@earendil-works/pi-coding-agent' = $manifest.components.piCodingAgent
-  '@anthropic-ai/claude-code' = '2.1.250'
-  'pi-claude-code-provider' = $manifest.components.piClaudeCodeProvider
   'pi-lsp-extension' = $manifest.components.piLspExtension
   pyright = $manifest.components.pyright
   'typescript-language-server' = $manifest.components.typescriptLanguageServer
@@ -239,7 +237,11 @@ if ($installWsl) {
     (Join-Path $pluginTarget 'scripts\editor-pi-bootstrap.mjs')='/tmp/pi-kether-install/editor-pi-bootstrap.mjs'
     (Join-Path $pluginTarget 'scripts\editor-rpc.mjs')='/tmp/pi-kether-install/editor-rpc.mjs'
     (Join-Path $pluginTarget 'extensions\editor-proxy.js')='/tmp/pi-kether-install/editor-proxy.js'
-    (Join-Path $pluginTarget 'extensions\claude-review.ts')='/tmp/pi-kether-install/claude-review.ts'
+    (Join-Path $pluginTarget 'scripts\accept-api-packet.mjs')='/tmp/pi-kether-install/accept-api-packet.mjs'
+    (Join-Path $pluginTarget 'scripts\controlled-provider.mjs')='/tmp/pi-kether-install/controlled-provider.mjs'
+    (Join-Path $pluginTarget 'scripts\provider-transport.mjs')='/tmp/pi-kether-install/provider-transport.mjs'
+    (Join-Path $pluginTarget 'extensions\controlled-provider.js')='/tmp/pi-kether-install/controlled-provider.js'
+    (Join-Path $pluginTarget 'scripts\anthropic-api-credential.mjs')='/tmp/pi-kether-install/anthropic-api-credential.mjs'
   }
   foreach ($pair in $transfers.GetEnumerator()) { Copy-ToWsl $pair.Key $pair.Value }
   & wsl.exe -d $WslDistro -u root -- env PI_KETHER_HARDEN_DISTRO=1 bash /tmp/pi-kether-install/provision-wsl.sh

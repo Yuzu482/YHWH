@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// YHWH patch logic is Apache-2.0; upstream matching excerpts retain pi-lsp-extension's declared MIT license.
+// Original package: pi-lsp-extension 1.3.0, gitHead 5edc932d325b630483f84f7d7f038e88ceba1eba.
+// See licenses/pi-lsp-extension-evidence.json and its notice for the pending upstream attribution.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -18,7 +22,10 @@ for (const [file, before, after] of [
   }
 }
 
-if (process.argv.includes('--security-only')) process.exit(0);
+function recordPatchNotice(mode) {
+  writeFileSync(join(root,'YHWH-PATCH-NOTICE.txt'),`Modified locally by YHWH contributors. Patch mode: ${mode}.\nUpstream: pi-lsp-extension 1.3.0, https://github.com/samfoy/pi-lsp-extension\nOriginal gitHead: 5edc932d325b630483f84f7d7f038e88ceba1eba\nUpstream declares MIT; complete upstream copyright notice remains pending.\nChanges: disable repository executable configuration and Lombok discovery;\nfull mode also adds hidden Windows subprocesses and C/C++/C# server entries.\nThis notice does not relicense upstream code or invent upstream attribution.\n`);
+}
+if (process.argv.includes('--security-only')) { recordPatchNotice('security-only'); process.exit(0); }
 
 function patch(file, changes) {
   const path = join(root, 'src', file);
@@ -55,3 +62,5 @@ patch('lsp-manager.ts', [
     after: 'stdio: "ignore",\n        windowsHide: process.platform === "win32",\n      },',
   },
 ]);
+
+recordPatchNotice('full');

@@ -7,7 +7,7 @@ YHWH 0.5 新增 10 个客户端配置，连同已有配置共 18 个宿主 ID。
 ## 选择与导出
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -Hosts "cursor,vscode-copilot,cline,gemini-cli,lm-studio"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.6.0.ps1 -Hosts "cursor,vscode-copilot,cline,gemini-cli,lm-studio"
 
 # 已安装 0.5：导出全部配置到新目录
 pwsh -NoProfile -File .\install\Export-HostProfiles.ps1 -Hosts all -OutputDirectory D:\YHWH-Connections

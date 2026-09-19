@@ -7,4 +7,4 @@ Use submit_subagent for review and other delegated work. get_subagent_status rep
 
 For nontrivial reviews, Tifereth should prefer standard resources with up to 300 seconds when admission permits, keep the pinned model/thinking, and submit one independently reviewable change per material packet. Tiny format probes can use small. Never omit required review evidence to fit the budget. Inspect authenticationMs, startupMs, timeToFirstResponseMs, firstResponseSource, generationMs, processTailMs and cleanupMs. Missing measurements are null, not proof of zero work. Timings are host observations of Pi stream events; timeToFirstResponseMs includes startup and may only observe the completed message when streaming is unavailable. Generation is measured until agent_end, not provider-only GPU time.
 
-Host Claude renewal requires at least max(5 minutes, task timeout + 60 seconds) of validity before dispatch, and verifies the renewed expiry meets that same requirement.
+Claude API keys are checked locally before dispatch; remote account access and billing require an authorized probe. No subscription credential renewal is performed.

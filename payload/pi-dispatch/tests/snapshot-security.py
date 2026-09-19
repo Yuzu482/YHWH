@@ -9,7 +9,7 @@ class SnapshotTests(unittest.TestCase):
             mod.snapshot(str(src),str(dst),{'read':['allowed.txt'],'write':[]})
             self.assertEqual([p.name for p in dst.iterdir()],['allowed.txt'])
     def test_explicit_secrets_and_traversal_are_rejected(self):
-        for name in ['../escape','.env','.pi-lsp.json','private.key']:
+        for name in ['../escape','.env','.pi-lsp.json','private.key','anthropic-api-key.json','nested/ANTHROPIC-API-KEY.JSON','provider-config.json','provider-credentials.json','nested/PROVIDER-CREDENTIALS.JSON']:
             with self.assertRaises(ValueError): mod.compile_scope([name])
     def test_binary_changes_outside_scope_are_rejected(self):
         with tempfile.TemporaryDirectory() as t:

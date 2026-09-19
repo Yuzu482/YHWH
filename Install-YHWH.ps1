@@ -216,12 +216,17 @@ function Invoke-YhwhMain {
   @{node=$node;pwsh=$pwsh;package=$package;config=$configPath;home=$HOME} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'installation.json') -Encoding UTF8
   Copy-Item -LiteralPath (Join-Path $package 'install\Open-YhwhPi.ps1') -Destination (Join-Path $root 'Open-Pi.ps1') -Force
   foreach ($provider in @('OpenAI','Claude')) {
-    $name = if ($provider -eq 'OpenAI') { 'Open-Pi.cmd' } else { 'Login-Claude.cmd' }
+    $name = if ($provider -eq 'OpenAI') { 'Open-Pi.cmd' } else { 'Configure-Claude-API.cmd' }
     $loginCmd = '@echo off' + "`r`n" + ('powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Open-Pi.ps1" -Provider ' + $provider) + "`r`n" + 'pause' + "`r`n"
     [IO.File]::WriteAllText((Join-Path $root $name), $loginCmd, [Text.Encoding]::ASCII)
   }
+  Copy-Item -LiteralPath (Join-Path $package 'install\Open-YhwhProviders.ps1') -Destination (Join-Path $root 'Open-Providers.ps1') -Force
+  $providerCmd='@echo off'+"`r`n"+'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Open-Providers.ps1"'+"`r`n"+'pause'+"`r`n"
+  [IO.File]::WriteAllText((Join-Path $root 'Configure-Providers.cmd'),$providerCmd,[Text.Encoding]::ASCII)
+  $migrationCmd=$providerCmd.Replace('Open-Providers.ps1"','Open-Providers.ps1" -Migrate')
+  [IO.File]::WriteAllText((Join-Path $root 'Migrate-API-Keys.cmd'),$migrationCmd,[Text.Encoding]::ASCII)
   Write-Host '[PASS] Files, dependencies and sandbox checks completed.'
-  Write-Host "[ACTION] Open $root\Open-Pi.cmd and use /login for OpenAI. Use Login-Claude.cmd for the reviewer account. Import the selected host profile and primary-agent instructions; keep the host's approval gates."
+  Write-Host "[ACTION] Open $root\Open-Pi.cmd and use /login for OpenAI. Use Configure-Claude-API.cmd to configure a separately billed Anthropic API key for the reviewer. Import the selected host profile and primary-agent instructions; keep the host's approval gates."
   Write-Host '[UNVERIFIED] Provider authentication/model heartbeat and ChatGPT Tunnel connectivity are not established by installation.'
 }
 

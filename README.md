@@ -8,6 +8,10 @@ Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责
 
 本仓库的 README 统一采用中英文双版本，并在顶部提供语言切换按钮；新增或修改时同步维护两版。维护约定见 [AGENTS.md](https://github.com/Yuzu482/YHWH/blob/main/AGENTS.md)（仓库文件，不随安装包分发）。
 
+**0.7 受控 API 配置：** 支持 OpenCode Go、CommandCode、OpenRouter 和自定义 HTTPS 平台。宿主显式配置后选择可选 API 路由，保留 Luna/Sonnet 5 与 max 绑定、审查者无工具、无自动降级。新增 `Configure-Providers.cmd`；见[平台配置指南](docs/provider-configuration.md)。真实账号与付费心跳尚未验证。
+
+**0.8 API key 加密：** Anthropic 和聚合平台密钥使用 Windows DPAPI 用户级加密；运行时经私有管道传递，不生成 API 明文凭据文件。升级后运行 `Migrate-API-Keys.cmd` 迁移旧格式。见[配置与迁移指南](docs/provider-configuration.md)。
+
 ## 仓库结构
 
 **0.5 多宿主接入：**共 18 个宿主 ID，新增 Cursor、VS Code/Copilot、Windsurf Cascade、Cline、Roo Code、Gemini CLI、Kiro、Zed、Continue 和 LM Studio，保留已有 Codex、Cherry Studio、OpenCode、DeepSeek Harness、Claude 与通用配置。主模型在宿主中选择。见[常见客户端指南](docs/common-clients.md)与[多宿主指南](docs/host-integration.md)；配置和协议测试不等于客户端界面与完整治理链已验证。
@@ -30,7 +34,7 @@ Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责
 
 - 通用 Node stdio MCP 入口，以及供 Secure MCP Tunnel 使用的认证 HTTP 入口；Codex 插件可选；
 - 通过 `get_workflow` 按需读取的主代理规则、角色技能和 references；选择 Codex 时另外安装全局规则与技能；
-- 普通低级 Agent 使用 `openai-codex`；Geburah/reviewer 专用 `pi-claude-code-provider` / `claude-sonnet-5`，仅允许无工具、无文件访问审查；
+- 普通低级 Agent 使用 `openai-codex`；Geburah/reviewer 专用 `anthropic` / `claude-sonnet-5`，仅允许无工具、无文件访问审查；
 - 带 CPU、内存、进程数、输出量、运行时间和写入范围限制的 WSL2/Bubblewrap 沙箱；
 - 请求账本、幂等处理、Provider 熔断、审计清洗、结果格式验证、任务队列和监控卡片；
 - Python、Java、JavaScript、TypeScript、C#、C/C++ 的 LSP 服务。
@@ -39,10 +43,10 @@ Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责
 
 ### 一键安装（Windows 11 x64）
 
-构建后的 `YHWH-OneClick-0.5.0.zip` 包含自包含脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
+构建后的 `YHWH-OneClick-0.8.0.zip` 包含自包含脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.8.0.ps1
 ```
 
 默认导出通用 MCP 接入配置，不修改 Codex 全局设置。用 `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"` 选择宿主；包含 `codex` 时才执行原有 Codex 集成。接入文件还需按宿主提示导入，并加载主代理规则；已有配置不会被导出器覆盖。
@@ -51,20 +55,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1
 
 它会导入专用 `YHWH` WSL2 Ubuntu 24.04 环境，安装 Windows 插件、治理规则和 WSL 沙箱/LSP，再运行安装检查。首次启用 WSL 可能出现 Windows 管理员授权，并需要重启后重新运行脚本；脚本以 `3010` 表示这一步尚待重启，不会声称安装完成。需要启用硬件虚拟化，且组织策略允许 WSL。WSL 安装方式依据 [Microsoft 官方说明](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)。
 
-完成后打开 `%LOCALAPPDATA%\YHWH\Open-Pi.cmd`，通过 `/login` 登录下级 worker 所用的 OpenAI 账号；审核代理的 Claude 账号使用同目录 `Login-Claude.cmd` 单独登录。再按输出目录中的配置接入所选宿主，加载 `PRIMARY-AGENT.md`。选择 Codex 时重启 Codex 并按需启用插件。主模型账号由宿主管理；下级模型登录有效性、真实心跳和 ChatGPT Tunnel 连通性需另外验证。安装器不安装宿主应用、不创建 Tunnel、不迁移凭据；现有受管文件按原安装器规则备份。
+完成后打开 `%LOCALAPPDATA%\YHWH\Open-Pi.cmd`，通过 `/login` 登录下级 worker 所用的 OpenAI 账号；审核代理使用同目录 `Configure-Claude-API.cmd` 配置用户自备 Anthropic API key，按 API 用量单独计费。再按输出目录中的配置接入所选宿主，加载 `PRIMARY-AGENT.md`。选择 Codex 时重启 Codex 并按需启用插件。主模型账号由宿主管理；下级模型登录有效性、真实心跳和 ChatGPT Tunnel 连通性需另外验证。安装器不安装宿主应用、不创建 Tunnel、不迁移凭据；现有受管文件按原安装器规则备份。
 
 已有 Pi 安装默认会被保护。确认任务结束并停止运行时后，显式添加 `-UpgradeExisting` 才允许覆盖并备份；正在运行的 Pi、没有本安装器所有权记录的 `YHWH` WSL 环境都会导致安装停止。不会自动停止进程、删除 WSL 环境或接管其他 Ubuntu 环境。安装不是事务式回滚；失败时保留已完成步骤和备份供诊断，修复原因后可重试。半完成的 WSL 导入或所有权记录异常需要人工检查。
 
 ```powershell
 # 只读预览，不下载、不改宿主
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.8.0.ps1 -PlanOnly
 # 固定目录，免交互安装（WSL 必须已经就绪；账号登录另行完成）
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.8.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
 # 仅校验并解包，目标必须是尚不存在的绝对路径
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.5.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.8.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-维护者运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/` 同时生成便携 ZIP、自包含 PS1、SHA256 和双击安装包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.5.0.ps1`。
+维护者运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/` 同时生成便携 ZIP、自包含 PS1、SHA256 和双击安装包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.8.0.ps1`。
 
 本版本已做脚本和包级验证，尚未在全新 Windows 虚拟机完成联网全量安装。Windows 与 WSL 的 Pi 使用同一依赖锁文件，但 Ubuntu 软件源、WSL 系统组件和 .NET 安装脚本仍是外部可变依赖；这不是完全离线或逐字节可复现的系统镜像。
 
@@ -136,10 +140,22 @@ pwsh .\install\Uninstall-PiKether.ps1
 
 ## 可复现边界
 
-安全加固：普通执行仅接受 `openai-codex`。Geburah/reviewer 可使用 Claude Sonnet 5，但必须为 `access:none`，由主 Agent 提供审查材料；Claude 需在宿主登录，凭据不包含在安装包中。Claude 的 Bun 运行时使用隔离 PID 命名空间内的私有 `/proc`；其它执行任务继续使用空 `/proc`。任务快照只包含 `readScope` 与 `writeScope` 的并集，范围使用相对文件路径或目录 `/**`；`.env`、凭据、私钥、项目 Pi 配置等默认拒绝进入快照。快照上限为 128 MiB、10,000 个文件，准备扫描限时 30 秒；每个任务临时文件系统上限为 512 MiB、30,000 个 inode。实际文件树与补丁均检查写入范围，二进制补丁会拒绝返回。
+安全加固：普通执行默认使用 `openai-codex`；可选受控 API 路由必须由宿主显式配置并选择。Geburah/reviewer 可使用 Claude Sonnet 5，但必须为 `access:none`，由主 Agent 提供审查材料；Claude reviewer 需配置用户自备 API key，凭据不包含在安装包中；所有执行任务均使用空 `/proc`。任务快照只包含 `readScope` 与 `writeScope` 的并集，范围使用相对文件路径或目录 `/**`；`.env`、凭据、私钥、项目 Pi 配置等默认拒绝进入快照。快照上限为 128 MiB、10,000 个文件，准备扫描限时 30 秒；每个任务临时文件系统上限为 512 MiB、30,000 个 inode。实际文件树与补丁均检查写入范围，二进制补丁会拒绝返回。
 
-LSP 禁止加载项目 `.pi-lsp.json` 和自动发现 Lombok Java agent。工具无法读取凭据文件；单一路由凭据通过一次性文件描述符进入可信 Pi 进程内存，随后关闭描述符。安装器收紧 Windows 凭据与状态目录的权限。OAuth 登录刷新由宿主执行并持久化；沙箱只接收临时访问令牌。沙箱保留网络供模型及语言服务使用，尚未实施出站域名白名单；可信 Pi/LSP 依赖或操作系统自身遭入侵不在这些范围检查的保证之内。
+LSP 禁止加载项目 `.pi-lsp.json` 和自动发现 Lombok Java agent。工具无法读取凭据文件；单一路由凭据通过一次性文件描述符进入可信 Pi 进程内存，随后关闭描述符。安装器收紧 Windows 凭据与状态目录的权限。OpenAI OAuth 登录刷新由宿主执行并持久化，沙箱只接收临时访问令牌；reviewer 的 API key 仅经 FD3 进入可信 Pi 内存。沙箱保留网络供模型及语言服务使用，尚未实施出站域名白名单；可信 Pi/LSP 依赖或操作系统自身遭入侵不在这些范围检查的保证之内。
 
 依赖版本记录在 `portable.manifest.json`。Node 和 JDT LS 下载会校验上游散列；Pi 的 npm 依赖树由随包 lockfile 固定。安装时仍需要联网访问 Ubuntu、Node.js、npm、Eclipse 和 Microsoft 的官方下载源。模型登录、OpenAI Tunnel、ChatGPT 工作区管理员授权以及目标机策略无法由离线包代替。
 
 受管文件的备份保存到 `~/.local/state/pi-kether/installer-backups/`。选择 Codex 时，安装器管理带 `PI-KETHER` 标记的 `AGENTS.md` 区块，并关闭 Codex 内置多 Agent 路由。其他宿主导出配置和主代理规则，由用户按接入指南合并。
+
+## 许可证
+
+YHWH 自有代码、文档与配置采用 [Apache-2.0](LICENSE)，版权说明见 [NOTICE](NOTICE)。第三方组件保留原许可证。[第三方清单](THIRD_PARTY.md)与 [Claude Code 可行性](docs/claude-code-feasibility.md)。
+
+自 0.6.0 起，reviewer 使用用户自备 API key，通过 Pi 原生 Anthropic API 调用；已移除订阅令牌读取、续期和 Claude Code 桥接。服务条款仍适用，实际 API 访问尚未验证。
+
+## Claude reviewer API 配置（0.6）
+
+安装后运行 `Configure-Claude-API.cmd`，或在源码目录运行 `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`。输入为隐藏输入，文件仅允许当前 Windows 用户访问；凭据保存在 `~/.local/state/pi-kether/anthropic-api-key.json`。不读取 Claude 订阅登录，不接受环境变量或自定义 API 地址作为回退。`check_claude_auth` 仅检查本地配置，实际密钥有效性、余额与模型可用性需另行授权心跳验证。Claude Code 主客户端仍由用户在官方客户端自行登录。
+
+旧版用户应等待任务结束后升级并重新配置 API key；旧 `pi-claude-code-provider` 路由和 `renew_claude_auth` 工具不再接受。本轮未更新当前运行服务。公开发布检查使用 `Build-Release.ps1 -PublicRelease`，目前会因 LSP 上游版权通知待确认而拒绝；普通构建仅生成本地预览。

@@ -164,7 +164,7 @@ test('model allowlists and exact provider/model routing', () => {
 test('gateway credentials are not inherited by Pi children', () => {
   const env = childEnvironment({ PATH: 'ok', PI_GATEWAY_TOKEN: 'secret', PI_GATEWAY_CONFIG: 'secret-path', MCP_GATEWAY_KEY: 'secret', OPENCODE_API_KEY: 'provider-auth' });
   assert.equal(env.PATH, 'ok');
-  assert.equal(env.OPENCODE_API_KEY, 'provider-auth');
+  assert.equal(env.OPENCODE_API_KEY, undefined); // API credentials now enter through the selected FD3 packet only.
   assert.equal(env.PI_GATEWAY_TOKEN, undefined);
   assert.equal(env.PI_GATEWAY_CONFIG, undefined);
   assert.equal(env.MCP_GATEWAY_KEY, undefined);
