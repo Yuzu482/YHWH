@@ -29,4 +29,8 @@ Claude Code 接入评估见 [可行性报告](docs/claude-code-feasibility.md)�
 
 ## LSP 通知与公开发布状态
 
-[原始包证据](licenses/pi-lsp-extension-evidence.json) 固定 npm 完整性值与源码提交；提供 [标准 MIT 条文](licenses/MIT-standard-reference.txt)作为参考，不虚构上游版权主体。上游版权通知仍待确认。`Build-Release.ps1 -PublicRelease` 强制执行此项阻断，默认构建仅生成本地预览。[上游询问草稿](docs/upstream-lsp-license-request.md)记录了草拟与发送状态。
+[原始包证据](licenses/pi-lsp-extension-evidence.json) 固定 npm 完整性值与源码提交；提供 [标准 MIT 条文](licenses/MIT-standard-reference.txt)作为参考，不虚构上游版权主体。上游版权通知仍待确认。`Build-Release.ps1 -PublicRelease` 强制执行此项阻断，默认构建仅生成本地预览。[上游请求记录](docs/upstream-lsp-license-request.md)记录了发送状态及 Issue 链接。
+
+补充核查覆盖固定版本、当前主分支及下载到的历史引用。范围、上游需提供的材料及确认后的接入步骤见 [LSP 许可证补齐记录](docs/lsp-license-remediation.md)。请求已提交为 [上游 Issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14)；本地材料完善不代表已取得上游完整通知。
+
+LSP 的功能、安装依赖和发布边界集中见 [LSP 组件说明](docs/lsp-component.md)。

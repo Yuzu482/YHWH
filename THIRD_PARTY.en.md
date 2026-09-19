@@ -29,4 +29,8 @@ See the [Claude Code feasibility report](docs/claude-code-feasibility.en.md). Ve
 
 ## LSP notice and publication status
 
-The [verified package evidence](licenses/pi-lsp-extension-evidence.json) pins the original npm integrity and source commit. [Standard MIT text](licenses/MIT-standard-reference.txt) is supplied as a reference, with no invented upstream copyright holder. The upstream attribution gap remains pending. `Build-Release.ps1 -PublicRelease` enforces this hold; the default builds local previews. An [upstream request draft](docs/upstream-lsp-license-request.md) is available; its recorded status distinguishes drafting from sending.
+The [verified package evidence](licenses/pi-lsp-extension-evidence.json) pins the original npm integrity and source commit. [Standard MIT text](licenses/MIT-standard-reference.txt) is supplied as a reference, with no invented upstream copyright holder. The upstream attribution gap remains pending. `Build-Release.ps1 -PublicRelease` enforces this hold; the default builds local previews. The [upstream request record](docs/upstream-lsp-license-request.md) includes submission status and the issue URL.
+
+The follow-up audit covers the pinned version, current main and fetched historical refs. See the [LSP license remediation record](docs/lsp-license-remediation.en.md) for scope, required upstream materials and integration steps. The request was submitted as [upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14); improved local records do not establish receipt of a complete upstream notice.
+
+See the [LSP component notes](docs/lsp-component.en.md) for functionality, installation dependencies and release boundaries.

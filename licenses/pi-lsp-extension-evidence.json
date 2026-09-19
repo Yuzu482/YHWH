@@ -69,5 +69,39 @@
     "package/src/tree-sitter/workspace-index.ts",
     "package/src/workspace-provider.ts",
     "package/.github/workflows/publish.yml"
-  ]
+  ],
+  "repositoryAudit": {
+    "checkedAt": "2026-09-19",
+    "repository": "https://github.com/samfoy/pi-lsp-extension",
+    "defaultBranch": "main",
+    "head": "f2433d19c3bb1300dfdc5f4505b062f9c9c0a1a6",
+    "mainReachableCommits": 65,
+    "allFetchedRefsReachableCommits": 66,
+    "historyScope": "All branches and tags fetched by a bare clone; no claim about deleted or unfetched refs.",
+    "historicalNoticeFilenameMatches": [],
+    "filenamePattern": "license|licence|copying|copyright|notice (case-insensitive)",
+    "contentCheckRefs": [
+      "5edc932d325b630483f84f7d7f038e88ceba1eba",
+      "f2433d19c3bb1300dfdc5f4505b062f9c9c0a1a6"
+    ],
+    "contentPattern": "copyright|permission is hereby granted|MIT License (case-insensitive; package-lock.json excluded)",
+    "contentMatches": [],
+    "readmeLicenseStatement": "MIT",
+    "pinnedPackageJson": "https://github.com/samfoy/pi-lsp-extension/blob/5edc932d325b630483f84f7d7f038e88ceba1eba/package.json",
+    "pinnedReadme": "https://github.com/samfoy/pi-lsp-extension/blob/5edc932d325b630483f84f7d7f038e88ceba1eba/README.md",
+    "issuesAndPullRequestsChecked": 13,
+    "licenseRelatedIssueOrPullRequestTitles": [],
+    "issueScope": "Open and closed issue/PR titles returned by the GitHub repository issues API; not an audit of all comments.",
+    "conclusion": "MIT declaration found; complete upstream copyright/permission notice not located. No attribution inferred from repository ownership or commit authors."
+  },
+  "upstreamRequest": {
+    "status": "submitted-awaiting-upstream",
+    "file": "docs/upstream-lsp-license-request.md",
+    "target": "https://github.com/samfoy/pi-lsp-extension/issues",
+    "url": "https://github.com/samfoy/pi-lsp-extension/issues/14",
+    "number": 14,
+    "submittedAt": "2026-09-19T05:27:00Z",
+    "verifiedState": "OPEN",
+    "bodyVerifiedAgainstLocalRecord": true
+  }
 }

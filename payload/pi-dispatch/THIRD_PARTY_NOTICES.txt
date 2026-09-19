@@ -98,6 +98,22 @@ copyright placeholder is deliberately not filled: it is a reference text,
 not an upstream-authored copyright notice or proof of maintainer confirmation.
 Public-release validation remains blocked pending the complete upstream notice.
 
+Follow-up audit on 2026-09-19 checked the pinned source and main at
+f2433d19c3bb1300dfdc5f4505b062f9c9c0a1a6, plus historical filenames across
+66 reachable commits in fetched branches/tags (65 on main). No notice-like
+filename was found. Targeted content checks at the pinned and current main
+commits also found no complete notice. Deleted/unfetched refs and all historical
+file contents were not exhaustively audited. The npm archive was re-downloaded
+and its SHA-256 matched the recorded evidence.
+
+The upstream request was submitted with user authorization on 2026-09-19:
+https://github.com/samfoy/pi-lsp-extension/issues/14
+Its public body was read back and verified. The complete notice and version
+coverage remain pending upstream confirmation. See the source distribution's
+docs/upstream-lsp-license-request.md and docs/lsp-license-remediation.en.md for
+public evidence and the required integration steps. Upstream source and existing
+release assets remain unchanged.
+
 claude-code-2.1.250-NOTICE.txt
 ============================================================
 © Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements outlined here: https://code.claude.com/docs/en/legal-and-compliance.
