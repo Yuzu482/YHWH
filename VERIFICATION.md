@@ -506,3 +506,15 @@ The user authorized pushing the accumulated coordinator-only policy, WSL model-t
 After the authorized Git add, code-graph refresh included the six new code/test files: 6 parsed, 148 reused, 154 total, no parse errors. Earlier entries describing those files as untracked refer to their pre-staging state. Project knowledge was inspected but not automatically promoted. This is source synchronization only, with no new version, tag or release.
 
 用户授权将累计的主代理协调规则、WSL 工具隔离、回归测试、严格禁止轮询及确定性心跳推送到私有仓库 `Yuzu482/YHWH` 的 `main`。提交范围为明确列出的 29 个文件，不包含本地日志、备份或认证数据。既有专项测试结果均保留，重叠用例不累加为独立数量；工作流目录与暂存差异检查通过，未宣称全量或新远端 CI 通过。正式暂存后，关系索引新增解析 6 项、复用 148 项，共 154 项且无错误。此前“未跟踪”描述是暂存前记录。本次不创建版本标签或 release。
+
+## 2026-09-21 — v0.12.0 release preparation / 发布准备
+
+The user authorized a new private GitHub release covering all changes since v0.11.0: `bee3e54` and `3c65085`. Version metadata was authored by Pi `openai-codex / gpt-5.6-luna / max`, request `yhwh-release-012-version-20260921`, and mechanically integrated after successful execution, format/role validation, cleanup and exact diff review. It changed only `portable.manifest.json` from 0.11.0 to 0.12.0. Primary-authored release documentation and README download examples were updated in both languages. Pre/post review is local primary review, not independent review or a linked runtime stage chain. No implementation logic changed in this preparation.
+
+Fresh local full Node regression passed **320/320**, zero failures/skips, in **164.80 s** (`.test/release-012-node.log`). Heap regression passed (`.test/release-012-heap.log`): 25 warmups, 400 ordinary requests, and 40 each large-output/cancelled/disconnected cases. Project-knowledge review reported no format errors; entries were not automatically refreshed or promoted. The subsequent package build uses `-SkipTests` only because this same runtime source just passed the full Node and heap checks; installer/configuration, encryption, license, plugin, archive and generated-installer checks still run. Final artifact verification is recorded in the GitHub release validation addendum.
+
+Baseline GitHub CI run 35531780910 failed seven tests: two missing installed Pi/LSP dependencies and five authentication-renewal persistence/cross-process fixtures. Local passing tests do not resolve or override this CI evidence. Antigravity live acceptance, fresh-machine installation, reboot persistence, full multi-client governance and the legacy LSP public-redistribution notice remain incomplete. Publishing does not deploy or restart any local service.
+
+用户授权创建 v0.12.0 私有 release，收录 v0.11.0 后两次功能提交。版本元数据由 Pi Luna/max 成功交付，主代理核对格式、角色、清理与变更范围后机械合入；双语发布说明与 README 下载示例同步更新，前后审查为主代理本地审查，未宣称独立审查或完整阶段链。本次准备不修改运行逻辑。
+
+新一轮本机全量 Node 回归 **320/320** 通过，零失败、零跳过，耗时 **164.80 秒**；内存回归通过。项目知识检查无格式错误，未自动刷新或确认条目。后续构建仅因同一运行源码已通过上述全量和内存测试而使用 `-SkipTests`，安装、配置、加密、许可、插件、归档和生成安装器检查仍执行；最终附件验收记于 GitHub release 的验证补充。基线远端 CI 的 7 项失败仍保留，不以本机通过代替 CI 通过。发布不自动部署或重启本机服务。

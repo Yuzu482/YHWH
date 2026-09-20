@@ -4,7 +4,7 @@
 
 ## 简体中文
 
-本页描述 v0.11.0 之后的开发改动。源码、已发布附件和本机运行服务是三个独立状态；修改源码不会自动升级服务或重发附件。
+本页描述 v0.12.0 收录的工作流改动。源码、已发布附件和本机运行服务是三个独立状态；修改源码不会自动升级服务或重发附件。
 
 ### CLI 验收与连续调用
 
@@ -70,7 +70,7 @@ node payload/pi-dispatch/scripts/change-impact.mjs C:/work/project
 
 ## English
 
-This page describes development changes after v0.11.0. Source, published assets and the installed service are separate states; source edits neither upgrade the service nor republish assets.
+This page describes workflow changes included in v0.12.0. Source, published assets and the installed service are separate states; source edits neither upgrade the service nor republish assets.
 
 ### CLI acceptance and sequential calls
 
