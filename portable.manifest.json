@@ -1,6 +1,6 @@
 {
   "name": "pi-kether-portable",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "platform": "Windows 11 + WSL2 Ubuntu 24.04",
   "components": {
     "piDispatch": "0.1.0+codex.20260904104257",
