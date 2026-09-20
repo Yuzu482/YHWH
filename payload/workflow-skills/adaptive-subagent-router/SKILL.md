@@ -11,9 +11,9 @@ Use this skill for every non-trivial task.
 
 Before acting, classify the task:
 
-1. Simple or tightly coupled: execute directly.
-2. Non-trivial but not separable: keep ownership in the primary agent and use focused internal checkpoints.
-3. Non-trivial and separable: delegate only self-contained subtasks with distinct deliverables and acceptance criteria.
+1. Non-coding reasoning, inspection and deterministic checks may stay with the primary.
+2. Any coding, including tightly coupled or small changes: delegate one bounded Pi worker; primary owns scope and acceptance but does not author code.
+3. Separable implementation: delegate self-contained tasks with disjoint ownership and acceptance. If workers fail, return focused corrections to workers or report blocked coding, never silently switch to primary implementation.
 
 Delegation is worthwhile only when it provides meaningful parallelism, independent research, specialist review, or a clear verification lane.
 
@@ -28,7 +28,7 @@ For Pi delegated reasoning, request:
 - role: exactly one of `worker`, `researcher`, or `reviewer`
 - recursion: disabled
 
-If Pi rejects a model, effort, role, or delegation option, use the highest actually supported Pi value and record the actual provider/model. If the Pi gateway is unavailable, keep the task with the primary agent or report the capability gap. Do not silently fall back to built-in subagents and do not invent a config key. Treat role names as prompt roles carried inside the Kether envelope.
+If Pi rejects the required model, effort or role, report the blocker without substituting bindings. If Pi is unavailable, coding stays blocked; the primary may continue reasoning and diagnosis, but cannot silently implement. Built-in subagents require explicit authorization. Do not invent configuration keys or role support.
 
 ## Prompt template
 

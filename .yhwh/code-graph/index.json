@@ -9555,8 +9555,210 @@
       }
     },
     {
+      "path": "payload/pi-dispatch/extensions/task-heartbeat.js",
+      "sha256": "8c734eb353ad11cd8105a0b1de9c3c61227edc1c71b147d4201d412bc78097e8",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:asTimestamp:0",
+            "name": "asTimestamp",
+            "qualified": "asTimestamp",
+            "kind": "function",
+            "parent": null,
+            "line": 4,
+            "endLine": 4
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat:0",
+            "name": "createTaskHeartbeat",
+            "qualified": "createTaskHeartbeat",
+            "kind": "function",
+            "parent": null,
+            "line": 6,
+            "endLine": 81
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.readNow:0",
+            "name": "readNow",
+            "qualified": "createTaskHeartbeat.readNow",
+            "kind": "function",
+            "parent": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat:0",
+            "line": 19,
+            "endLine": 19
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.beat:0",
+            "name": "beat",
+            "qualified": "createTaskHeartbeat.beat",
+            "kind": "function",
+            "parent": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat:0",
+            "line": 21,
+            "endLine": 25
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.makeSnapshot:0",
+            "name": "makeSnapshot",
+            "qualified": "createTaskHeartbeat.makeSnapshot",
+            "kind": "function",
+            "parent": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat:0",
+            "line": 27,
+            "endLine": 48
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.start:0",
+            "name": "start",
+            "qualified": "createTaskHeartbeat.start",
+            "kind": "function",
+            "parent": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat:0",
+            "line": 50,
+            "endLine": 57
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.progress:0",
+            "name": "progress",
+            "qualified": "createTaskHeartbeat.progress",
+            "kind": "function",
+            "parent": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat:0",
+            "line": 59,
+            "endLine": 61
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.stop:0",
+            "name": "stop",
+            "qualified": "createTaskHeartbeat.stop",
+            "kind": "function",
+            "parent": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat:0",
+            "line": 63,
+            "endLine": 72
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.snapshot:0",
+            "name": "snapshot",
+            "qualified": "createTaskHeartbeat.snapshot",
+            "kind": "function",
+            "parent": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat:0",
+            "line": 74,
+            "endLine": 78
+          }
+        ],
+        "imports": [],
+        "mentions": [
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:asTimestamp:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 4
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:asTimestamp:0",
+            "kind": "construct",
+            "name": "Date",
+            "line": 4
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.readNow:0",
+            "kind": "call",
+            "name": "Number",
+            "line": 19
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.readNow:0",
+            "kind": "call",
+            "name": "now",
+            "line": 19
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.beat:0",
+            "kind": "call",
+            "name": "readNow",
+            "line": 23
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.makeSnapshot:0",
+            "kind": "call",
+            "name": "Math.max",
+            "line": 28
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.makeSnapshot:0",
+            "kind": "call",
+            "name": "Math.max",
+            "line": 31
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.makeSnapshot:0",
+            "kind": "call",
+            "name": "asTimestamp",
+            "line": 42
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.makeSnapshot:0",
+            "kind": "call",
+            "name": "asTimestamp",
+            "line": 45
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.start:0",
+            "kind": "call",
+            "name": "beat",
+            "line": 53
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.start:0",
+            "kind": "call",
+            "name": "setIntervalFn",
+            "line": 54
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.start:0",
+            "kind": "call",
+            "name": "timer.unref",
+            "line": 56
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.progress:0",
+            "kind": "call",
+            "name": "readNow",
+            "line": 60
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.stop:0",
+            "kind": "call",
+            "name": "clearIntervalFn",
+            "line": 67
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.stop:0",
+            "kind": "call",
+            "name": "makeSnapshot",
+            "line": 71
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.stop:0",
+            "kind": "call",
+            "name": "readNow",
+            "line": 71
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.snapshot:0",
+            "kind": "call",
+            "name": "readNow",
+            "line": 76
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-heartbeat.js#function:createTaskHeartbeat.snapshot:0",
+            "kind": "call",
+            "name": "makeSnapshot",
+            "line": 77
+          }
+        ]
+      }
+    },
+    {
       "path": "payload/pi-dispatch/extensions/task-monitor.js",
-      "sha256": "0018255246823d7aff939135001a9a4ce0b12ec40dd66956e59df22c95c5ad17",
+      "sha256": "4a9b19383ffe00c982e0dadf00297e0872b9331f41e12428aa7c57f2ad2d77fa",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -9567,8 +9769,8 @@
             "qualified": "stable",
             "kind": "function",
             "parent": null,
-            "line": 7,
-            "endLine": 11
+            "line": 8,
+            "endLine": 12
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:digest:0",
@@ -9576,8 +9778,8 @@
             "qualified": "digest",
             "kind": "function",
             "parent": null,
-            "line": 13,
-            "endLine": 15
+            "line": 14,
+            "endLine": 16
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:toolSummary:0",
@@ -9585,8 +9787,8 @@
             "qualified": "toolSummary",
             "kind": "function",
             "parent": null,
-            "line": 17,
-            "endLine": 23
+            "line": 18,
+            "endLine": 24
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
@@ -9594,8 +9796,8 @@
             "qualified": "publicRecord",
             "kind": "function",
             "parent": null,
-            "line": 25,
-            "endLine": 64
+            "line": 26,
+            "endLine": 66
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
@@ -9603,8 +9805,8 @@
             "qualified": "createTaskMonitor",
             "kind": "function",
             "parent": null,
-            "line": 66,
-            "endLine": 190
+            "line": 68,
+            "endLine": 198
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.trim:0",
@@ -9612,8 +9814,8 @@
             "qualified": "createTaskMonitor.trim",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
-            "line": 71,
-            "endLine": 78
+            "line": 73,
+            "endLine": 80
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
@@ -9621,8 +9823,8 @@
             "qualified": "createTaskMonitor.submit",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
-            "line": 80,
-            "endLine": 156
+            "line": 82,
+            "endLine": 163
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit.markRunning:0",
@@ -9630,8 +9832,8 @@
             "qualified": "createTaskMonitor.submit.markRunning",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "line": 117,
-            "endLine": 124
+            "line": 121,
+            "endLine": 129
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.get:0",
@@ -9639,8 +9841,8 @@
             "qualified": "createTaskMonitor.get",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
-            "line": 158,
-            "endLine": 161
+            "line": 165,
+            "endLine": 168
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.getResult:0",
@@ -9648,8 +9850,8 @@
             "qualified": "createTaskMonitor.getResult",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
-            "line": 163,
-            "endLine": 168
+            "line": 170,
+            "endLine": 175
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
@@ -9657,8 +9859,8 @@
             "qualified": "createTaskMonitor.list",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
-            "line": 170,
-            "endLine": 176
+            "line": 177,
+            "endLine": 183
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.cancel:0",
@@ -9666,8 +9868,8 @@
             "qualified": "createTaskMonitor.cancel",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
-            "line": 178,
-            "endLine": 187
+            "line": 185,
+            "endLine": 195
           },
           {
             "id": "payload/pi-dispatch/extensions/task-monitor.js#method:createTaskMonitor.size:0",
@@ -9675,8 +9877,8 @@
             "qualified": "createTaskMonitor.size",
             "kind": "method",
             "parent": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
-            "line": 189,
-            "endLine": 189
+            "line": 197,
+            "endLine": 197
           }
         ],
         "imports": [
@@ -9686,14 +9888,19 @@
             "line": 1
           },
           {
-            "specifier": "node:crypto",
+            "specifier": "./task-heartbeat.js",
             "form": "import_statement",
             "line": 2
           },
           {
-            "specifier": "./audit-log.js",
+            "specifier": "node:crypto",
             "form": "import_statement",
             "line": 3
+          },
+          {
+            "specifier": "./audit-log.js",
+            "form": "import_statement",
+            "line": 4
           }
         ],
         "mentions": [
@@ -9701,156 +9908,138 @@
             "from": null,
             "kind": "construct",
             "name": "Set",
-            "line": 5
+            "line": 6
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:stable:0",
             "kind": "call",
             "name": "Array.isArray",
-            "line": 8
+            "line": 9
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:stable:0",
             "kind": "call",
             "name": "value.map",
-            "line": 8
+            "line": 9
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:stable:0",
             "kind": "call",
             "name": "Object.fromEntries",
-            "line": 9
+            "line": 10
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:stable:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 9
+            "line": 10
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:stable:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 9
+            "line": 10
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:stable:0",
             "kind": "call",
             "name": "Object.keys",
-            "line": 9
+            "line": 10
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:stable:0",
             "kind": "call",
             "name": "stable",
-            "line": 9
+            "line": 10
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:digest:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 14
+            "line": 15
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:digest:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 14
+            "line": 15
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:digest:0",
             "kind": "call",
             "name": "createHash",
-            "line": 14
+            "line": 15
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:digest:0",
             "kind": "call",
             "name": "JSON.stringify",
-            "line": 14
+            "line": 15
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:digest:0",
             "kind": "call",
             "name": "stable",
-            "line": 14
+            "line": 15
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:toolSummary:0",
             "kind": "call",
             "name": "Array.isArray",
-            "line": 19
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:toolSummary:0",
-            "kind": "call",
-            "name": "<dynamic>",
             "line": 20
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:toolSummary:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 22
+            "line": 21
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:toolSummary:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 23
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:toolSummary:0",
             "kind": "call",
             "name": "Object.values",
-            "line": 22
+            "line": 23
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:toolSummary:0",
             "kind": "call",
             "name": "Number",
-            "line": 22
+            "line": 23
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
             "name": "Date.now",
-            "line": 25
+            "line": 26
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
             "name": "Math.max",
-            "line": 48
+            "line": 49
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
             "name": "Date.parse",
-            "line": 48
+            "line": 49
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 48
+            "line": 49
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "construct",
             "name": "Date",
-            "line": 48
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
-            "kind": "call",
-            "name": "Date.parse",
-            "line": 48
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
-            "kind": "call",
-            "name": "Math.max",
-            "line": 49
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
-            "kind": "call",
-            "name": "Date.parse",
             "line": 49
           },
           {
@@ -9863,277 +10052,301 @@
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
             "name": "Math.max",
-            "line": 51
+            "line": 50
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
             "name": "Date.parse",
-            "line": 51
+            "line": 50
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
             "name": "Date.parse",
-            "line": 51
+            "line": 50
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
-            "name": "TERMINAL.has",
+            "name": "record.heartbeat.snapshot",
             "line": 52
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
-            "name": "TERMINAL.has",
+            "name": "Math.max",
             "line": 53
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
-            "name": "toolSummary",
+            "name": "Date.parse",
+            "line": 53
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
+            "kind": "call",
+            "name": "Date.parse",
+            "line": 53
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
+            "kind": "call",
+            "name": "TERMINAL.has",
+            "line": 54
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
+            "kind": "call",
+            "name": "TERMINAL.has",
             "line": 55
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
+            "name": "toolSummary",
+            "line": 57
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
+            "kind": "call",
             "name": "summarizeUsage",
-            "line": 56
+            "line": 58
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:publicRecord:0",
             "kind": "call",
             "name": "summarizePatch",
-            "line": 57
+            "line": 59
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
             "kind": "construct",
             "name": "Error",
-            "line": 67
+            "line": 69
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
             "kind": "call",
             "name": "Number.isInteger",
-            "line": 68
+            "line": 70
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
             "kind": "construct",
             "name": "Error",
-            "line": 68
+            "line": 70
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor:0",
             "kind": "construct",
             "name": "Map",
-            "line": 69
+            "line": 71
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.trim:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 73
+            "line": 75
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.trim:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 73
+            "line": 75
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.trim:0",
             "kind": "call",
             "name": "records.values",
-            "line": 73
+            "line": 75
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.trim:0",
             "kind": "call",
             "name": "TERMINAL.has",
-            "line": 73
+            "line": 75
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.trim:0",
             "kind": "call",
             "name": "Date.parse",
-            "line": 73
+            "line": 75
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.trim:0",
             "kind": "call",
             "name": "Date.parse",
-            "line": 73
+            "line": 75
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.trim:0",
             "kind": "call",
             "name": "records.delete",
-            "line": 76
+            "line": 78
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "construct",
             "name": "Error",
-            "line": 82
+            "line": 84
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "digest",
-            "line": 83
+            "line": 85
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "records.get",
-            "line": 84
+            "line": 86
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "construct",
             "name": "Error",
-            "line": 86
+            "line": 88
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "publicRecord",
-            "line": 87
+            "line": 89
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "construct",
             "name": "AbortController",
-            "line": 90
+            "line": 92
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "createHeartbeat",
+            "line": 93
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 91
+            "line": 94
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "construct",
             "name": "Date",
-            "line": 91
+            "line": 94
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 96
+            "line": 99
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "records.set",
-            "line": 114
+            "line": 118
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "trim",
-            "line": 115
+            "line": 119
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit.markRunning:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 120
+            "line": 124
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit.markRunning:0",
             "kind": "construct",
             "name": "Date",
-            "line": 120
+            "line": 124
           },
           {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit.markRunning:0",
             "kind": "call",
-            "name": "<dynamic>",
-            "line": 125
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 125
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 125
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "call",
-            "name": "Promise.resolve",
-            "line": 125
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "construct",
-            "name": "Error",
-            "line": 126
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "call",
-            "name": "runner",
+            "name": "record.heartbeat.start",
             "line": 127
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 132
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "construct",
-            "name": "Date",
-            "line": 132
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "call",
-            "name": "redactSensitiveText",
-            "line": 137
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "call",
-            "name": "redactSensitiveText",
-            "line": 142
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
-            "kind": "call",
-            "name": "trim",
-            "line": 144
+            "line": 130
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 147
+            "line": 130
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 130
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "Promise.resolve",
+            "line": 130
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "construct",
+            "name": "Error",
+            "line": 131
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "runner",
+            "line": 132
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "record.heartbeat.progress",
+            "line": 134
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 137
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "construct",
             "name": "Date",
-            "line": 147
+            "line": 137
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "record.heartbeat.stop",
+            "line": 138
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
             "name": "redactSensitiveText",
-            "line": 149
+            "line": 143
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "redactSensitiveText",
+            "line": 148
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
@@ -10144,116 +10357,152 @@
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
             "kind": "call",
+            "name": "<dynamic>",
+            "line": 153
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "construct",
+            "name": "Date",
+            "line": 153
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "record.heartbeat.stop",
+            "line": 154
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "redactSensitiveText",
+            "line": 156
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
+            "name": "trim",
+            "line": 157
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.submit:0",
+            "kind": "call",
             "name": "publicRecord",
-            "line": 155
+            "line": 162
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.get:0",
             "kind": "call",
             "name": "records.get",
-            "line": 159
+            "line": 166
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.get:0",
             "kind": "call",
             "name": "publicRecord",
-            "line": 160
+            "line": 167
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.getResult:0",
             "kind": "call",
             "name": "records.get",
-            "line": 164
+            "line": 171
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.getResult:0",
             "kind": "call",
             "name": "TERMINAL.has",
-            "line": 166
+            "line": 173
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.getResult:0",
             "kind": "call",
             "name": "exportResult",
-            "line": 167
+            "line": 174
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 171
+            "line": 178
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 171
+            "line": 178
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 171
+            "line": 178
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 171
+            "line": 178
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
             "kind": "call",
             "name": "records.values",
-            "line": 171
+            "line": 178
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
             "kind": "call",
             "name": "Date.parse",
-            "line": 173
+            "line": 180
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
             "kind": "call",
             "name": "Date.parse",
-            "line": 173
+            "line": 180
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.list:0",
             "kind": "call",
             "name": "publicRecord",
-            "line": 175
+            "line": 182
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.cancel:0",
             "kind": "call",
             "name": "records.get",
-            "line": 179
+            "line": 186
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.cancel:0",
             "kind": "call",
             "name": "TERMINAL.has",
-            "line": 181
+            "line": 188
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.cancel:0",
             "kind": "call",
             "name": "publicRecord",
-            "line": 181
+            "line": 188
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.cancel:0",
+            "kind": "call",
+            "name": "record.heartbeat.stop",
+            "line": 190
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.cancel:0",
             "kind": "call",
             "name": "record.controller.abort",
-            "line": 184
+            "line": 192
           },
           {
             "from": "payload/pi-dispatch/extensions/task-monitor.js#function:createTaskMonitor.cancel:0",
             "kind": "call",
             "name": "publicRecord",
-            "line": 186
+            "line": 194
           }
         ]
       }
@@ -20874,7 +21123,7 @@
     },
     {
       "path": "payload/pi-dispatch/scripts/dispatch.mjs",
-      "sha256": "be8bd3cdad6a18b1db4d7a6259c065381d942e9dab62ce23ee10918038a54618",
+      "sha256": "fff245397e1a5c898274fcf3886a0b67122859003005e9cc067ae855ffe61819",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -32069,7 +32318,7 @@
     },
     {
       "path": "payload/pi-dispatch/scripts/host-workflow.mjs",
-      "sha256": "0dbe1f557293edecf250b0be10874744348944f55ffe611b18b7799b499078b1",
+      "sha256": "b705d140f53e2be12bfc53062113279ac5ba6203cc8a3a1dc6120cca4ce0d1a9",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -32080,8 +32329,8 @@
             "qualified": "workflowTopic",
             "kind": "function",
             "parent": null,
-            "line": 6,
-            "endLine": 10
+            "line": 13,
+            "endLine": 17
           },
           {
             "id": "payload/pi-dispatch/scripts/host-workflow.mjs#function:registerHostWorkflow:0",
@@ -32089,8 +32338,8 @@
             "qualified": "registerHostWorkflow",
             "kind": "function",
             "parent": null,
-            "line": 11,
-            "endLine": 17
+            "line": 18,
+            "endLine": 24
           }
         ],
         "imports": [
@@ -32130,76 +32379,82 @@
             "line": 4
           },
           {
+            "from": null,
+            "kind": "call",
+            "name": "Object.freeze",
+            "line": 5
+          },
+          {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:workflowTopic:0",
             "kind": "call",
             "name": "Object.hasOwn",
-            "line": 7
+            "line": 14
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:workflowTopic:0",
             "kind": "construct",
             "name": "Error",
-            "line": 7
+            "line": 14
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:workflowTopic:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 9
+            "line": 16
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:workflowTopic:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 9
+            "line": 16
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:workflowTopic:0",
             "kind": "call",
             "name": "createHash",
-            "line": 9
+            "line": 16
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:workflowTopic:0",
             "kind": "call",
             "name": "Object.keys",
-            "line": 9
+            "line": 16
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:registerHostWorkflow:0",
             "kind": "call",
             "name": "server.registerTool",
-            "line": 12
+            "line": 19
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:registerHostWorkflow:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 14
+            "line": 21
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:registerHostWorkflow:0",
             "kind": "call",
             "name": "z.enum",
-            "line": 14
+            "line": 21
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:registerHostWorkflow:0",
             "kind": "call",
             "name": "Object.keys",
-            "line": 14
+            "line": 21
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:registerHostWorkflow:0",
             "kind": "call",
             "name": "JSON.stringify",
-            "line": 16
+            "line": 23
           },
           {
             "from": "payload/pi-dispatch/scripts/host-workflow.mjs#function:registerHostWorkflow:0",
             "kind": "call",
             "name": "workflowTopic",
-            "line": 16
+            "line": 23
           }
         ]
       }
@@ -42682,7 +42937,7 @@
     },
     {
       "path": "payload/pi-dispatch/scripts/provider-policy.mjs",
-      "sha256": "f7f14df54acc721c7dc17b773ff1d52220b4e160139f31f7df3f8588ae16939c",
+      "sha256": "4396661e6cd5e586c92ffd3e62063cd7afaf73d7743d852ca31fe209364d6c04",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -54671,7 +54926,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/dispatch.test.mjs",
-      "sha256": "5dec9a7226c883f1df95a7b10cb5d1704d6f0fba17a73faf47667cc628b9a8d0",
+      "sha256": "6337c38aa867e5aadc73081d5f6e6aa58d2cb48c93a8bb7614867b3f84e30552",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -55893,67 +56148,97 @@
           {
             "from": null,
             "kind": "call",
-            "name": "assert.ok",
+            "name": "assert.equal",
             "line": 160
           },
           {
             "from": null,
             "kind": "call",
-            "name": "wslArgs.includes",
+            "name": "<dynamic>",
+            "line": 160
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
             "line": 160
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.ok",
+            "name": "assert.deepEqual",
+            "line": 161
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
             "line": 161
           },
           {
             "from": null,
             "kind": "call",
-            "name": "wslArgs.includes",
+            "name": "<dynamic>",
             "line": 161
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 162
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 162
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 162
           },
           {
             "from": null,
             "kind": "call",
             "name": "wslArgs.at",
+            "line": 161
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 161
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 162
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
-            "line": 164
+            "name": "wslArgs.includes",
+            "line": 162
           },
           {
             "from": null,
             "kind": "call",
-            "name": "childEnvironment",
+            "name": "assert.ok",
+            "line": 163
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 163
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 163
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "wslArgs.at",
+            "line": 163
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
             "line": 165
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "childEnvironment",
             "line": 166
           },
           {
@@ -55983,199 +56268,193 @@
           {
             "from": null,
             "kind": "call",
-            "name": "test",
-            "line": 172
+            "name": "assert.equal",
+            "line": 171
           },
           {
             "from": null,
             "kind": "call",
-            "name": "runProcess",
+            "name": "test",
             "line": 173
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "runProcess",
             "line": 174
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.deepEqual",
+            "name": "assert.equal",
             "line": 175
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 176
           },
           {
             "from": null,
             "kind": "call",
             "name": "JSON.parse",
-            "line": 175
+            "line": 176
           },
           {
             "from": null,
             "kind": "call",
             "name": "test",
-            "line": 177
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "runProcess",
             "line": 178
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "runProcess",
             "line": 179
           },
           {
             "from": null,
             "kind": "call",
+            "name": "assert.equal",
+            "line": 180
+          },
+          {
+            "from": null,
+            "kind": "call",
             "name": "test",
-            "line": 181
+            "line": 182
           },
           {
             "from": null,
             "kind": "construct",
             "name": "AbortController",
-            "line": 182
+            "line": 183
           },
           {
             "from": null,
             "kind": "call",
             "name": "setTimeout",
-            "line": 183
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "controller.abort",
-            "line": 183
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "runProcess",
             "line": 184
           },
           {
             "from": null,
             "kind": "call",
-            "name": "clearTimeout",
+            "name": "controller.abort",
+            "line": 184
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "runProcess",
             "line": 185
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "clearTimeout",
             "line": 186
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
-            "line": 188
+            "name": "assert.equal",
+            "line": 187
           },
           {
             "from": null,
             "kind": "call",
-            "name": "runProcess",
+            "name": "test",
             "line": 189
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "runProcess",
             "line": 190
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.ok",
+            "name": "assert.equal",
             "line": 191
           },
           {
             "from": null,
             "kind": "call",
+            "name": "assert.ok",
+            "line": 192
+          },
+          {
+            "from": null,
+            "kind": "call",
             "name": "test",
-            "line": 193
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
             "line": 194
           },
           {
             "from": null,
             "kind": "call",
             "name": "JSON.stringify",
-            "line": 194
+            "line": 195
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 195
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 195
+            "line": 196
           },
           {
             "from": null,
             "kind": "call",
             "name": "summarize",
-            "line": 195
+            "line": 196
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.match",
-            "line": 196
+            "line": 197
           },
           {
             "from": null,
             "kind": "call",
             "name": "summarize",
-            "line": 196
+            "line": 197
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 197
+            "line": 198
           },
           {
             "from": null,
             "kind": "call",
             "name": "summarize",
-            "line": 197
+            "line": 198
           },
           {
             "from": null,
             "kind": "call",
             "name": "test",
-            "line": 199
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
             "line": 200
           },
           {
             "from": null,
             "kind": "call",
             "name": "JSON.stringify",
-            "line": 200
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
             "line": 201
           },
           {
             "from": null,
             "kind": "call",
-            "name": "summarize",
+            "name": "JSON.stringify",
             "line": 201
           },
           {
@@ -56205,7 +56484,7 @@
           {
             "from": null,
             "kind": "call",
-            "name": "assert.deepEqual",
+            "name": "assert.equal",
             "line": 204
           },
           {
@@ -56217,104 +56496,448 @@
           {
             "from": null,
             "kind": "call",
-            "name": "test",
-            "line": 206
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 207
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 207
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 207
-          },
-          {
-            "from": null,
-            "kind": "call",
             "name": "assert.deepEqual",
-            "line": 208
+            "line": 205
           },
           {
             "from": null,
             "kind": "call",
             "name": "summarize",
-            "line": 208
+            "line": 205
           },
           {
             "from": null,
             "kind": "call",
             "name": "test",
-            "line": 210
+            "line": 207
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 208
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 208
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 208
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 209
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 209
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 211
           },
           {
             "from": null,
             "kind": "call",
             "name": "runProcess",
-            "line": 211
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolve",
-            "line": 211
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
             "line": 212
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
-            "line": 214
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 215
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "findPiEntry",
-            "line": 215
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 217
+            "name": "resolve",
+            "line": 212
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.ok",
-            "line": 218
+            "line": 213
           },
           {
             "from": null,
             "kind": "call",
-            "name": "<dynamic>",
-            "line": 218
+            "name": "test",
+            "line": 215
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 216
           },
           {
             "from": null,
             "kind": "call",
             "name": "findPiEntry",
+            "line": 216
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
             "line": 218
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 219
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 219
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "findPiEntry",
+            "line": 219
+          }
+        ]
+      }
+    },
+    {
+      "path": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs",
+      "sha256": "b44d328e5d16248af1a1089a6a001813487253162c73e567e4d22cc7f68136ec",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:flagValue:0",
+            "name": "flagValue",
+            "qualified": "flagValue",
+            "kind": "function",
+            "parent": null,
+            "line": 23,
+            "endLine": 26
+          },
+          {
+            "id": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:extensions:0",
+            "name": "extensions",
+            "qualified": "extensions",
+            "kind": "function",
+            "parent": null,
+            "line": 28,
+            "endLine": 30
+          },
+          {
+            "id": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:withFixtureUserProfile:0",
+            "name": "withFixtureUserProfile",
+            "qualified": "withFixtureUserProfile",
+            "kind": "function",
+            "parent": null,
+            "line": 32,
+            "endLine": 41
+          },
+          {
+            "id": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:expectedTools:0",
+            "name": "expectedTools",
+            "qualified": "expectedTools",
+            "kind": "function",
+            "parent": null,
+            "line": 43,
+            "endLine": 50
+          },
+          {
+            "id": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "name": "assertToolAndExtensionPolicy",
+            "qualified": "assertToolAndExtensionPolicy",
+            "kind": "function",
+            "parent": null,
+            "line": 52,
+            "endLine": 61
+          }
+        ],
+        "imports": [
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "../scripts/dispatch.mjs",
+            "form": "import_statement",
+            "line": 3
+          }
+        ],
+        "mentions": [
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:flagValue:0",
+            "kind": "call",
+            "name": "args.indexOf",
+            "line": 24
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:extensions:0",
+            "kind": "call",
+            "name": "args.flatMap",
+            "line": 29
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:withFixtureUserProfile:0",
+            "kind": "call",
+            "name": "callback",
+            "line": 36
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 53
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "flagValue",
+            "line": 53
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 54
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "args.includes",
+            "line": 54
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 55
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "construct",
+            "name": "Set",
+            "line": 55
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 56
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "expectedTools",
+            "line": 56
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "extensions",
+            "line": 58
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 59
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "extensionArgs.includes",
+            "line": 59
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 60
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "extensionArgs.some",
+            "line": 60
+          },
+          {
+            "from": "payload/pi-dispatch/tests/editor-access-matrix.test.mjs#function:assertToolAndExtensionPolicy:0",
+            "kind": "call",
+            "name": "extension.includes",
+            "line": 60
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 64
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "withFixtureUserProfile",
+            "line": 65
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 67
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 68
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 70
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flagValue",
+            "line": 70
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 71
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flagValue",
+            "line": 71
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 72
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flagValue",
+            "line": 72
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assertToolAndExtensionPolicy",
+            "line": 73
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assertToolAndExtensionPolicy",
+            "line": 74
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 76
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flagValue",
+            "line": 76
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 77
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flagValue",
+            "line": 77
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 78
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "authorizedTools.filter",
+            "line": 78
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "baseTools.includes",
+            "line": 78
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 79
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "baseTools.filter",
+            "line": 79
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "authorizedTools.includes",
+            "line": 79
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 84
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "withFixtureUserProfile",
+            "line": 85
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 86
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 87
           }
         ]
       }
@@ -68670,6 +69293,258 @@
       }
     },
     {
+      "path": "payload/pi-dispatch/tests/host-workflow.test.mjs",
+      "sha256": "de68b5559d212daebd7d269e9d2c65f9aeda5dffd06e38ae6cf8066c1227f5ce",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/tests/host-workflow.test.mjs#method:registerTool:0",
+            "name": "registerTool",
+            "qualified": "registerTool",
+            "kind": "method",
+            "parent": null,
+            "line": 45,
+            "endLine": 45
+          }
+        ],
+        "imports": [
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "node:crypto",
+            "form": "import_statement",
+            "line": 3
+          },
+          {
+            "specifier": "node:fs",
+            "form": "import_statement",
+            "line": 4
+          },
+          {
+            "specifier": "../scripts/host-workflow.mjs",
+            "form": "import_statement",
+            "line": 5
+          }
+        ],
+        "mentions": [
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "URL",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 14
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 15
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "Object.isFrozen",
+            "line": 15
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 25
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 28
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 31
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 32
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "createHash",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "Object.keys",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 35
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 38
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 39
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 39
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 42
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "registerHostWorkflow",
+            "line": 47
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 48
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "registration.handler",
+            "line": 49
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 50
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 51
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 52
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 52
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 52
+          }
+        ]
+      }
+    },
+    {
       "path": "payload/pi-dispatch/tests/http-fixture.mjs",
       "sha256": "7f95a22f5340e7df684936fb41393c8c7a66f50a21efa5fc630c9900b659ec45",
       "facts": {
@@ -71520,7 +72395,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/lsp-adapter.test.mjs",
-      "sha256": "b1ea7b5e67b87c432b37aebac5226d664286ecd35755f2b930b98ecf13a6e748",
+      "sha256": "ab7d25ea3b78b70cc4f126b426a88c98132facb6528d5a8c33c644bcecbf26f0",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -71755,7 +72630,13 @@
           {
             "from": null,
             "kind": "call",
-            "name": "assert.ok",
+            "name": "assert.deepEqual",
+            "line": 25
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
             "line": 25
           },
           {
@@ -71768,6 +72649,12 @@
             "from": null,
             "kind": "call",
             "name": "args.at",
+            "line": 25
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
             "line": 25
           },
           {
@@ -87925,6 +88812,988 @@
       }
     },
     {
+      "path": "payload/pi-dispatch/tests/task-heartbeat.test.mjs",
+      "sha256": "5710f8a64cf661a8096ad0cbb5335515df4b5d03791d3e454a95320f38818112",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "name": "fakeClock",
+            "qualified": "fakeClock",
+            "kind": "function",
+            "parent": null,
+            "line": 6,
+            "endLine": 26
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.setIntervalFn:0",
+            "name": "setIntervalFn",
+            "qualified": "fakeClock.setIntervalFn",
+            "kind": "method",
+            "parent": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "line": 13,
+            "endLine": 18
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.setIntervalFn.unref:0",
+            "name": "unref",
+            "qualified": "fakeClock.setIntervalFn.unref",
+            "kind": "method",
+            "parent": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.setIntervalFn:0",
+            "line": 14,
+            "endLine": 14
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.clearIntervalFn:0",
+            "name": "clearIntervalFn",
+            "qualified": "fakeClock.clearIntervalFn",
+            "kind": "method",
+            "parent": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "line": 19,
+            "endLine": 19
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.advance:0",
+            "name": "advance",
+            "qualified": "fakeClock.advance",
+            "kind": "method",
+            "parent": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "line": 20,
+            "endLine": 20
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.tick:0",
+            "name": "tick",
+            "qualified": "fakeClock.tick",
+            "kind": "method",
+            "parent": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "line": 21,
+            "endLine": 21
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.activeCount:0",
+            "name": "activeCount",
+            "qualified": "fakeClock.activeCount",
+            "kind": "method",
+            "parent": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "line": 22,
+            "endLine": 22
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.createdTimers:0",
+            "name": "createdTimers",
+            "qualified": "fakeClock.createdTimers",
+            "kind": "method",
+            "parent": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "line": 23,
+            "endLine": 23
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.unrefCount:0",
+            "name": "unrefCount",
+            "qualified": "fakeClock.unrefCount",
+            "kind": "method",
+            "parent": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "line": 24,
+            "endLine": 24
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:heartbeatFor:0",
+            "name": "heartbeatFor",
+            "qualified": "heartbeatFor",
+            "kind": "function",
+            "parent": null,
+            "line": 28,
+            "endLine": 30
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:deferred:0",
+            "name": "deferred",
+            "qualified": "deferred",
+            "kind": "function",
+            "parent": null,
+            "line": 32,
+            "endLine": 36
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:flush:0",
+            "name": "flush",
+            "qualified": "flush",
+            "kind": "function",
+            "parent": null,
+            "line": 38,
+            "endLine": 40
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:task:0",
+            "name": "task",
+            "qualified": "task",
+            "kind": "function",
+            "parent": null,
+            "line": 46,
+            "endLine": 46
+          },
+          {
+            "id": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:monitorFor:0",
+            "name": "monitorFor",
+            "qualified": "monitorFor",
+            "kind": "function",
+            "parent": null,
+            "line": 48,
+            "endLine": 53
+          }
+        ],
+        "imports": [
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "../extensions/task-heartbeat.js",
+            "form": "import_statement",
+            "line": 3
+          },
+          {
+            "specifier": "../extensions/task-monitor.js",
+            "form": "import_statement",
+            "line": 4
+          }
+        ],
+        "mentions": [
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:fakeClock:0",
+            "kind": "construct",
+            "name": "Set",
+            "line": 8
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.setIntervalFn:0",
+            "kind": "call",
+            "name": "timers.add",
+            "line": 15
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.setIntervalFn:0",
+            "kind": "call",
+            "name": "createdTimers.push",
+            "line": 16
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.clearIntervalFn:0",
+            "kind": "call",
+            "name": "timers.delete",
+            "line": 19
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#method:fakeClock.tick:0",
+            "kind": "call",
+            "name": "timer.fn",
+            "line": 21
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:heartbeatFor:0",
+            "kind": "call",
+            "name": "createTaskHeartbeat",
+            "line": 29
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:deferred:0",
+            "kind": "construct",
+            "name": "Promise",
+            "line": 34
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:flush:0",
+            "kind": "call",
+            "name": "Promise.resolve",
+            "line": 39
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:monitorFor:0",
+            "kind": "call",
+            "name": "createTaskMonitor",
+            "line": 49
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:monitorFor:0",
+            "kind": "call",
+            "name": "onCreate",
+            "line": 51
+          },
+          {
+            "from": "payload/pi-dispatch/tests/task-heartbeat.test.mjs#function:monitorFor:0",
+            "kind": "call",
+            "name": "heartbeatFor",
+            "line": 51
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 55
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fakeClock",
+            "line": 56
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "heartbeatFor",
+            "line": 57
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "heartbeatFor",
+            "line": 58
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 59
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.snapshot",
+            "line": 59
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.start",
+            "line": 60
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "second.start",
+            "line": 61
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 62
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 63
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 64
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 65
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "clock.tick",
+            "line": 67
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 68
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.snapshot",
+            "line": 68
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 69
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.snapshot",
+            "line": 69
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 70
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "second.snapshot",
+            "line": 70
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "clock.advance",
+            "line": 71
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "second.snapshot",
+            "line": 72
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 73
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 74
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "second.snapshot",
+            "line": 74
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.progress",
+            "line": 75
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.notEqual",
+            "line": 76
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.snapshot",
+            "line": 76
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 77
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "second.snapshot",
+            "line": 77
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "clock.advance",
+            "line": 78
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 79
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "second.snapshot",
+            "line": 79
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.stop",
+            "line": 81
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "second.stop",
+            "line": 82
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.snapshot",
+            "line": 83
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "clock.advance",
+            "line": 84
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "timer.fn",
+            "line": 85
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.progress",
+            "line": 86
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 87
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "first.snapshot",
+            "line": 87
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 88
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 91
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fakeClock",
+            "line": 92
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "deferred",
+            "line": 93
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitorFor",
+            "line": 94
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "queuedMonitor.submit",
+            "line": 95
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "task",
+            "line": 95
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flush",
+            "line": 96
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 97
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "queuedMonitor.get",
+            "line": 97
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 98
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 99
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "queuedMonitor.cancel",
+            "line": 99
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "queuedWork.resolve",
+            "line": 100
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flush",
+            "line": 101
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 102
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "queuedMonitor.get",
+            "line": 102
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 103
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "queuedMonitor.get",
+            "line": 103
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fakeClock",
+            "line": 105
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "deferred",
+            "line": 106
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitorFor",
+            "line": 108
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.submit",
+            "line": 109
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "task",
+            "line": 109
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "running",
+            "line": 110
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flush",
+            "line": 114
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 115
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 115
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 116
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "clock.advance",
+            "line": 117
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 118
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 118
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "progress",
+            "line": 119
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.notEqual",
+            "line": 120
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 120
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "clock.advance",
+            "line": 121
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 122
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 122
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "clock.tick",
+            "line": 123
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 124
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 124
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "work.resolve",
+            "line": 125
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flush",
+            "line": 126
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 127
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "progress",
+            "line": 128
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 129
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 129
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 132
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "running",
+            "line": 134
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "running",
+            "line": 135
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "running",
+            "line": 136
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "running",
+            "line": 137
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Error",
+            "line": 137
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.test",
+            "line": 139
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fakeClock",
+            "line": 140
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitorFor",
+            "line": 141
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.submit",
+            "line": 142
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "task",
+            "line": 142
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flush",
+            "line": 143
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 144
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 145
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 146
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 147
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 151
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fakeClock",
+            "line": 152
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "deferred",
+            "line": 153
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitorFor",
+            "line": 155
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.submit",
+            "line": 156
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "task",
+            "line": 156
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "running",
+            "line": 156
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flush",
+            "line": 157
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.submit",
+            "line": 158
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "task",
+            "line": 158
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Error",
+            "line": 158
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 159
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 160
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 161
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.cancel",
+            "line": 162
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 163
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 164
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "work.resolve",
+            "line": 165
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flush",
+            "line": 166
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 167
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 167
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 168
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.get",
+            "line": 168
+          }
+        ]
+      }
+    },
+    {
       "path": "payload/pi-dispatch/tests/task-monitor.test.mjs",
       "sha256": "0ce329648cfc5723eb90894a5c131b4322c0af8150e0e226a3073b88e3758089",
       "facts": {
@@ -89344,6 +91213,402 @@
             "kind": "call",
             "name": "assert.match",
             "line": 30
+          }
+        ]
+      }
+    },
+    {
+      "path": "payload/pi-dispatch/tests/worker-editor-boundary.test.mjs",
+      "sha256": "7aee6272b1acab8360d0304cec3040fb7a24256175cd149141b224a4a9d1d966",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/tests/worker-editor-boundary.test.mjs#function:flagValue:0",
+            "name": "flagValue",
+            "qualified": "flagValue",
+            "kind": "function",
+            "parent": null,
+            "line": 13,
+            "endLine": 16
+          },
+          {
+            "id": "payload/pi-dispatch/tests/worker-editor-boundary.test.mjs#function:extensions:0",
+            "name": "extensions",
+            "qualified": "extensions",
+            "kind": "function",
+            "parent": null,
+            "line": 18,
+            "endLine": 20
+          }
+        ],
+        "imports": [
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "../scripts/dispatch.mjs",
+            "form": "import_statement",
+            "line": 3
+          }
+        ],
+        "mentions": [
+          {
+            "from": "payload/pi-dispatch/tests/worker-editor-boundary.test.mjs#function:flagValue:0",
+            "kind": "call",
+            "name": "args.indexOf",
+            "line": 14
+          },
+          {
+            "from": "payload/pi-dispatch/tests/worker-editor-boundary.test.mjs#function:extensions:0",
+            "kind": "call",
+            "name": "args.flatMap",
+            "line": 19
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "flagValue",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "extensions",
+            "line": 25
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 27
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 28
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "extensionArgs.includes",
+            "line": 28
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "extensionArgs.some",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "args.includes",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 36
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "args.includes",
+            "line": 36
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "args.includes",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 38
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 38
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "extensions",
+            "line": 38
+          }
+        ]
+      }
+    },
+    {
+      "path": "payload/pi-dispatch/tests/workflow-input-boundary.test.mjs",
+      "sha256": "40799abdc264e5e99acc1172243d38f89e76a17e12b6c2e4a6b6a24327f0d9e8",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [],
+        "imports": [
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "@modelcontextprotocol/sdk/server/mcp.js",
+            "form": "import_statement",
+            "line": 3
+          },
+          {
+            "specifier": "@modelcontextprotocol/sdk/client/index.js",
+            "form": "import_statement",
+            "line": 4
+          },
+          {
+            "specifier": "@modelcontextprotocol/sdk/inMemory.js",
+            "form": "import_statement",
+            "line": 5
+          },
+          {
+            "specifier": "../scripts/host-workflow.mjs",
+            "form": "import_statement",
+            "line": 6
+          }
+        ],
+        "mentions": [
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 8
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "McpServer",
+            "line": 9
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Client",
+            "line": 10
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "InMemoryTransport.createLinkedPair",
+            "line": 11
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "registerHostWorkflow",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "server.connect",
+            "line": 14
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "client.connect",
+            "line": 15
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "client.listTools",
+            "line": 17
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "tools.tools.find",
+            "line": 18
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 19
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 20
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "client.callTool",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "client.callTool",
+            "line": 27
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 28
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 28
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 28
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "client.callTool",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 35
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "client.close",
+            "line": 38
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "server.close",
+            "line": 39
           }
         ]
       }

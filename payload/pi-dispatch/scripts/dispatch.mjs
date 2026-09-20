@@ -170,8 +170,8 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false)
   if (request.access === 'none' && !editorAuthorized) args.push('--no-tools');
   else {
     const tools = request.access === 'none' ? [] : request.access === 'read'
-      ? [...readTools, ...lspReadTools]
-      : [...readTools, ...lspReadTools, 'edit', 'write', 'code_rewrite'];
+      ? [...readTools, ...(runtime === 'wsl2' ? [] : lspReadTools)]
+      : [...readTools, ...(runtime === 'wsl2' ? [] : lspReadTools), 'edit', 'write', ...(runtime === 'wsl2' ? [] : ['code_rewrite'])];
     if (runtime === 'wsl2' && request.access !== 'none') tools.push(...['diagnostics','hover','definition','references','symbols','completions','code_actions'].map(m=>'yhwh_lsp_'+m));
     if(editorAuthorized)tools.push('pi_editor_execute');
     args.push('--tools', tools.join(','));

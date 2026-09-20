@@ -2,6 +2,10 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+**主代理只负责思考与调度：** Astra（或宿主选择的主模型）负责方案、调度、补丁整合与验收；代码、测试和实现修复由 Pi 子代理编写，默认 Luna/max。子代理失败不自动回退为主代理编码。该策略是宿主指令约束，不能禁用所有客户端的编辑工具；详见[职责与失败处理](docs/coordinator-only.md)。
+
+**子代理监管心跳：** 本地计时器提供不调用模型的心跳，并单独记录最近执行进度；静默不触发自动重试。它不证明远端模型健康，也不自动唤醒主代理；详见[心跳说明与部署边界](docs/subagent-heartbeat.md)。
+
 连续调用改进：`HeadlessBatchEvents` 实时显示各项阶段、等待状态和结果；会话缓存减少重复文件读取与哈希，保留每次版本检查。整批执行前校验，同会话串行调用，失败即停止；报告缓存命中及分段耗时。详见[操作与验收边界](docs/workflow-operations.md#简体中文)。
 
 **开发中优化：** CLI 实机回显验收、连续批次与耗时证据、可选 Windows Job Object 清理、受管插件升级/回滚、Git 变更影响候选及 Windows CI。Antigravity 路径留空、默认禁用。源码能力与已部署/已发布状态分别记录，见[操作与验收指南](docs/workflow-operations.md#简体中文)。

@@ -157,7 +157,8 @@ test('model allowlists and exact provider/model routing', () => {
   assert.ok(buildPiArgs(validate({ ...base, access: 'read' })).includes('--extension'));
   const wslArgs = buildPiArgs(validate({ ...base, access: 'workspace-write' }, true), 'wsl2');
   assert.ok(wslArgs.includes('/opt/pi-kether/extensions/auth-scrub.js'));
-  assert.ok(wslArgs.includes('/opt/pi-kether/node_modules/pi-lsp-extension/src/index.ts'));
+  assert.equal(new Set(wslArgs).has('/opt/pi-kether/node_modules/pi-lsp-extension/src/index.ts'), false);
+  assert.deepEqual(new Set(wslArgs.at(-1).split(',')), new Set(['read', 'grep', 'find', 'ls', 'edit', 'write', 'yhwh_lsp_diagnostics', 'yhwh_lsp_hover', 'yhwh_lsp_definition', 'yhwh_lsp_references', 'yhwh_lsp_symbols', 'yhwh_lsp_completions', 'yhwh_lsp_code_actions']));
   assert.ok(wslArgs.includes('/opt/pi-kether/extensions/write-scope-guard.js'));
   assert.ok(!wslArgs.at(-1).split(',').includes('powershell'));
 });

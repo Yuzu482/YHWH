@@ -22,7 +22,7 @@ test('adapter is admitted only for WSL file access; reviewer receives no tools',
   const args=buildPiArgs(base,'wsl2');
   assert.ok(args.includes('/opt/pi-kether/extensions/lsp-proxy.js'));
   assert.ok(args.at(-1).includes('yhwh_lsp_diagnostics'));
-  assert.ok(args.at(-1).includes('ast_search'));
+  assert.deepEqual(new Set(args.at(-1).split(',')), new Set(['read', 'grep', 'find', 'ls', 'yhwh_lsp_diagnostics', 'yhwh_lsp_hover', 'yhwh_lsp_definition', 'yhwh_lsp_references', 'yhwh_lsp_symbols', 'yhwh_lsp_completions', 'yhwh_lsp_code_actions']));
   const none=buildPiArgs({...base,access:'none'},'wsl2');
   assert.ok(none.includes('--no-tools'));
   assert.ok(!none.includes('/opt/pi-kether/extensions/lsp-proxy.js'));

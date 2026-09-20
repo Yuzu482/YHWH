@@ -10,9 +10,9 @@ This skill implements the user's Kether governance architecture for ChatGPT Work
 ## Choose the execution path
 
 1. Identify the actual host capabilities and active authorization. Higher-priority instructions and explicit user intent govern. Loading this skill does not switch the host into Plan mode or grant permissions.
-2. Use compact mode for simple or tightly coupled low-risk work. Apply intent, scope, execution, and a proportional correctness check locally. Do not spawn agents for ceremony.
+2. Use compact primary mode for non-coding work. All coding, including small fixes, tests and implementation scripts, is authored by bounded Pi workers under the coordinator-only policy. The primary plans, inspects, mechanically integrates accepted patches and verifies; it does not take over failed implementation.
 3. For substantive work, use the staged path below with bounded specialists wherever they provide real value and the host permits delegation. Dispatch model-backed specialists through Pi with provider `openai-codex`; built-in subagents require an explicit user request for the current task. Workers are real calls, not simulated personas. The primary owns decomposition, integration, acceptance, and user communication.
-4. If mandatory specialist capacity is unavailable, distinguish local review from independent verification. Continue useful authorized work unless strict independent execution was explicitly required. A prompt or role name alone never establishes independent execution; model-backed specialist work must be evidenced by an actual Pi dispatch.
+4. If mandatory worker capacity is unavailable, coding stays blocked; continue only primary reasoning/diagnosis. Distinguish local review from independent verification. A prompt or role name alone never establishes independent execution; require actual Pi dispatch and accepted worker artifacts. Primary-authored coding needs an explicit subsequent user exception.
 
 ## Derive a task agreement
 
@@ -48,7 +48,7 @@ Use one writer by default. Parallel scouting and review should have non-overlapp
 
 ## Model and capability handling
 
-Preserve explicit user choices. For delegated reasoning use gpt-5.6-luna with max effort only if the Pi catalog and host instructions support that request; otherwise disclose the actual selection. Dispatch model-backed work only through Pi with provider openai-codex. Do not call built-in subagent tools as an automatic fallback; if Pi is unavailable, continue locally when feasible or report the capability gap. Do not guess provider availability or claim a model escalation that did not occur. Da'at is a focused capability bridge: provide the referenced input, question, output needs and continuation context, and return observations/limitations to the original owner.
+Preserve explicit user choices and the live role bindings. Workers use gpt-5.6-luna/max through Pi when supported; reviewers keep their explicit separate route. If a required route is unavailable, report the blocker rather than substitute. No built-in fallback or primary coding takeover: continue only local reasoning/diagnosis. Da'at is a focused capability bridge when configured; return observations and limitations to the owner without expanding authority.
 
 Use the original bounded-repair idea: initial tier up to three focused repairs; after reassessment, at most one repair at each available higher tier. Security/authority or scope disputes escalate immediately. Repeated tool errors require diagnosis, not an identical retry loop. A missing Pi model or capability is a capability limit. Only an actual Pi run may claim a provider, model, or tool result.
 

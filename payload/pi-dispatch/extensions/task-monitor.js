@@ -1,4 +1,5 @@
 import {exportResult} from './result-export.js';
+import { createTaskHeartbeat } from './task-heartbeat.js';
 import { createHash } from 'node:crypto';
 import { redactSensitiveText, summarizePatch, summarizeUsage } from './audit-log.js';
 
@@ -48,6 +49,7 @@ function publicRecord(record, now = Date.now()) {
     queueWaitMs:result?.timings?.queueWaitMs ?? Math.max(0,Date.parse(record.startedAt??record.finishedAt??new Date(now).toISOString())-Date.parse(record.createdAt)),
     executionMs:result?.timings?.executionMs ?? (record.startedAt?Math.max(0,(record.finishedAt?Date.parse(record.finishedAt):now)-Date.parse(record.startedAt)):0),
     phaseTimings:result?.phaseTimings??record.phaseTimings??null,
+    heartbeat: record.heartbeat.snapshot(),
     elapsedMs: Math.max(0, (record.finishedAt ? Date.parse(record.finishedAt) : now) - Date.parse(record.createdAt)),
     cancellable: !TERMINAL.has(record.state) && record.state !== 'cancelling',
     outcome: TERMINAL.has(record.state) ? {
@@ -63,7 +65,7 @@ function publicRecord(record, now = Date.now()) {
   };
 }
 
-export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512 } = {}) {
+export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createHeartbeat = createTaskHeartbeat } = {}) {
   if (!gatewayInstanceId) throw new Error('gatewayInstanceId is required');
   if (!Number.isInteger(maxEntries) || maxEntries < 16 || maxEntries > 4096) throw new Error('maxEntries must be an integer from 16 to 4096');
   const records = new Map();
@@ -88,6 +90,7 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512 } = {}) 
     }
 
     const controller = new AbortController();
+    const heartbeat = createHeartbeat();
     const now = new Date().toISOString();
     const record = {
       requestId,
@@ -110,6 +113,7 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512 } = {}) 
       result: null,
       phaseTimings:null,
       controller,
+      heartbeat,
     };
     records.set(requestId, record);
     trim();
@@ -120,16 +124,18 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512 } = {}) 
         record.startedAt = new Date().toISOString();
         if(info?.executionTimeoutSeconds) record.timeoutSeconds=info.executionTimeoutSeconds;
         record.waitReasons=[];
+        record.heartbeat.start();
       }
     };
     record.promise = Promise.resolve().then(() => {
       if (controller.signal.aborted) throw new Error('cancelled before execution');
       return runner(controller.signal, markRunning, value=>{
         if(record.state==='queued') {record.waitReasons=[...value.waitReasons];record.queueDeadlineAt=value.queueDeadlineAt;record.timeoutSeconds=value.executionTimeoutMs/1000;}
-      },value=>{record.phaseTimings=value;});
+      },value=>{record.heartbeat.progress();record.phaseTimings=value;});
     }).then(envelope => {
       record.result = envelope?.response ?? envelope;
       record.finishedAt = new Date().toISOString();
+      record.heartbeat.stop();
       if (record.state === 'cancelling' || controller.signal.aborted) {
         record.state = 'cancelled';
         record.failureReason = 'cancelled by Tifereth';
@@ -145,6 +151,7 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512 } = {}) 
       return envelope;
     }).catch(error => {
       record.finishedAt = new Date().toISOString();
+      record.heartbeat.stop();
       record.state = record.state === 'cancelling' || controller.signal.aborted ? 'cancelled' : 'failed';
       record.failureReason = redactSensitiveText(record.state === 'cancelled' ? 'cancelled by Tifereth' : error?.message ?? 'execution failed');
       trim();
@@ -180,6 +187,7 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512 } = {}) 
     if (!record) return { accepted: false, reason: 'not_found', task: null };
     if (TERMINAL.has(record.state)) return { accepted: false, reason: 'already_terminal', task: publicRecord(record) };
     if (record.state !== 'cancelling') {
+      record.heartbeat.stop();
       record.state = 'cancelling';
       record.controller.abort();
     }

@@ -2,6 +2,10 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+**Primary reasoning and orchestration only:** Astra (or the host-selected primary model) owns planning, scheduling, patch integration and acceptance. Pi subagents, normally Luna/max, author code, tests and implementation repairs. Worker failure never silently falls back to primary coding. This is a host instruction policy, not a mechanism disabling every client's editing tools; see [ownership and failure handling](docs/coordinator-only.en.md).
+
+**Subagent supervision heartbeats:** Local timers provide heartbeats without model calls and track execution progress separately; silence never triggers automatic retries. This does not prove remote-model health or automatically wake the primary; see [heartbeat behavior and deployment boundaries](docs/subagent-heartbeat.en.md).
+
 Sequential-call improvements: `HeadlessBatchEvents` streams per-request phases, waiting status and results. Session caches reduce repeated file reads and hashing while retaining exact version checks. Entire batches are validated before execution; session calls are serialized and stop after failure, with cache and phase timings reported. See [operations and acceptance boundaries](docs/workflow-operations.md#english).
 
 **Development optimizations:** live CLI echo acceptance, sequential batches and timing evidence, optional Windows Job Object cleanup, managed plugin upgrade/rollback, Git change-impact candidates and Windows CI. Antigravity remains disabled with an empty path. Source capabilities, deployment and publication are tracked separately; see the [operations and acceptance guide](docs/workflow-operations.md#english).

@@ -5,21 +5,21 @@ Apply this policy to every task and every agent operating under this Codex home.
 ### Routing
 
 - For every non-trivial task, first assess scope, uncertainty, dependencies, and whether delegation creates real parallel or specialist value.
-- Keep simple, tightly coupled, or low-risk tasks with the primary agent.
+- Keep simple non-coding work with the primary. Coding always goes to a bounded Pi worker; tightly coupled edits go to one worker. Follow [coordinator-only](coordinator-only.md).
 - Delegate only bounded, independently reviewable subtasks. Never delegate merely to add ceremony.
-- Route every model-backed lower-agent task through the installed Pi gateway with provider `openai-codex`. Do not use the built-in multi-agent runtime unless the user explicitly requests it for the current task. If Pi is unavailable, keep the work with the primary agent or report the capability gap; do not silently fall back to built-in subagents.
+- Route model-backed lower-agent work through the installed Pi gateway using the current role binding. Do not use the built-in multi-agent runtime unless explicitly requested. If Pi is unavailable, keep coding blocked and continue only primary reasoning/diagnosis; do not silently fall back to primary coding or built-in subagents.
 
 ### Primary-agent ownership
 
 - The primary agent owns task decomposition, delegation prompts, acceptance criteria, integration, user-facing decisions, and the final result.
 - Give each worker one clear objective, relevant context, explicit deliverables, constraints, and verification requirements.
 - Review every worker result against the acceptance criteria and source evidence.
-- If a result is incomplete or wrong, request a focused revision or fix it directly before integrating it.
+- If a result is incomplete or wrong, request a focused worker revision. The primary reviews and mechanically applies accepted patches; it does not author implementation repairs.
 
 ### Default delegated model
 
 - For delegated reasoning work through Pi, request `gpt-5.6-luna` with `max` reasoning effort when the Pi catalog supports both values.
-- If either value is unavailable, use the highest actually supported reasoning effort/model and record that limitation; never assume `ultra` or an undocumented field.
+- If the required binding is unavailable, report the blocker; do not substitute a model/provider or lower effort to evade it.
 
 ### Worker roles
 

@@ -5,12 +5,13 @@ These user-level rules apply to tasks operating under this Codex home. They rema
 ## Core rules
 
 - The primary agent owns intent, scope, authorization, decomposition, integration, and evidence-based final acceptance. Inspect current sources before changes and preserve unrelated work.
-- Keep simple, tightly coupled, or low-risk work on the compact primary-agent path. For non-trivial work, assess uncertainty, dependencies, and the value of independent work; read the governance reference and load the available kether-governance skill.
+- The primary is a reasoning and coordination center; actual coding, including small fixes, tests and implementation scripts, belongs to Pi workers, normally Luna/max. Read the coordinator-only reference before implementation. Simple non-coding work may stay local.
 - Honor Plan/Execute mode and existing authorization. Resolve only material ambiguity. Do not invent a new confirmation gate for already-authorized reversible work; an answer to clarification does not authorize a separate action.
-- Delegate only bounded, independently reviewable work with real value. Model-backed lower agents use Pi; built-in subagents require an explicit user request for that route. No recursive delegation without primary-agent authorization. If Pi is unavailable, continue locally when feasible and disclose missing independence; strict independent execution remains blocked.
+- Delegate bounded implementation through Pi; built-in subagents require an explicit user request for that route. No recursive delegation without primary-agent authorization. If Pi is unavailable, continue diagnosis and planning locally but keep coding blocked; do not silently implement or repair worker code in the primary.
 - Query Pi capabilities before model dispatch. The current role bindings are OpenAI Luna/max for workers and Claude Sonnet/max for reviewers, with reviewer access none. Read the routing reference for exact identifiers. Its explicit bindings and reviewer exception govern older default-route or fallback wording in references and skills; never substitute a provider/model to evade them.
 - For substantive changes, follow the governance stages with pre-review before mutation and post-review after verification. Default to one writer. Reviewers do not edit; verifiers do not silently repair. Never claim an unperformed stage or check passed.
 - Accept completion only with the required evidence. Distinguish completed, failed, blocked, and unverified; keep user-facing explanations concise. Bound repair loops and stop delegation when acceptance is satisfied.
+- Astra must not repeatedly poll Pi progress, including sleep/query loops or script-wrapped polling. Use an actually available completion wait, otherwise wait without status queries until a genuine event, predeclared deadline or explicit user request. Keep monitor refresh independent; read the async-results reference for bounded decision checks and final acceptance.
 - Do not create tasks, automations, external messages, commits, pushes, deployments, memories, or permission changes merely because a workflow mentions them. The user's request and host rules must authorize them.
 - Execute deterministic LSP through the direct tool, without a model. For raster-image generation/editing or image-prompt optimization, use the image-prompt-review default; read its reference and installed skill before proceeding. Only an explicit user exception changes that workflow, subject to higher-priority instructions.
 
@@ -20,6 +21,7 @@ Resolve these links relative to the installed AGENTS.md (in the Codex home direc
 
 | Trigger | Reference |
 | --- | --- |
+| Any implementation, code/test repair, worker failure or patch integration | [Coordinator-only primary](agent-references/coordinator-only.md) |
 | Non-trivial work; stage selection, scope changes, repair or acceptance decisions | [Kether governance](agent-references/governance.md) |
 | Considering or preparing model-backed delegation | [Delegation and primary ownership](agent-references/delegation.md) |
 | Before selecting or dispatching a Pi model/role | [Current Pi routing](agent-references/pi-routing.md) |
