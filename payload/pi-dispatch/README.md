@@ -2,6 +2,10 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+新增可选主代理 CLI 运行器：`scripts/headless-host.mjs` 支持 Codex、Claude Code、Antigravity，提供 `doctor/run/fingerprint`。配置模板位于 `workflow/headless.example.json`，默认全部禁用；通过官方 CLI 自身认证，不作为 Pi provider 使用。见 [配置与边界](../../docs/headless-cli.md#简体中文)。
+
+新增开发功能 `code_graph`：只读查询项目 `.yhwh/code-graph/index.json` 的 JS/TS/Python 关系索引，操作为 `status/search/neighbors/impact`。宿主通过 `node scripts/code-graph.mjs '<JSON>'` 执行 `refresh`（必需绝对 Git 根目录 `cwd`），按散列增量更新；可选 `watch` 默认间隔 5 秒、持续 300 秒，不安装后台服务。只索引已跟踪的普通非忽略源文件，调用和基类只保存语法提及，相对导入才解析为文件边；默认拒绝过期索引。读取 `get_workflow(topic="code-graph")` 获取限制、Git 审查、并发锁与恢复规则。MCP 不提供写入接口；原有 LSP 隔离不变。已有服务尚需升级才能使用。
+
 新增项目长期知识工具 `project_memory`：读取 Git 项目中的 `.yhwh/memory/<id>.md`，提供 `list/search/read/review/snapshot`；默认检索仅包含已确认且来源未变化的知识。`review` 分别展示已暂存、未暂存和未跟踪差异。工具只读、无模型，不写入或提交；主代理按现有权限编辑知识条目。运行机器须安装 Git，`cwd` 必须是允许的 Git 工作树根目录。读取 `get_workflow(topic="project-memory")` 获取完整格式、边界和复核流程。已有服务需升级；这不是宿主聊天记忆或 LSP 常驻缓存。
 
 主代理可来自任何具备 MCP 工具调用和持续规则加载能力的宿主。新增 `get_workflow` 按主题提供主代理契约、角色技能和治理 references；`scripts/host-profiles.mjs` 为 Cherry Studio、OpenCode v1/v2、Claude Code/Desktop、DeepSeek Harness、Codex 和通用客户端导出配置。另有 `scripts/common-client-profiles.mjs` 导出 Cursor、VS Code/Copilot、Windsurf Cascade、Cline、Roo Code、Gemini CLI、Kiro、Zed、Continue 和 LM Studio 配置，总计 18 个宿主 ID；每份新适配的元数据附官方来源与适用范围。连接与配置验证不等于各宿主已完成完整模型治理链验证。默认 stdio 每连接一运行时；多个宿主同时使用需通过 `PI_GATEWAY_CONFIG` 共享同一 HTTP 网关。后端仍要求 Windows + WSL2。

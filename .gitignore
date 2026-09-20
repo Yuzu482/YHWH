@@ -21,3 +21,5 @@ auth.json
 **/anthropic-api-key.json
 **/provider-config.json
 **/provider-credentials.json
+.yhwh/code-graph/*.lock
+.yhwh/code-graph/*.tmp

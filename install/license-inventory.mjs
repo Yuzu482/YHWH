@@ -43,7 +43,7 @@ const packages = locks.flatMap(lockfile => Object.entries(json(lockfile).package
   optional: entry.optional === true,
 })));
 const inventory = {schemaVersion:1, scope:'npm lockfile declarations only; includes optional/transitive packages; excludes system dependencies; not a license-text or provenance audit', packages};
-const notices = ['licenses/multilspy-dependency-notices.txt','licenses/pi-0.84.4-MIT.txt','licenses/pi-claude-code-provider-0.1.4-MIT.txt','licenses/MIT-standard-reference.txt','licenses/pi-lsp-extension-NOTICE.txt','licenses/claude-code-2.1.250-NOTICE.txt'];
+const notices = ['licenses/code-graph-tree-sitter-notices.txt','licenses/multilspy-dependency-notices.txt','licenses/pi-0.84.4-MIT.txt','licenses/pi-claude-code-provider-0.1.4-MIT.txt','licenses/MIT-standard-reference.txt','licenses/pi-lsp-extension-NOTICE.txt','licenses/claude-code-2.1.250-NOTICE.txt'];
 const standalone = 'Third-party notices for the YHWH Pi integration\n\nDependencies retain their own licenses. These notices do not license Claude services.\nThe complete source distribution also contains THIRD_PARTY.md and a lockfile inventory.\n\n'+notices.map(file => `${path.basename(file)}\n${'='.repeat(60)}\n${read(file).toString('utf8').trim()}\n`).join('\n');
 const outputs = new Map([
   ['licenses/dependency-inventory.json', Buffer.from(JSON.stringify(inventory,null,2)+'\n')],

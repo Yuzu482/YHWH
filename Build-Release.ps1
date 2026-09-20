@@ -11,6 +11,7 @@ New-Item -ItemType Directory -Force -Path $release | Out-Null
 & (Join-Path $root 'install\Test-PiKether.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Portable self-test failed.' }
 & (Join-Path $root 'install\Test-WorkflowConfig.ps1')
+& (Join-Path $root 'install\Test-Headless.ps1')
 & (Join-Path $root 'install\Sync-HostWorkflow.ps1') -Check
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'install/Test-ClaudeApiSetup.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'API setup validation failed.' }

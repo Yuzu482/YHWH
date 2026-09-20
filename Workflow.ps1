@@ -1,8 +1,11 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-  [ValidateSet('Init','Plan','Install','Verify','Build')][string]$Action='Plan',
+  [ValidateSet('Init','Plan','Install','Verify','Build','HeadlessDoctor','HeadlessRun','HeadlessCompare')][string]$Action='Plan',
   [string]$ConfigFile=(Join-Path $PSScriptRoot 'install.config.json'),
+  [string]$HeadlessConfigFile,
+  [string]$HeadlessRequestFile,
+  [string]$ComparePluginRoot,
   [string]$TargetHome=$HOME,
   [switch]$SkipWsl,
   [switch]$SkipTunnel,
@@ -10,6 +13,9 @@ param(
 )
 $ErrorActionPreference='Stop'
 switch($Action) {
+  'HeadlessDoctor' { & (Join-Path $PSScriptRoot 'install/Invoke-Headless.ps1') -Action Doctor -ConfigFile $HeadlessConfigFile }
+  'HeadlessRun' { & (Join-Path $PSScriptRoot 'install/Invoke-Headless.ps1') -Action Run -ConfigFile $HeadlessConfigFile -RequestFile $HeadlessRequestFile }
+  'HeadlessCompare' { & (Join-Path $PSScriptRoot 'install/Invoke-Headless.ps1') -Action Compare -ComparePluginRoot $ComparePluginRoot }
   'Init' {
     if(Test-Path -LiteralPath $ConfigFile){throw 'Configuration already exists; edit it explicitly.'}
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.config.example.json') -Destination $ConfigFile

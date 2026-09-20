@@ -16,14 +16,14 @@
   "sources": [
     {
       "path": "AGENTS.md",
-      "sha256": "efe465fa23ba6578c03633ddbeec4d114e0d83c72c50400440d8c13486cbe130"
+      "sha256": "768a0e7252288ddd5858b863e934f4c0b887e4faa52d45ff0a44b01dd7841249"
     },
     {
       "path": "templates/host-primary.md",
-      "sha256": "44c06cb0ccddd857babe92352dfac492c2670d2330a33e7578867e0d00b54037"
+      "sha256": "2b6334c0f8cade013e26a76baeee0fc43f44769b4a032bf8b0342f203552a21a"
     }
   ],
-  "sourceCommit": "57a12b63ff0c0ba849af0a663ac70daf706d00f7",
+  "sourceCommit": "ebe7a3a168f3c1af543b4aff2b1edf5d8b4df219",
   "reviewedAt": "2026-09-20"
 }
 ---

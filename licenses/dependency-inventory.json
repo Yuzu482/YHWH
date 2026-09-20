@@ -24,6 +24,16 @@
     },
     {
       "lockfile": "payload/pi-dispatch/package-lock.json",
+      "packagePath": "node_modules/@vscode/tree-sitter-wasm",
+      "name": "@vscode/tree-sitter-wasm",
+      "version": "0.3.1",
+      "declaredLicense": "MIT",
+      "resolved": "https://registry.npmjs.org/@vscode/tree-sitter-wasm/-/tree-sitter-wasm-0.3.1.tgz",
+      "integrity": "sha512-RJFoomET6FajjG511fmQxeBQfU6M24a0aFZPqpid+ttIxanWf1VGytBG0UmsGjt07qmIPJS8U31D+aecuCucsQ==",
+      "optional": false
+    },
+    {
+      "lockfile": "payload/pi-dispatch/package-lock.json",
       "packagePath": "node_modules/accepts",
       "name": "accepts",
       "version": "2.0.0",

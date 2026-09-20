@@ -1,5 +1,41 @@
 # Publication verification
 
+## 2026-09-20 — Official headless primary CLI feature / 官方无头主代理入口
+
+Added optional Codex, Claude Code and Antigravity transports through `scripts/headless-host.mjs`, a host-owned disabled-by-default configuration, explicit version/model/policy selection, stdin prompts with the packaged primary contract, normalized terminal results, process budgets/cancellation, and adapter/catalog parity checks. `Workflow.ps1` exposes HeadlessDoctor/HeadlessRun/HeadlessCompare; installation checks compare installed files and release builds run an isolated feature-package check. Pi providers, live role bindings and authentication adapters were not modified by this feature.
+
+Validation: full Node suite **270/270** passed; targeted headless tests **11/11**, including actual Windows descendant cleanup, missing/changed versions, protocol failure, denial status, cancellation and output limits. `Test-Headless.ps1` passed an isolated copied runtime, inert defaults, wrapper invocation and altered-installation rejection. Portable/config/catalog/license checks, **35** source one-click checks and heap regression passed. A multiple-Node PATH issue found in the PowerShell wrapper was corrected and the wrapper checks rerun successfully. The restricted process environment initially could not confirm tree cleanup; the real-user Windows fixture verified it rather than weakening the failure status.
+
+Live probes: Codex `codex-cli 0.153.0` and Claude Code `2.1.250 (Claude Code)` matched exact versions and required help flags. Authentication and model access were not tested. Antigravity was not found on PATH; its adapter has official-documentation and fixture evidence only. No model-backed CLI run, live-service deployment, CLI installation/update, account migration, Git publication or release was performed. Parity covers the feature modules/example/catalog, not the whole Pi installation or vendor-native settings. Source changes remain pending publication alongside the earlier code-graph work.
+
+Governance: primary-local planning, pre-review, implementation, verification and post-review; no independent Pi reviewer execution is claimed. Existing memory statements on primary ownership, lower-agent binding and bilingual documentation were re-read against the updated primary contract before refreshing their source fingerprint. No automatic knowledge promotion or Git staging was performed.
+
+中文：已加入三个官方 CLI 的可选无头主代理入口，默认禁用，包含版本/参数校验、统一结果、预算、取消、进程树清理及源码/治理目录一致性检查。完整 Node 回归 **270/270**、专项 **11/11**、隔离包检查、安装/配置/许可证检查、**35** 项单文件安装器源码检查与内存回归通过。本机仅验证 Codex/Claude 的版本和帮助；Antigravity 仅有官方协议和夹具证据。未调用真实模型、部署服务、发布或推送。本次审查由主代理本地完成，不宣称独立审查；既有知识经重新核实后更新来源指纹。
+
+## 2026-09-20 — Local code graph deployment / 本地关系记忆部署
+
+On subsequent explicit user authorization, deployment `code-graph-20260920-01` updated the installed Pi through a narrow gateway patch, graph modules, the pinned parser package, dependency metadata, notices and local on-demand policy references. Thirty-eight target files were hash-checked with before/after backups; 61 other installed runtime source files remained byte-identical. Host-specific authentication adapters were retained. The local global policy entry gained only the code-graph reference row.
+
+The idle gateway was restarted under its existing maintenance mutex. Gateway health/readiness and Tunnel readiness passed. Advertised providers, authentication, LSP, roots, access, governance and project-memory policy compared equal before/after. Actual authenticated HTTP MCP verified graph discovery, all four read actions, the current 132-file graph, allowed-root denial, write-action denial and all five usable knowledge entries. Querying and installed-CLI no-op refresh preserved the project index. A separate tracked three-file JS/Python fixture exercised the installed WASM parser, dependency lookup, stale-query refusal, one-file incremental reparse and removal of the obsolete relationship. No model calls were made; this does not establish paid model availability or a fresh-machine installation.
+
+用户授权后，本地 Pi 已更新并重启。更新前后保留文件备份，网关和 Tunnel 就绪；原有模型路由、认证、LSP、访问范围与治理配置一致。实际 MCP 和安装后解析器验证通过，既有五条知识仍有效。验证没有调用模型，未推送或发布；上文/下文实施阶段的“未部署”记录保留为历史状态。
+
+Evidence: `.test/code-graph-deployment.json`, `.test/code-graph-live-check.json`; rollback backup: `C:/Users/asus/.local/state/pi-kether/deploy-backups/code-graph-20260920-01`. Primary performed local pre/post review; no independent reviewer verdict is claimed for this deployment.
+
+## 2026-09-20 — Persistent code relationships (unreleased) / 代码关系持续记忆（未发布）
+
+Added a deterministic JS/JSX, TS/TSX and Python syntax index in `.yhwh/code-graph/index.json`, read-only MCP queries, a fixed-path host refresh CLI and explicit bounded watching. Changed-file hashes reuse AST facts; all relationships are re-resolved for queries, including after deletion/rename/branch changes. Calls/base types remain unresolved mentions; reverse impact covers unique relative file imports only. No existing LSP isolation, runtime service, model route or credentials were changed.
+
+Validation: final serial Node suite **259/259 passed**, no failures/skips, including **12 new graph tests**. Tests exercise real parsing, comment/string negatives, persistence across processes, no-op reuse, incremental edits/deletions/renames, newly tracked targets, branch/parser changes, ambiguity, syntax errors, pagination, stale rejection, locks/revision conflicts, concurrent refreshers and source drift, ignored/secret/binary/oversized/link paths, bounded watching and actual MCP root/read-only/lifecycle behavior without model calls. Existing heap regression passed. Portable self-test, workflow configuration, catalog synchronization and license inventory passed. The source one-click harness passed **35 checks**; no new full release archive or clean-machine installation was built/tested. All **74 checked local links** in the changed README pairs and graph guides resolved; language navigation remains present.
+
+Real repository smoke: **132 tracked sources**, **690 named symbols**, **646 import records**, **10542 call/construction/base mentions**, zero parse errors, a 2219246-byte index. First refresh took approximately **3.2 seconds**; unchanged refresh approximately **2.6 seconds**, **0 reparsed / 132 reused**, unchanged index bytes and no write. These are single local measurements, not a latency guarantee. The source memory module's reverse import query returned eight file dependents through the gateway chain. Newly added untracked implementation files are intentionally outside this initial graph until an authorized Git add. Five human knowledge entries remain fresh; two changed source-backed entries were re-reviewed before updating their fingerprints.
+
+Primary pre/post review only: automatic approval rejected external Claude review because the packet contained private repository details without specific disclosure authorization. No independent reviewer pass or runtime-attested stage chain is claimed. The parser uses pinned upstream WASM, with original notices for the package, runtime, bundled grammars and inherited C grammar; binary reproducibility was not independently established. No commit, push, release, live Pi deployment or host policy installation occurred.
+
+已加入跨任务保存的代码关系索引、增量刷新、只读查询和显式限时监听。最终测试 259/259 通过，其中新增关系测试 12 项；原有堆回归、安装自检、配置、规则目录及许可检查通过。一键脚本仅运行源码夹具的 35 项检查，不代表新安装包或新机部署通过。真实仓库 132 个已跟踪源码均解析成功，首次约 3.2 秒、复用刷新约 2.6 秒。调用与基类保留为语法提及，不宣称完整语义关系图。独立外部审查被自动审批拒绝，采用本地前后审查；没有推送、发布或升级运行服务。
+
+Evidence: `.test/code-graph-final-tests.txt`, `.test/code-graph-concurrency-tests.txt`, `.test/code-graph-memory-regression.txt`, `.test/code-graph-real-refresh.json`, `.test/code-graph-real-noop.json`, `.test/code-graph-real-impact.json`, `.test/code-graph-knowledge-review.json`, `.test/code-graph-oneclick-checks.txt`.
+
 Verified on Windows on 2026-09-18 before the initial private GitHub publication.
 
 - Clean dependency installation with lifecycle scripts disabled succeeded.

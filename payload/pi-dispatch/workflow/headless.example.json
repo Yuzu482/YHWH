@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "workspaceRoots": ["C:/work/project"],
+  "timeoutSeconds": 300,
+  "maxOutputBytes": 2097152,
+  "clients": {
+    "codex": { "enabled": false, "executable": "C:/tools/node.exe", "nodeScript": "C:/tools/node_modules/@openai/codex/bin/codex.js", "expectedVersion": "codex-cli 0.153.0", "model": "gpt-5.6-luna", "effort": "max", "policy": "read-only" },
+    "claude": { "enabled": false, "executable": "C:/tools/claude.exe", "expectedVersion": "2.1.250 (Claude Code)", "model": "claude-sonnet-5", "effort": "max", "policy": "no-tools" },
+    "antigravity": { "enabled": false, "executable": "C:/tools/agy.exe", "expectedVersion": "REPLACE_WITH_EXACT_VERSION_OUTPUT", "model": "REPLACE_WITH_MODEL_FROM_AGY_MODELS", "effort": "high", "policy": "native", "acceptNativePermissions": false }
+  }
+}

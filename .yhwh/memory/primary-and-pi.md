@@ -14,14 +14,14 @@
   "sources": [
     {
       "path": "payload/pi-dispatch/scripts/gateway.mjs",
-      "sha256": "773462d23993f1830ae2206eb25f6bb8d1d8e32dcc78eab3c4ac8f81fe246449"
+      "sha256": "c593d4a26b35ea2f35f39e68d154dd70024865685835c4a7662569209cd61c88"
     },
     {
       "path": "templates/host-primary.md",
-      "sha256": "44c06cb0ccddd857babe92352dfac492c2670d2330a33e7578867e0d00b54037"
+      "sha256": "2b6334c0f8cade013e26a76baeee0fc43f44769b4a032bf8b0342f203552a21a"
     }
   ],
-  "sourceCommit": "57a12b63ff0c0ba849af0a663ac70daf706d00f7",
+  "sourceCommit": "ebe7a3a168f3c1af543b4aff2b1edf5d8b4df219",
   "reviewedAt": "2026-09-20"
 }
 ---

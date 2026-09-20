@@ -16,6 +16,8 @@ Pi 的 MIT 授权与 YHWH 对自有代码采用 Apache-2.0 可以共存；保留
 
 ## 分发范围
 
+代码关系解析新增固定依赖 `@vscode/tree-sitter-wasm@0.3.1`（Microsoft MIT）。[来源清单](licenses/code-graph-parser.json)记录上游发布标签、构建脚本与锁文件；[原始许可合集](licenses/code-graph-tree-sitter-notices.txt)涵盖运行库及包内语法。npm 完整性固定预编译 WASM；本次未独立复现这些二进制。该组件与旧 LSP 扩展的许可状态分开管理。
+
 源码包和安装包包含 YHWH 脚本、文档、配置、锁文件以及许可材料；不捆绑 npm 依赖目录或 Node.js、Java、.NET、JDT LS、clangd、Claude Code 等依赖二进制。安装器从上游下载依赖。目标环境仍受每个下载组件自己的条款约束，下载时安装不免除这些义务。
 
 [依赖声明清单](licenses/dependency-inventory.json) 从 Windows 网关和 WSL 两份 npm 锁文件生成，包含传递及可选依赖、版本、声明许可证、分发地址与完整性值。它是元数据清单，不是完整许可证文本审计，也不覆盖 Ubuntu、PowerShell、Node、Java、.NET、JDT LS、csharp-ls、clangd、Bubblewrap 等系统/独立下载组件。它们的版本和来源仍以安装脚本及引导依赖清单为准；若未来捆绑这些组件，必须补充相应再分发材料。

@@ -27,6 +27,9 @@ const digest = text => createHash('sha256').update(text).digest('hex');
 const fail = message => { throw new Error(message); };
 const inside = (root, path) => { const rel = relative(root, path); return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); };
 
+// Shared, bounded read-only primitives. The graph writer has a separate fixed destination.
+export const projectFiles = Object.freeze({context, git, checkedPath, readText, sourcePath, safePath, digest});
+
 function safePath(value) {
   if (typeof value !== 'string' || value.length > 500 || !value || /[\\:\x00-\x1f\x7f]/.test(value) || isAbsolute(value)
       || value.split('/').some(p => !p || p === '.' || p === '..' || /[. ]$/.test(p) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p))) fail('Unsafe project-relative path');

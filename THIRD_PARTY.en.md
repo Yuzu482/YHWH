@@ -1,5 +1,7 @@
 # Third-party components and licensing
 
+Persistent code relationships add pinned `@vscode/tree-sitter-wasm@0.3.1` (Microsoft MIT). [Provenance](licenses/code-graph-parser.json) records the upstream release tag, build script and lockfile; [original notices](licenses/code-graph-tree-sitter-notices.txt) cover the runtime and bundled grammars. npm integrity pins the prebuilt WASM; these binaries were not independently reproduced here. This component is managed separately from legacy LSP licensing.
+
 [简体中文](THIRD_PARTY.md)
 
 Original YHWH code, documentation and configuration use [Apache-2.0](LICENSE). Third-party code, excerpts, dependencies and original license texts retain their own licenses and are not relicensed by this declaration. See [NOTICE](NOTICE).

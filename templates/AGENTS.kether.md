@@ -29,6 +29,7 @@ Resolve these links relative to the installed AGENTS.md (in the Codex home direc
 | Before Claude dispatch; authentication errors or renewal/recovery | [Host Claude authentication](agent-references/pi-auth.md); also read [result timing](agent-references/pi-results.md) for the task-dependent credential-validity threshold |
 | Before direct LSP/structural operations or interpreting their results | [Direct deterministic LSP](agent-references/pi-lsp.md) |
 | A project has `.yhwh/memory/`; project knowledge retrieval or Git diff management | [Project knowledge](agent-references/project-memory.md) |
+| A project has `.yhwh/code-graph/`; persistent code relationships or change impact | [Code relationships](agent-references/code-graph.md) |
 | Generating/editing raster images or optimizing an image prompt | [Default image workflow](agent-references/image-workflow.md) |
 
 Keep protocol details in their references. Moving an instruction out of this entry file does not remove it or relax an existing contract, approval boundary, role binding, or evidence requirement.

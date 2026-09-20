@@ -78,6 +78,18 @@
       "component": "rust-analyzer-1.98.1-LICENSE-APACHE.txt",
       "source": "https://static.rust-lang.org/dist/2026-09-03/rust-analyzer-1.98.1-x86_64-unknown-linux-gnu.tar.xz",
       "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+    },
+    {
+      "file": "licenses/code-graph-tree-sitter-notices.txt",
+      "component": "Code graph parser provenance and notices",
+      "source": "https://github.com/microsoft/vscode-tree-sitter-wasm/tree/78c97c860ddd965b9617f0e30962ad1da08c4c91",
+      "sha256": "bd6a218090449416928043989e74aabcd23274fd0c6717b090551f14cd08f7a7"
+    },
+    {
+      "file": "licenses/code-graph-parser.json",
+      "component": "Code graph parser provenance and notices",
+      "source": "https://github.com/microsoft/vscode-tree-sitter-wasm/tree/78c97c860ddd965b9617f0e30962ad1da08c4c91",
+      "sha256": "d5a455eb73f6c57ea20301f02d5eee6a0ac6a42fffd43122c279b5d73b796331"
     }
   ]
 }
