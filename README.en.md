@@ -2,9 +2,13 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+Sequential-call improvements: `HeadlessBatchEvents` streams per-request phases, waiting status and results. Session caches reduce repeated file reads and hashing while retaining exact version checks. Entire batches are validated before execution; session calls are serialized and stop after failure, with cache and phase timings reported. See [operations and acceptance boundaries](docs/workflow-operations.md#english).
+
+**Development optimizations:** live CLI echo acceptance, sequential batches and timing evidence, optional Windows Job Object cleanup, managed plugin upgrade/rollback, Git change-impact candidates and Windows CI. Antigravity remains disabled with an empty path. Source capabilities, deployment and publication are tracked separately; see the [operations and acceptance guide](docs/workflow-operations.md#english).
+
 New optional feature: official Codex, Claude Code and Antigravity headless primary-host entries, with exact version checks, normalized results, bounded execution and release/local file comparison. Existing Pi routes are unchanged; clients are disabled by default. See the [guide](docs/headless-cli.md#english).
 
-**In development: persistent code relationships.** `.yhwh/code-graph/index.json` initially covers files, classes, functions and syntax relationships in JS/TS (including JSX/TSX) and Python. Read-only `code_graph` searches relationships and reverse relative-import impact; the host CLI incrementally refreshes by source hash and offers explicit bounded watching. Unresolved calls, syntax errors and stale state are reported; this is not a complete semantic call graph. See [usage, Git management and limits](docs/code-graph.md#english). The maintainer's local Pi has been updated and verified through actual MCP and incremental refresh checks; this source change is not released yet.
+**0.11 persistent code relationships.** `.yhwh/code-graph/index.json` initially covers files, classes, functions and syntax relationships in JS/TS (including JSX/TSX) and Python. Read-only `code_graph` searches relationships and reverse relative-import impact; the host CLI incrementally refreshes by source hash and offers explicit bounded watching. Unresolved calls, syntax errors and stale state are reported; this is not a complete semantic call graph. See [usage, Git management and limits](docs/code-graph.md#english). The maintainer's local Pi has been updated and verified through actual MCP and incremental refresh checks; this feature shipped in v0.11.0.
 
 A private source repository for Kether governance rules and the Pi execution workflow. The primary agent owns intent, authorization, task decomposition, integration and acceptance. Pi provides governed model calls, deterministic LSP, resource limits, result validation and runtime monitoring.
 

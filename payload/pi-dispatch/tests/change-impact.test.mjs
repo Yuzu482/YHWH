@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { changeImpact } from '../scripts/change-impact.mjs';
+import { refreshCodeGraph } from '../scripts/code-graph.mjs';
+import { projectMemory } from '../scripts/project-memory.mjs';
+
+test('diff candidates combine fresh relative imports and knowledge without changing Git or knowledge', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yhwh-impact-test-'));
+  t.after(() => { assert.equal(path.dirname(root), path.resolve(os.tmpdir())); fs.rmSync(root, { recursive: true, force: true }); });
+  const git = (...args) => execFileSync('git', ['-c', `safe.directory=${root}`, '-c', 'core.autocrlf=false', ...args], { cwd: root, encoding: 'utf8', windowsHide: true });
+  const put = (p, s) => { fs.mkdirSync(path.dirname(path.join(root, p)), { recursive: true }); fs.writeFileSync(path.join(root, p), s); };
+  git('init', '-q'); git('config', 'user.name', 'Fixture'); git('config', 'user.email', 'fixture@example.invalid');
+  put('base.js', 'export const n=1;'); put('tests/use.test.js', "import {n} from '../base.js';");
+  git('add', '.'); git('commit', '-qm', 'fixture');
+  const snapshot = await projectMemory({ cwd: root, action: 'snapshot', paths: ['tests/use.test.js'] });
+  const memory = `---\n${JSON.stringify({ schemaVersion: 1, id: 'relationship', kind: 'architecture', status: 'accepted', title: 'Relationship', tags: ['code'], sources: snapshot.sources.map(({path,sha256})=>({path,sha256})), sourceCommit: snapshot.sourceCommit, reviewedAt: '2026-09-20' })}\n---\nSource relationship.\n`;
+  put('.yhwh/memory/relationship.md', memory);
+  await refreshCodeGraph({ cwd: root }); put('base.js', 'export const n=2;'); put('new.js', 'export const n=3;');
+  const stale = await changeImpact({ cwd: root });
+  assert.equal(stale.graph.usable, false); assert.equal(stale.graph.reason, 'stale');
+  await refreshCodeGraph({ cwd: root });
+  const before = git('status', '--porcelain=v1'), index = fs.readFileSync(path.join(root, '.git/index'));
+  const result = await changeImpact({ cwd: root });
+  assert.equal(result.graph.usable, true); assert(result.graph.unindexed.includes('new.js'));
+  assert.deepEqual(result.testCandidates, ['tests/use.test.js']);
+  assert.equal(result.knowledgeCandidates[0].id, 'relationship'); assert.equal(result.modelCalls, 0);
+  assert.equal(git('status', '--porcelain=v1'), before); assert.deepEqual(fs.readFileSync(path.join(root, '.git/index')), index);
+  assert.equal(fs.readFileSync(path.join(root, '.yhwh/memory/relationship.md'), 'utf8'), memory);
+  await assert.rejects(changeImpact({ cwd: root, baseline: '--unsafe' }), /invalid_baseline/);
+});

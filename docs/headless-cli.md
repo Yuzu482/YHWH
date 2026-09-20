@@ -2,6 +2,8 @@
 
 [简体中文](#简体中文) · [English](#english)
 
+开发中的批次、活动进度、实机回显验收、Job Object 与升级说明见 [操作指南](workflow-operations.md#简体中文)。Development batch/progress, live echo acceptance, Job Objects and upgrade details are in the [operations guide](workflow-operations.md#english).
+
 ## 简体中文
 
 这是新增的可选主代理入口：Codex、Claude Code 和 Google Antigravity 的官方 CLI 使用同一套 YHWH 运行器。它不会替换 Pi 下层调用，也不会更改 worker/reviewer 的模型绑定。运行器通过标准输入发送发行包内的主代理治理文本和用户任务，不拼接 shell 命令。现有安装器复制整个插件目录，因此发行包与安装副本使用同一份源码。

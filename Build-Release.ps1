@@ -1,11 +1,11 @@
 [CmdletBinding()]
-param([switch]$SkipTests,[switch]$PublicRelease)
+param([switch]$SkipTests,[switch]$PublicRelease,[string]$OutputDirectory=(Join-Path $PSScriptRoot 'release'))
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $manifest = Get-Content -LiteralPath (Join-Path $root 'portable.manifest.json') -Raw | ConvertFrom-Json
 $version = [string]$manifest.version
 if ($version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$') { throw 'Invalid release version.' }
-$release = Join-Path $root 'release'
+$release = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $release | Out-Null
 
 & (Join-Path $root 'install\Test-PiKether.ps1')

@@ -47,6 +47,18 @@ test('idle replacement changes actual MCP execution and preserves the governed t
   assert.equal(disposed, 1);
 });
 
+test('upgrade stop acknowledges only after disposal and invokes the host stop callback', async () => {
+  let stopped = false;
+  await withGateway(async ({ runtime, url }) => {
+    const post = action => fetch(url + '/admin/upgrade/' + action, { method:'POST', headers:{ Authorization:`Bearer ${token}` } });
+    assert.equal((await post('stop')).status, 409);
+    assert.equal((await post('pause')).status, 200);
+    const response = await post('stop'); assert.equal(response.status, 200); assert.equal((await response.json()).disposed, true);
+    assert.equal(runtime.capabilities().lifecycle.phase, 'disposed');
+    await new Promise(resolve => setImmediate(resolve)); assert.equal(stopped, true);
+  }, { onMaintenanceStop: () => { stopped = true; } });
+});
+
 test('active dispatch and its result-recording tail both block replacement', async () => {
   const entered = deferred(), release = deferred();
   let runtimeRef, tailCheck;
@@ -54,10 +66,15 @@ test('active dispatch and its result-recording tail both block replacement', asy
     runtimeRef = runtime;
     const call = client.callTool({ name:'dispatch_subagent', arguments:input });
     await entered.promise;
+    assert.equal(runtime.pauseForUpgrade(), false, 'active work blocks upgrade maintenance');
     await assert.rejects(runtime.replaceAdapter('dispatch', { create:() => () => {} }), { code:'GATEWAY_BUSY' });
     release.resolve();
     assert.equal(parsed(await call).ok, true);
     await tailCheck;
+    assert.equal(runtime.pauseForUpgrade(), true);
+    const refused = parsed(await client.callTool({ name:'dispatch_subagent', arguments:input }));
+    assert.equal(refused.ok, false);
+    assert.equal(runtime.resumeAfterUpgrade(), true);
   }, {
     dispatchFn:async (r, _s, t) => { entered.resolve(); await release.promise; return reply(r, t, 'done'); },
     auditLogger:{ enabled:true, record:record => {

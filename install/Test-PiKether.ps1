@@ -15,7 +15,7 @@ function Check([bool]$Ok, [string]$Name) {
 }
 try { $manifest = Get-Content -LiteralPath (Join-Path $packageRoot 'portable.manifest.json') -Raw | ConvertFrom-Json; Check ($manifest.containsCredentials -eq $false) 'portable manifest' } catch { Check $false 'portable manifest' }
 $payloadPlugin = Join-Path $packageRoot 'payload\pi-dispatch'
-foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','workflow/headless.example.json','workflow/catalog.json')) {
+foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','workflow/headless.example.json','workflow/catalog.json')) {
   Check (Test-Path -LiteralPath (Join-Path $payloadPlugin $headlessFile) -PathType Leaf) ('headless CLI payload: '+$headlessFile)
   if($Installed) {
     $installedFile=Join-Path (Join-Path $TargetHome 'plugins/pi-dispatch') $headlessFile

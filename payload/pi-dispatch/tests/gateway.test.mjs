@@ -152,6 +152,26 @@ async function withGateway(run, options = {}) {
   }
 }
 
+test('host upgrade maintenance requires authentication and closes admission until resumed', async () => {
+  await withGateway(async ({ port, client }) => {
+    const base = `http://127.0.0.1:${port}`;
+    const post = (action, extra = {}) => fetch(`${base}/admin/upgrade/${action}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, ...extra });
+    const identity = await (await post('status')).json(); assert.equal(identity.pid, process.pid); assert.equal(identity.phase, 'running');
+    assert.equal((await post('pause', { headers: {} })).status, 401);
+    assert.equal((await post('pause', { body: 'body' })).status, 400);
+    assert.equal((await post('pause', { headers: { Authorization: `Bearer ${token}`, Origin: 'https://example.invalid' } })).status, 400);
+    assert.equal((await post('unknown')).status, 409);
+    const paused = await post('pause'); assert.equal(paused.status, 200); assert.equal((await paused.json()).pid, process.pid);
+    assert.equal((await fetch(`${base}/readyz`)).status, 503);
+    assert.equal((await (await post('status')).json()).phase, 'maintenance');
+    assert.equal((await post('pause')).status, 409);
+    const r = parsed(await client.callTool({ name: 'list_capabilities', arguments: {} }));
+    assert.equal(r.accepting, false);
+    assert.equal((await post('resume')).status, 200);
+    assert.equal((await fetch(`${base}/readyz`)).status, 200);
+  });
+});
+
 test('gateway rejects incomplete governance contracts before model execution', async () => {
   let dispatched = 0;
   await withGateway(async ({client}) => {

@@ -285,6 +285,8 @@ if($LASTEXITCODE -ne 0){throw 'Host profile generation failed.'}
 & (Join-Path $PSScriptRoot 'Protect-PiState.ps1') -TargetHome $TargetHome
 & (Join-Path $packageRoot 'install\Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $WslDistro -Hosts $Hosts -SkipWsl:$(-not $installWsl)
 if ($LASTEXITCODE -ne 0) { throw 'Post-install self-test failed.' }
+& $nodePath (Join-Path $pluginTarget 'scripts/plugin-upgrade.mjs') record $pluginSource $pluginTarget
+if($LASTEXITCODE -ne 0){throw 'Managed installation baseline could not be recorded.'}
 Say "Installation complete. Backup: $backupRoot"
 Say 'Sign in with Pi on this Windows account if ~/.pi/agent/auth.json is not already present.'
 Say "Import your selected host's connection and PRIMARY-AGENT.md from: $hostExports"

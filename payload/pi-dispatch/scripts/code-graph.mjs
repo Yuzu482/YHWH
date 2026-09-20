@@ -124,6 +124,24 @@ function graph(index) {
 }
 
 // MCP calls this read-only entry point. Refresh/watch are deliberately not admitted here.
+export async function affectedFiles(cwd, changedPaths, depth=3) {
+  if(!Array.isArray(changedPaths)||changedPaths.length>512||!Number.isInteger(depth)||depth<1||depth>8) fail('Invalid impact batch');
+  changedPaths.forEach(safe.sourcePath);
+  const ctx=await safe.context(cwd),loaded=await loadIndex(ctx),current=await snapshot(ctx);
+  const stale=!loaded||loaded.index.parserVersion!==PARSER_VERSION||isChanged(difference(loaded.index.files,current.files));
+  if(stale) return {usable:false,reason:loaded?'stale':'missing',files:[],truncated:false};
+  const {edges}=graph(loaded.index),known=new Set(loaded.index.files.map(f=>f.path)),visited=new Set(changedPaths),frontier=[...changedPaths];
+  let level=0,currentFrontier=frontier;
+  while(currentFrontier.length&&level<depth) {
+    const next=[];
+    for(const edge of edges) if(edge.kind==='imports'&&known.has(edge.to)&&currentFrontier.includes(edge.to)&&!visited.has(edge.from)) {visited.add(edge.from);next.push(edge.from);}
+    currentFrontier=next;level++;
+  }
+  const truncated=edges.some(e=>e.kind==='imports'&&known.has(e.to)&&currentFrontier.includes(e.to)&&!visited.has(e.from));
+  return {usable:true,revision:loaded.revision,files:[...visited].sort(),unindexed:changedPaths.filter(p=>!known.has(p)),truncated,
+    parseErrors:loaded.index.files.filter(f=>f.facts.status==='parse-error').map(f=>f.path),evidence:'relative file imports only'};
+}
+
 export async function codeGraph(input) {
   if(!input||Object.keys(input).some(k=>!['cwd','action','query','id','direction','depth','offset','limit','allowStale'].includes(k))) fail('Unknown code graph option');
   const {cwd,action='status',query='',id,direction='both',depth=3,offset=0,limit=40,allowStale=false}=input;

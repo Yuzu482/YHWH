@@ -693,7 +693,12 @@ export function createGatewayRuntime(options) {
     shutdownPromise.then(result => { if (!result.disposed) shutdownPromise = null; }, () => {});
     return shutdownPromise;
   };
-  return { makeServer, executor, capabilities, gatewayInstanceId, taskMonitor, shutdown, replaceAdapter };
+  function pauseForUpgrade() {
+    if (phase !== 'running' || inFlight || pendingTasks() || executor.state.active || executor.state.queued) return false;
+    phase = 'maintenance'; return true;
+  }
+  function resumeAfterUpgrade() { if (phase !== 'maintenance') return false; phase = 'running'; return true; }
+  return { makeServer, executor, capabilities, gatewayInstanceId, taskMonitor, shutdown, replaceAdapter, pauseForUpgrade, resumeAfterUpgrade };
 }
 
 export function createGatewayApp(options) {
@@ -713,6 +718,25 @@ export function createGatewayApp(options) {
   app.get('/readyz', (_req, res) => {
     const capabilities = runtime.capabilities();
     res.status(capabilities.accepting ? 200 : 503).json({ ok: options.roots.length > 0 && capabilities.accepting, service: 'pi-kether-gateway' });
+  });
+  // Trusted host maintenance, not an MCP tool. Close admission before stopping a process.
+  app.post('/admin/upgrade/:action', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ') || !safeEqual(auth.slice(7), options.token)) return res.status(401).json({ error: 'unauthorized' });
+    if (req.headers.origin || req.headers['transfer-encoding'] || Number(req.headers['content-length'] || 0) !== 0) return res.status(400).json({ error: 'body and origin not allowed' });
+    const action = req.params.action;
+    if (action === 'status') return res.json({ ok: true, gatewayInstanceId: runtime.gatewayInstanceId, pid: process.pid, phase: runtime.capabilities().lifecycle.phase });
+    if (action === 'stop') {
+      if (runtime.capabilities().lifecycle.phase !== 'maintenance' || typeof options.onMaintenanceStop !== 'function') return res.status(409).json({ ok: false });
+      try {
+        const result = await runtime.shutdown({ graceMs: 1000, abortWaitMs: 1000 });
+        if (!result.disposed) return res.status(409).json({ ok: false });
+        res.once('finish', () => { void options.onMaintenanceStop(); });
+        return res.json({ ok: true, disposed: true, pid: process.pid });
+      } catch { return res.status(503).json({ ok: false, reason: 'runtime_cleanup_failed' }); }
+    }
+    const ok = action === 'pause' ? runtime.pauseForUpgrade() : action === 'resume' ? runtime.resumeAfterUpgrade() : false;
+    res.status(ok ? 200 : 409).json({ ok, gatewayInstanceId: runtime.gatewayInstanceId, pid: process.pid });
   });
   app.use('/mcp', (req, res, next) => {
     const length = Number(req.headers['content-length'] || 0);
@@ -798,7 +822,7 @@ export function loadGatewayOptions(env = process.env) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const options = loadGatewayOptions();
-    const { app, runtime } = createGatewayApp(options);
+    const { app, runtime } = createGatewayApp({ ...options, onMaintenanceStop: () => stop() });
     const server = app.listen(options.port, options.host, () => console.log(JSON.stringify({ ok: true, host: options.host, port: options.port, mcp: '/mcp' })));
     let stopping = false;
     const stop = async () => {

@@ -2,6 +2,10 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+取消验收：`node scripts/headless-acceptance.mjs <config> --live --cancel`；先回显、再单独启动并取消。Windows Job Object 通过关闭受控作业清理进程树；提前完成不算取消通过。升级服务采用独立后台进程，停服前生成备份日志，维护冲突不解除他人的维护状态。
+
+开发中新增 `run-events/batch/batch-events`、`headless-acceptance.mjs`、可选 Windows Job Object 和受管文件升级。连续调用支持有界帮助/文件摘要缓存、整批预校验、串行队列、阶段/等待状态与逐项结果、耗时汇总；每次仍检查版本，失败即停止。缓存不复用模型对话或进程。`change-impact.mjs` 只读组合 Git、关系索引与知识复核候选。默认不调用模型或升级服务；Antigravity 路径留空且禁用。详见[操作与验收边界](../../docs/workflow-operations.md#简体中文)。
+
 新增可选主代理 CLI 运行器：`scripts/headless-host.mjs` 支持 Codex、Claude Code、Antigravity，提供 `doctor/run/fingerprint`。配置模板位于 `workflow/headless.example.json`，默认全部禁用；通过官方 CLI 自身认证，不作为 Pi provider 使用。见 [配置与边界](../../docs/headless-cli.md#简体中文)。
 
 新增开发功能 `code_graph`：只读查询项目 `.yhwh/code-graph/index.json` 的 JS/TS/Python 关系索引，操作为 `status/search/neighbors/impact`。宿主通过 `node scripts/code-graph.mjs '<JSON>'` 执行 `refresh`（必需绝对 Git 根目录 `cwd`），按散列增量更新；可选 `watch` 默认间隔 5 秒、持续 300 秒，不安装后台服务。只索引已跟踪的普通非忽略源文件，调用和基类只保存语法提及，相对导入才解析为文件边；默认拒绝过期索引。读取 `get_workflow(topic="code-graph")` 获取限制、Git 审查、并发锁与恢复规则。MCP 不提供写入接口；原有 LSP 隔离不变。已有服务尚需升级才能使用。

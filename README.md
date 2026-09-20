@@ -2,6 +2,10 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+连续调用改进：`HeadlessBatchEvents` 实时显示各项阶段、等待状态和结果；会话缓存减少重复文件读取与哈希，保留每次版本检查。整批执行前校验，同会话串行调用，失败即停止；报告缓存命中及分段耗时。详见[操作与验收边界](docs/workflow-operations.md#简体中文)。
+
+**开发中优化：** CLI 实机回显验收、连续批次与耗时证据、可选 Windows Job Object 清理、受管插件升级/回滚、Git 变更影响候选及 Windows CI。Antigravity 路径留空、默认禁用。源码能力与已部署/已发布状态分别记录，见[操作与验收指南](docs/workflow-operations.md#简体中文)。
+
 新增可选特性：Codex、Claude Code、Antigravity 官方 CLI 无头主代理入口，包含版本锁定、统一结果、运行预算和发布/本地文件比对。现有 Pi 路由保持不变，默认不启用客户端。见 [使用说明](docs/headless-cli.md#简体中文)。
 
 Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责意图、授权、任务拆分、整合和验收；Pi 提供受控的模型调用、确定性 LSP、资源限制、结果验证和运行监控。
@@ -20,7 +24,7 @@ Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责
 
 ## 仓库结构
 
-**开发中：代码关系持续记忆。** 新增 `.yhwh/code-graph/index.json`，首批支持 JS/TS（含 JSX/TSX）与 Python 的文件、类、函数及语法关系。只读 `code_graph` 可检索关系和反查相对导入的影响范围；宿主 CLI 按文件散列增量刷新，支持显式限时监听。未解析调用、语法错误和过期状态会明确报告，不代表完整语义调用图。见[使用、Git 管理与限制](docs/code-graph.md#简体中文)。维护者本机 Pi 已更新并通过实际 MCP 与增量刷新验证；此源码改动尚未发布。
+**0.11 代码关系持续记忆。** 新增 `.yhwh/code-graph/index.json`，首批支持 JS/TS（含 JSX/TSX）与 Python 的文件、类、函数及语法关系。只读 `code_graph` 可检索关系和反查相对导入的影响范围；宿主 CLI 按文件散列增量刷新，支持显式限时监听。未解析调用、语法错误和过期状态会明确报告，不代表完整语义调用图。见[使用、Git 管理与限制](docs/code-graph.md#简体中文)。维护者本机 Pi 已更新并通过实际 MCP 与增量刷新验证；已随 v0.11.0 发布。
 
 **0.5 多宿主接入：**共 18 个宿主 ID，新增 Cursor、VS Code/Copilot、Windsurf Cascade、Cline、Roo Code、Gemini CLI、Kiro、Zed、Continue 和 LM Studio，保留已有 Codex、Cherry Studio、OpenCode、DeepSeek Harness、Claude 与通用配置。主模型在宿主中选择。见[常见客户端指南](docs/common-clients.md)与[多宿主指南](docs/host-integration.md)；配置和协议测试不等于客户端界面与完整治理链已验证。
 
