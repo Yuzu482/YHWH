@@ -208,7 +208,7 @@ test('gateway requires bearer auth and exposes only governed MCP tools', async (
     const tools = await client.listTools();
     assert.deepEqual(tools.tools.map(tool => tool.name).sort(), [
       'cancel_subagent', 'check_claude_auth', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'get_workflow', 'list_capabilities', 'list_subagents',
-      'lsp_request', 'probe_model', 'render_subagent_monitor', 'submit_subagent',
+      'lsp_request', 'probe_model', 'project_memory', 'render_subagent_monitor', 'submit_subagent',
     ]);
     const caps = parsed(await client.callTool({ name: 'list_capabilities', arguments: {} }));
     assert.equal(caps.writeEnabled, true);

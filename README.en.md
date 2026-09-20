@@ -14,6 +14,8 @@ Every maintained README in this repository has complete Chinese and English vers
 
 **0.8 API key encryption:** Anthropic and aggregator keys use Windows DPAPI user encryption. Runtime uses private pipes without plaintext API credential files. After upgrading, run `Migrate-API-Keys.cmd` for legacy keys. See [configuration and migration](docs/provider-configuration.en.md).
 
+**Long-term project knowledge (new in the current source):** `.yhwh/memory/` stores source-backed Markdown knowledge with draft, accepted and deprecated states. The read-only `project_memory` tool provides Chinese/English search, source-change detection and Git review of staged, unstaged and untracked entries. Updates use the primary's existing file permissions without automatic commits. Git is required on the runtime machine; existing services need an upgrade to discover the tool. See the [usage and management guide](docs/project-memory.md#english).
+
 ## Repository layout
 
 **0.5 multi-host integration:** 18 host IDs now include Cursor, VS Code/Copilot, Windsurf Cascade, Cline, Roo Code, Gemini CLI, Kiro, Zed, Continue and LM Studio, alongside existing Codex, Cherry Studio, OpenCode, DeepSeek Harness, Claude and generic profiles. Select the primary model in the host. See the [common client guide](docs/common-clients.en.md) and [multi-host guide](docs/host-integration.en.md); configuration and protocol checks do not validate client UIs or the complete governance chain.

@@ -14,6 +14,8 @@ Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责
 
 **0.8 API key 加密：** Anthropic 和聚合平台密钥使用 Windows DPAPI 用户级加密；运行时经私有管道传递，不生成 API 明文凭据文件。升级后运行 `Migrate-API-Keys.cmd` 迁移旧格式。见[配置与迁移指南](docs/provider-configuration.md)。
 
+**项目长期知识（当前源码新增）：** `.yhwh/memory/` 保存有来源的 Markdown 知识，支持草稿、确认和废弃状态。只读 `project_memory` 工具提供中英文检索、源文件变化检测，以及已暂存、未暂存和未跟踪条目的 Git 差异检查。更新由主代理已有文件权限完成，不自动提交；需要运行机器安装 Git，已有服务需升级才可发现新工具。见[使用与管理指南](docs/project-memory.md#简体中文)。
+
 ## 仓库结构
 
 **0.5 多宿主接入：**共 18 个宿主 ID，新增 Cursor、VS Code/Copilot、Windsurf Cascade、Cline、Roo Code、Gemini CLI、Kiro、Zed、Continue 和 LM Studio，保留已有 Codex、Cherry Studio、OpenCode、DeepSeek Harness、Claude 与通用配置。主模型在宿主中选择。见[常见客户端指南](docs/common-clients.md)与[多宿主指南](docs/host-integration.md)；配置和协议测试不等于客户端界面与完整治理链已验证。

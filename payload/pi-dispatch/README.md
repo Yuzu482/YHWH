@@ -2,6 +2,8 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+新增项目长期知识工具 `project_memory`：读取 Git 项目中的 `.yhwh/memory/<id>.md`，提供 `list/search/read/review/snapshot`；默认检索仅包含已确认且来源未变化的知识。`review` 分别展示已暂存、未暂存和未跟踪差异。工具只读、无模型，不写入或提交；主代理按现有权限编辑知识条目。运行机器须安装 Git，`cwd` 必须是允许的 Git 工作树根目录。读取 `get_workflow(topic="project-memory")` 获取完整格式、边界和复核流程。已有服务需升级；这不是宿主聊天记忆或 LSP 常驻缓存。
+
 主代理可来自任何具备 MCP 工具调用和持续规则加载能力的宿主。新增 `get_workflow` 按主题提供主代理契约、角色技能和治理 references；`scripts/host-profiles.mjs` 为 Cherry Studio、OpenCode v1/v2、Claude Code/Desktop、DeepSeek Harness、Codex 和通用客户端导出配置。另有 `scripts/common-client-profiles.mjs` 导出 Cursor、VS Code/Copilot、Windsurf Cascade、Cline、Roo Code、Gemini CLI、Kiro、Zed、Continue 和 LM Studio 配置，总计 18 个宿主 ID；每份新适配的元数据附官方来源与适用范围。连接与配置验证不等于各宿主已完成完整模型治理链验证。默认 stdio 每连接一运行时；多个宿主同时使用需通过 `PI_GATEWAY_CONFIG` 共享同一 HTTP 网关。后端仍要求 Windows + WSL2。
 
 Pi 作为受 Tifereth 控制的下级 Agent 执行层、模型探针层和 LSP 层。默认安装使用 stdio；可选共享运行时使用本机 Streamable HTTP MCP 端点 `http://127.0.0.1:17331/mcp`。模型任务先经过 Kether 运行信封，再按精确 allowlist 路由到：
