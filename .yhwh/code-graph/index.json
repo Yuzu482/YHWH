@@ -91735,6 +91735,381 @@
       }
     },
     {
+      "path": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs",
+      "sha256": "10416f7b9992856239494fe4fe3440df57aec180700e37a125e0e9b12a3b1692",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:env:0",
+            "name": "env",
+            "qualified": "env",
+            "kind": "function",
+            "parent": null,
+            "line": 14,
+            "endLine": 19
+          },
+          {
+            "id": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:classify:0",
+            "name": "classify",
+            "qualified": "classify",
+            "kind": "function",
+            "parent": null,
+            "line": 20,
+            "endLine": 23
+          },
+          {
+            "id": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:signal:0",
+            "name": "signal",
+            "qualified": "signal",
+            "kind": "function",
+            "parent": null,
+            "line": 24,
+            "endLine": 24
+          },
+          {
+            "id": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:emit:0",
+            "name": "emit",
+            "qualified": "emit",
+            "kind": "function",
+            "parent": null,
+            "line": 25,
+            "endLine": 29
+          },
+          {
+            "id": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:invoke:0",
+            "name": "invoke",
+            "qualified": "invoke",
+            "kind": "function",
+            "parent": null,
+            "line": 30,
+            "endLine": 35
+          },
+          {
+            "id": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:stagesOf:0",
+            "name": "stagesOf",
+            "qualified": "stagesOf",
+            "kind": "function",
+            "parent": null,
+            "line": 36,
+            "endLine": 37
+          }
+        ],
+        "imports": [
+          {
+            "specifier": "node:fs",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:os",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "node:path",
+            "form": "import_statement",
+            "line": 3
+          },
+          {
+            "specifier": "node:url",
+            "form": "import_statement",
+            "line": 4
+          },
+          {
+            "specifier": "node:child_process",
+            "form": "import_statement",
+            "line": 5
+          }
+        ],
+        "mentions": [
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 9
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 10
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.dirname",
+            "line": 11
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fileURLToPath",
+            "line": 11
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.resolve",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 13
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:classify:0",
+            "kind": "call",
+            "name": "allowedErrors.has",
+            "line": 22
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:signal:0",
+            "kind": "call",
+            "name": "allowedSignals.has",
+            "line": 24
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:emit:0",
+            "kind": "call",
+            "name": "console.log",
+            "line": 26
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:emit:0",
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 26
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:emit:0",
+            "kind": "call",
+            "name": "classify",
+            "line": 27
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:emit:0",
+            "kind": "call",
+            "name": "Number.isInteger",
+            "line": 27
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:emit:0",
+            "kind": "call",
+            "name": "signal",
+            "line": 28
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:invoke:0",
+            "kind": "call",
+            "name": "Date.now",
+            "line": 31
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:invoke:0",
+            "kind": "call",
+            "name": "spawnSync",
+            "line": 32
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:invoke:0",
+            "kind": "call",
+            "name": "env",
+            "line": 32
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:invoke:0",
+            "kind": "call",
+            "name": "Date.now",
+            "line": 34
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:stagesOf:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 36
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:stagesOf:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 36
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:stagesOf:0",
+            "kind": "call",
+            "name": "String",
+            "line": 36
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-diagnostic.mjs#function:stagesOf:0",
+            "kind": "call",
+            "name": "allowed.has",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "console.log",
+            "line": 40
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 40
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "process.exit",
+            "line": 42
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.mkdtempSync",
+            "line": 47
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 47
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "os.tmpdir",
+            "line": 47
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 48
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.writeFileSync",
+            "line": 49
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 54
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 55
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 56
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 57
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 60
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 61
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.writeFileSync",
+            "line": 62
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.openSync",
+            "line": 63
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.closeSync",
+            "line": 66
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "name.startsWith",
+            "line": 69
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "invoke",
+            "line": 72
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "name.startsWith",
+            "line": 72
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "emit",
+            "line": 73
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "stagesOf",
+            "line": 73
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.closeSync",
+            "line": 76
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "console.log",
+            "line": 82
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 82
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.rmSync",
+            "line": 86
+          }
+        ]
+      }
+    },
+    {
       "path": "payload/pi-dispatch/tests/windows-api-credential.test.mjs",
       "sha256": "978bd8bd858167d7d37ef8cd7ac2e00192dbb7f2ca2a07cc3b05750d3615bccc",
       "facts": {

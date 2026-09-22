@@ -31,6 +31,11 @@ jobs:
         run: |
           npm ci
           if ($LASTEXITCODE -ne 0) { throw 'Dependency install failed' }
+      - name: Diagnose Windows ACL timeout
+        working-directory: payload/pi-dispatch
+        run: |
+          node tests/windows-acl-diagnostic.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'ACL diagnostic failed' }
       - name: Credential-free runtime checks
         working-directory: payload/pi-dispatch
         run: |
