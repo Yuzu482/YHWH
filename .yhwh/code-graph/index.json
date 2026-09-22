@@ -92110,6 +92110,304 @@
       }
     },
     {
+      "path": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs",
+      "sha256": "a6a7e2c802158722828c65c63ffa7cf36302e2775c2d98d87eb7297445e21453",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs#function:runPs:0",
+            "name": "runPs",
+            "qualified": "runPs",
+            "kind": "function",
+            "parent": null,
+            "line": 10,
+            "endLine": 15
+          }
+        ],
+        "imports": [
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "node:fs",
+            "form": "import_statement",
+            "line": 3
+          },
+          {
+            "specifier": "node:os",
+            "form": "import_statement",
+            "line": 4
+          },
+          {
+            "specifier": "node:path",
+            "form": "import_statement",
+            "line": 5
+          },
+          {
+            "specifier": "node:child_process",
+            "form": "import_statement",
+            "line": 6
+          },
+          {
+            "specifier": "../scripts/openai-auth-store.mjs",
+            "form": "import_statement",
+            "line": 7
+          }
+        ],
+        "mentions": [
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs#function:runPs:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 11
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs#function:runPs:0",
+            "kind": "call",
+            "name": "Buffer.from",
+            "line": 11
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs#function:runPs:0",
+            "kind": "call",
+            "name": "spawnSync",
+            "line": 12
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs#function:runPs:0",
+            "kind": "call",
+            "name": "path.join",
+            "line": 12
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs#function:runPs:0",
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 13
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs#function:runPs:0",
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 14
+          },
+          {
+            "from": "payload/pi-dispatch/tests/windows-acl-preservation.test.mjs#function:runPs:0",
+            "kind": "call",
+            "name": "result.stdout.toString",
+            "line": 14
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 17
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.mkdtempSync",
+            "line": 18
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 18
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "os.tmpdir",
+            "line": 18
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 20
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 21
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.writeFileSync",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "runPs",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "atomicAuthWrite",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.readFileSync",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "runPs",
+            "line": 35
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.rmSync",
+            "line": 38
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 41
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.mkdtempSync",
+            "line": 42
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 42
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "os.tmpdir",
+            "line": 42
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 44
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "path.join",
+            "line": 45
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.writeFileSync",
+            "line": 46
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 46
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.readFileSync",
+            "line": 47
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 48
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "atomicAuthWrite",
+            "line": 48
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 49
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.readFileSync",
+            "line": 49
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 50
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 50
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.readdirSync",
+            "line": 50
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "name.includes",
+            "line": 50
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fs.rmSync",
+            "line": 51
+          }
+        ]
+      }
+    },
+    {
       "path": "payload/pi-dispatch/tests/windows-api-credential.test.mjs",
       "sha256": "978bd8bd858167d7d37ef8cd7ac2e00192dbb7f2ca2a07cc3b05750d3615bccc",
       "facts": {
