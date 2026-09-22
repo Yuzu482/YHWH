@@ -518,3 +518,19 @@ Baseline GitHub CI run 35531780910 failed seven tests: two missing installed Pi/
 用户授权创建 v0.12.0 私有 release，收录 v0.11.0 后两次功能提交。版本元数据由 Pi Luna/max 成功交付，主代理核对格式、角色、清理与变更范围后机械合入；双语发布说明与 README 下载示例同步更新，前后审查为主代理本地审查，未宣称独立审查或完整阶段链。本次准备不修改运行逻辑。
 
 新一轮本机全量 Node 回归 **320/320** 通过，零失败、零跳过，耗时 **164.80 秒**；内存回归通过。项目知识检查无格式错误，未自动刷新或确认条目。后续构建仅因同一运行源码已通过上述全量和内存测试而使用 `-SkipTests`，安装、配置、加密、许可、插件、归档和生成安装器检查仍执行；最终附件验收记于 GitHub release 的验证补充。基线远端 CI 的 7 项失败仍保留，不以本机通过代替 CI 通过。发布不自动部署或重启本机服务。
+
+## 2026-09-22 — v0.13.0 release preparation / 发布准备
+
+The user authorized pushing the current completed workflow changes to the existing private Yuzu482/YHWH repository and creating a new release. The target is main and v0.13.0. This includes native worker effort/default and execution-budget changes, metadata-only stream diagnostics, and previously accepted Windows execution-policy plus credential-free Pi/LSP test-fixture fixes. Unfinished completion waits and delivery-template drafts remain outside the payload.
+
+The implementation source passed the isolated full suite **326/326**, with zero failures or skips, in 306.811 seconds; temporary USERPROFILE/HOME and a restricted executable PATH were used. Focused budget/dispatch/role/API checks passed **34/34** and are a subset. The heap/handle regression passed again during release preparation. Catalog consistency, configuration validation, portable self-test and diff whitespace checks passed. Source has not changed since the full suite except for the single package-version value and documentation/index updates. Build-Release uses -SkipTests to reuse this exact-source evidence; package, configuration, encryption, license, plugin and generated-installer checks still run. Final archive hashes, package check results and exact-commit GitHub CI status are recorded in the Release verification addendum, not presumed from this preparation record.
+
+Code authorship: the accepted effort patch came from Pi Luna/high, request yhwh-effort-budget-20260922-04, with successful terminal execution, valid v2 role output and successful cleanup. Earlier failed/unverified proposals were not accepted. The primary normalized only patch transport/context metadata, preserving every source addition/deletion. Version metadata came from Pi Luna/low, request yhwh-release-013-version-20260922, and only changed portable.manifest.json version 0.12.0 to 0.13.0. Review is local primary pre/post review; independent Claude review remains unavailable because of authentication. No linked full-stage attestation or matched-task effort benchmark is claimed.
+
+No local service upgrade or restart is included in publication. Installed native workers can receive explicit effort selections under updated host policy, but service defaults and new execution-budget code require a separate upgrade. Reviewer and controlled API bindings remain unchanged. A private release does not resolve the documented legacy pi-lsp-extension upstream notice limitation or prove fresh-machine installation, reboot persistence, all-client behavior, or token savings.
+
+用户授权把当前已完成改动推送到原私有仓库 Yuzu482/YHWH 的 main 并创建 v0.13.0。范围包含原生 worker 思考档位与交付预算、执行流元数据诊断，以及此前已验收的 Windows 兼容性和无凭据测试夹具修复；未完成的事件等待和交付模板草稿不进入发布包。
+
+相同实现源码隔离全量回归 **326/326** 通过，无失败或跳过，耗时 306.811 秒；专项 **34/34** 属于其子集。发布准备阶段重新运行堆／句柄内存回归并通过。目录一致性、配置、便携自检及差异空白检查通过。全量测试后仅修改包版本元数据、文档和索引；构建使用 -SkipTests 复用该源码证据，但继续执行安装、配置、加密、许可、插件与生成安装器检查。最终附件哈希、构建结果和准确提交的 GitHub CI 状态记录于 Release 验证补充，不由本段预先推断。
+
+思考与预算源码由 Luna/high 的 04 号任务成功交付，版本元数据由 Luna/low 的 yhwh-release-013-version-20260922 成功交付；主代理仅做机械整合和本地前后审查。Claude 独立审查因认证问题未完成；不声称完整阶段链或档位性能对照实验通过。发布不升级或重启本机服务，不改变 reviewer／API 路由绑定，不消除旧 LSP 上游通知限制，也不证明新机安装、重启持久性、全部客户端体验或 token 节省。

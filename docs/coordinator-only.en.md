@@ -2,7 +2,7 @@
 
 [简体中文](coordinator-only.md) | [English](coordinator-only.en.md)
 
-YHWH uses the primary agent for requirements, architecture, decomposition, scheduling and final acceptance. This Codex host currently uses Astra; Pi subagents, normally Luna/max, author source code, tests and implementation scripts. Other hosts may still select their own primary model.
+YHWH uses the primary agent for requirements, architecture, decomposition, scheduling and final acceptance. This Codex host currently uses Astra; Pi subagents author source code, tests and implementation scripts. Native workers default to Luna/medium with task-proportional thinking; see [delivery budgets](worker-budgets.en.md). Other hosts may still select their own primary model.
 
 The primary may inspect sources, run deterministic probes and existing checks, write plans and governance documents, and mechanically apply worker patches after checking scope and baseline. Small fixes, test repairs and inline scripts are not exceptions allowing primary coding. Return implementation corrections to workers. Give tightly coupled changes to one worker instead of forcing parallel edits.
 

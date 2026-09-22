@@ -4048,8 +4048,54 @@
       }
     },
     {
+      "path": "payload/pi-dispatch/extensions/execution-budget.js",
+      "sha256": "bddeab42f8893c667e7a5e29c40f842a9a07dbd8ae0d4ee2138386014fe95550",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/extensions/execution-budget.js#function:calculateExecutionBudget:0",
+            "name": "calculateExecutionBudget",
+            "qualified": "calculateExecutionBudget",
+            "kind": "function",
+            "parent": null,
+            "line": 1,
+            "endLine": 10
+          }
+        ],
+        "imports": [],
+        "mentions": [
+          {
+            "from": "payload/pi-dispatch/extensions/execution-budget.js#function:calculateExecutionBudget:0",
+            "kind": "call",
+            "name": "Number.isInteger",
+            "line": 2
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/execution-budget.js#function:calculateExecutionBudget:0",
+            "kind": "call",
+            "name": "Number.isFinite",
+            "line": 3
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/execution-budget.js#function:calculateExecutionBudget:0",
+            "kind": "call",
+            "name": "Math.min",
+            "line": 7
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/execution-budget.js#function:calculateExecutionBudget:0",
+            "kind": "call",
+            "name": "Math.floor",
+            "line": 8
+          }
+        ]
+      }
+    },
+    {
       "path": "payload/pi-dispatch/extensions/execution-timeline.js",
-      "sha256": "acd74c8b89a0123a3ce3cbe91bf2b0e2c9b9f86baba88063d741cca4d71a53b8",
+      "sha256": "dcdc4ed3fbb3962ddbd592aa60eecc1d1bdf70163920fd94ea6419f1bab01e8d",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -4061,7 +4107,16 @@
             "kind": "function",
             "parent": null,
             "line": 2,
-            "endLine": 26
+            "endLine": 48
+          },
+          {
+            "id": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.hasTextContent:0",
+            "name": "hasTextContent",
+            "qualified": "createExecutionTimeline.hasTextContent",
+            "kind": "function",
+            "parent": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline:0",
+            "line": 5,
+            "endLine": 10
           },
           {
             "id": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.state:0",
@@ -4069,8 +4124,8 @@
             "qualified": "createExecutionTimeline.state",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline:0",
-            "line": 4,
-            "endLine": 4
+            "line": 11,
+            "endLine": 11
           },
           {
             "id": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.publish:0",
@@ -4078,8 +4133,8 @@
             "qualified": "createExecutionTimeline.publish",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline:0",
-            "line": 5,
-            "endLine": 5
+            "line": 12,
+            "endLine": 12
           },
           {
             "id": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.event:0",
@@ -4087,8 +4142,8 @@
             "qualified": "createExecutionTimeline.event",
             "kind": "function",
             "parent": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline:0",
-            "line": 6,
-            "endLine": 12
+            "line": 13,
+            "endLine": 34
           },
           {
             "id": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.feed:0",
@@ -4096,8 +4151,8 @@
             "qualified": "createExecutionTimeline.feed",
             "kind": "method",
             "parent": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline:0",
-            "line": 14,
-            "endLine": 21
+            "line": 36,
+            "endLine": 43
           },
           {
             "id": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.close:0",
@@ -4105,8 +4160,8 @@
             "qualified": "createExecutionTimeline.close",
             "kind": "method",
             "parent": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline:0",
-            "line": 22,
-            "endLine": 22
+            "line": 44,
+            "endLine": 44
           },
           {
             "id": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.cleaned:0",
@@ -4114,8 +4169,8 @@
             "qualified": "createExecutionTimeline.cleaned",
             "kind": "method",
             "parent": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline:0",
-            "line": 23,
-            "endLine": 23
+            "line": 45,
+            "endLine": 45
           }
         ],
         "imports": [],
@@ -4127,76 +4182,94 @@
             "line": 3
           },
           {
+            "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.hasTextContent:0",
+            "kind": "call",
+            "name": "Array.isArray",
+            "line": 7
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.hasTextContent:0",
+            "kind": "call",
+            "name": "content.some",
+            "line": 8
+          },
+          {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.publish:0",
             "kind": "call",
             "name": "onProgress",
-            "line": 5
+            "line": 12
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.publish:0",
             "kind": "call",
             "name": "state",
-            "line": 5
-          },
-          {
-            "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.event:0",
-            "kind": "call",
-            "name": "now",
-            "line": 7
+            "line": 12
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.event:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 9
+            "line": 15
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.event:0",
+            "kind": "call",
+            "name": "now",
+            "line": 17
+          },
+          {
+            "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.event:0",
+            "kind": "call",
+            "name": "hasTextContent",
+            "line": 27
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#function:createExecutionTimeline.event:0",
             "kind": "call",
             "name": "publish",
-            "line": 11
+            "line": 33
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.feed:0",
             "kind": "call",
             "name": "chunk.match",
-            "line": 16
+            "line": 38
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.feed:0",
             "kind": "call",
             "name": "part.endsWith",
-            "line": 19
+            "line": 41
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.feed:0",
             "kind": "call",
             "name": "event",
-            "line": 19
+            "line": 41
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.feed:0",
             "kind": "call",
             "name": "JSON.parse",
-            "line": 19
+            "line": 41
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.close:0",
             "kind": "call",
             "name": "now",
-            "line": 22
+            "line": 44
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.close:0",
             "kind": "call",
             "name": "publish",
-            "line": 22
+            "line": 44
           },
           {
             "from": "payload/pi-dispatch/extensions/execution-timeline.js#method:createExecutionTimeline.cleaned:0",
             "kind": "call",
             "name": "publish",
-            "line": 23
+            "line": 45
           }
         ]
       }
@@ -21123,7 +21196,7 @@
     },
     {
       "path": "payload/pi-dispatch/scripts/dispatch.mjs",
-      "sha256": "fff245397e1a5c898274fcf3886a0b67122859003005e9cc067ae855ffe61819",
+      "sha256": "426e027ef2dca43d53d3023fffcab6ab7d82c8db6b9482d66e215a39986ec573",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -21134,8 +21207,8 @@
             "qualified": "findPiEntry",
             "kind": "function",
             "parent": null,
-            "line": 22,
-            "endLine": 42
+            "line": 23,
+            "endLine": 43
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
@@ -21143,8 +21216,8 @@
             "qualified": "validateRequest",
             "kind": "function",
             "parent": null,
-            "line": 44,
-            "endLine": 74
+            "line": 45,
+            "endLine": 76
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:isWithinRoot:0",
@@ -21152,8 +21225,8 @@
             "qualified": "isWithinRoot",
             "kind": "function",
             "parent": null,
-            "line": 76,
-            "endLine": 79
+            "line": 78,
+            "endLine": 81
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
@@ -21161,8 +21234,8 @@
             "qualified": "validateKetherInvocation",
             "kind": "function",
             "parent": null,
-            "line": 81,
-            "endLine": 113
+            "line": 83,
+            "endLine": 115
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
@@ -21170,8 +21243,8 @@
             "qualified": "runProcess",
             "kind": "function",
             "parent": null,
-            "line": 115,
-            "endLine": 154
+            "line": 117,
+            "endLine": 156
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
@@ -21179,8 +21252,8 @@
             "qualified": "runProcess.stop",
             "kind": "function",
             "parent": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "line": 119,
-            "endLine": 130
+            "line": 121,
+            "endLine": 132
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.abort:0",
@@ -21188,8 +21261,8 @@
             "qualified": "runProcess.abort",
             "kind": "function",
             "parent": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "line": 132,
-            "endLine": 132
+            "line": 134,
+            "endLine": 134
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.finish:0",
@@ -21197,8 +21270,8 @@
             "qualified": "runProcess.finish",
             "kind": "function",
             "parent": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "line": 135,
-            "endLine": 141
+            "line": 137,
+            "endLine": 143
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.collect:0",
@@ -21206,8 +21279,8 @@
             "qualified": "runProcess.collect",
             "kind": "function",
             "parent": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "line": 142,
-            "endLine": 146
+            "line": 144,
+            "endLine": 148
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
@@ -21215,8 +21288,8 @@
             "qualified": "buildPiArgs",
             "kind": "function",
             "parent": null,
-            "line": 156,
-            "endLine": 180
+            "line": 158,
+            "endLine": 182
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:childEnvironment:0",
@@ -21224,8 +21297,8 @@
             "qualified": "childEnvironment",
             "kind": "function",
             "parent": null,
-            "line": 182,
-            "endLine": 188
+            "line": 184,
+            "endLine": 190
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:eventsFrom:0",
@@ -21233,8 +21306,8 @@
             "qualified": "eventsFrom",
             "kind": "function",
             "parent": null,
-            "line": 190,
-            "endLine": 192
+            "line": 192,
+            "endLine": 194
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
@@ -21242,8 +21315,8 @@
             "qualified": "summarize",
             "kind": "function",
             "parent": null,
-            "line": 194,
-            "endLine": 208
+            "line": 196,
+            "endLine": 210
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
@@ -21251,8 +21324,8 @@
             "qualified": "dispatch",
             "kind": "function",
             "parent": null,
-            "line": 210,
-            "endLine": 234
+            "line": 212,
+            "endLine": 245
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch.progress:0",
@@ -21260,8 +21333,8 @@
             "qualified": "dispatch.progress",
             "kind": "function",
             "parent": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
-            "line": 217,
-            "endLine": 217
+            "line": 220,
+            "endLine": 220
           },
           {
             "id": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
@@ -21269,8 +21342,8 @@
             "qualified": "main",
             "kind": "function",
             "parent": null,
-            "line": 236,
-            "endLine": 253
+            "line": 247,
+            "endLine": 264
           }
         ],
         "imports": [
@@ -21348,6 +21421,11 @@
             "specifier": "../extensions/review-contract.js",
             "form": "import_statement",
             "line": 15
+          },
+          {
+            "specifier": "../extensions/execution-budget.js",
+            "form": "import_statement",
+            "line": 16
           }
         ],
         "mentions": [
@@ -21355,157 +21433,151 @@
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
             "kind": "call",
             "name": "isAbsolute",
-            "line": 25
+            "line": 26
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
             "kind": "call",
             "name": "existsSync",
-            "line": 25
+            "line": 26
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 25
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "construct",
-            "name": "Error",
-            "line": 25
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "realpathSync",
             "line": 26
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
             "kind": "construct",
-            "name": "Set",
-            "line": 29
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 29
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "dirname",
-            "line": 29
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 29
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "join",
-            "line": 32
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "base.replace",
-            "line": 32
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "JSON.parse",
-            "line": 34
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "readFileSync",
-            "line": 34
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "join",
-            "line": 34
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "resolve",
-            "line": 36
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
-            "kind": "call",
-            "name": "existsSync",
-            "line": 37
+            "name": "Error",
+            "line": 26
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
             "kind": "call",
             "name": "realpathSync",
+            "line": 27
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "construct",
+            "name": "Set",
+            "line": 30
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 30
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "dirname",
+            "line": 30
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 30
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "join",
+            "line": 33
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "base.replace",
+            "line": 33
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 35
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 35
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "join",
+            "line": 35
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "resolve",
             "line": 37
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "existsSync",
+            "line": 38
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
+            "kind": "call",
+            "name": "realpathSync",
+            "line": 38
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:findPiEntry:0",
             "kind": "construct",
             "name": "Error",
-            "line": 41
+            "line": 42
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "process.cwd",
-            "line": 44
+            "line": 45
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "Array.isArray",
-            "line": 45
+            "line": 46
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "construct",
             "name": "Error",
-            "line": 45
+            "line": 46
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "construct",
             "name": "Set",
-            "line": 46
+            "line": 47
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "Object.keys",
-            "line": 47
+            "line": 48
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "allowed.has",
-            "line": 47
+            "line": 48
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "construct",
             "name": "Error",
-            "line": 47
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "construct",
-            "name": "Error",
-            "line": 49
+            "line": 48
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
@@ -21515,24 +21587,6 @@
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "call",
-            "name": "isAbsolute",
-            "line": 51
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 51
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "call",
-            "name": "statSync",
-            "line": 51
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "construct",
             "name": "Error",
             "line": 51
@@ -21540,7 +21594,25 @@
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
-            "name": "realpathSync",
+            "name": "isAbsolute",
+            "line": 52
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 52
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
+            "kind": "call",
+            "name": "statSync",
+            "line": 52
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
+            "kind": "construct",
+            "name": "Error",
             "line": 52
           },
           {
@@ -21552,44 +21624,44 @@
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
+            "name": "realpathSync",
+            "line": 54
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
+            "kind": "call",
             "name": "resolve",
-            "line": 53
+            "line": 54
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "isWithinRoot",
-            "line": 54
+            "line": 55
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "construct",
             "name": "Error",
-            "line": 54
+            "line": 55
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "request.prompt.trim",
-            "line": 55
+            "line": 56
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "construct",
             "name": "Error",
-            "line": 55
+            "line": 56
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 56
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "construct",
-            "name": "Error",
-            "line": 56
+            "line": 57
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
@@ -21599,21 +21671,21 @@
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "call",
-            "name": "resolveResourceLimits",
+            "kind": "construct",
+            "name": "Error",
             "line": 58
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
-            "name": "<dynamic>",
-            "line": 60
+            "name": "resolveResourceLimits",
+            "line": 59
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "construct",
-            "name": "Error",
-            "line": 60
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 61
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
@@ -21623,122 +21695,104 @@
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "call",
-            "name": "validateRoute",
+            "kind": "construct",
+            "name": "Error",
             "line": 62
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
-            "name": "<dynamic>",
-            "line": 63
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "construct",
-            "name": "Error",
+            "name": "validateRoute",
             "line": 63
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 64
+            "line": 65
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "construct",
             "name": "Error",
-            "line": 64
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "call",
-            "name": "API_PROVIDERS.includes",
             "line": 65
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
-            "name": "loadProviderConfig",
+            "name": "<dynamic>",
+            "line": 66
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
+            "kind": "construct",
+            "name": "Error",
             "line": 66
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
-            "name": "configuredRoute",
+            "name": "API_PROVIDERS.includes",
             "line": 67
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
-            "kind": "construct",
-            "name": "Error",
+            "kind": "call",
+            "name": "loadProviderConfig",
             "line": 68
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
+            "kind": "call",
+            "name": "configuredRoute",
+            "line": 69
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "construct",
             "name": "Error",
-            "line": 69
+            "line": 70
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
+            "kind": "construct",
+            "name": "Error",
+            "line": 71
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateRequest:0",
             "kind": "call",
             "name": "configDigest",
-            "line": 70
+            "line": 72
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:isWithinRoot:0",
             "kind": "call",
             "name": "relative",
-            "line": 77
+            "line": 79
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:isWithinRoot:0",
             "kind": "call",
             "name": "rel.startsWith",
-            "line": 78
+            "line": 80
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:isWithinRoot:0",
             "kind": "call",
             "name": "isAbsolute",
-            "line": 78
+            "line": 80
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "call",
             "name": "process.cwd",
-            "line": 81
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "call",
-            "name": "Array.isArray",
-            "line": 82
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "construct",
-            "name": "Error",
-            "line": 82
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "construct",
-            "name": "Set",
             "line": 83
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "call",
-            "name": "Object.keys",
-            "line": 84
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "call",
-            "name": "allowed.has",
+            "name": "Array.isArray",
             "line": 84
           },
           {
@@ -21749,15 +21803,33 @@
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "call",
-            "name": "validateKetherTask",
+            "kind": "construct",
+            "name": "Set",
             "line": 85
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
+            "kind": "call",
+            "name": "Object.keys",
+            "line": 86
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
+            "kind": "call",
+            "name": "allowed.has",
+            "line": 86
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "construct",
             "name": "Error",
             "line": 86
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
+            "kind": "call",
+            "name": "validateKetherTask",
+            "line": 87
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
@@ -21769,12 +21841,6 @@
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "construct",
             "name": "Error",
-            "line": 89
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "call",
-            "name": "compileWriteScope",
             "line": 90
           },
           {
@@ -21785,267 +21851,267 @@
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "construct",
-            "name": "Error",
+            "kind": "call",
+            "name": "compileWriteScope",
             "line": 92
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "call",
-            "name": "compileWriteScope",
+            "kind": "construct",
+            "name": "Error",
             "line": 93
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "call",
-            "name": "resolveRoleModel",
+            "kind": "construct",
+            "name": "Error",
             "line": 94
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "call",
-            "name": "providerPolicy",
+            "name": "compileWriteScope",
             "line": 95
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
-            "kind": "construct",
-            "name": "Error",
-            "line": 96
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "call",
             "name": "resolveRoleModel",
+            "line": 96
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
+            "kind": "call",
+            "name": "providerPolicy",
+            "line": 97
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
+            "kind": "construct",
+            "name": "Error",
             "line": 98
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "call",
-            "name": "requireRoleFields",
+            "name": "resolveRoleModel",
             "line": 100
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
+            "kind": "call",
+            "name": "requireRoleFields",
+            "line": 102
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "call",
             "name": "requireReviewMaterials",
-            "line": 100
+            "line": 102
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:validateKetherInvocation:0",
             "kind": "call",
             "name": "validateRequest",
-            "line": 101
+            "line": 103
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "construct",
             "name": "Promise",
-            "line": 116
+            "line": 118
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
             "name": "spawn",
-            "line": 118
+            "line": 120
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
             "kind": "call",
             "name": "spawn",
-            "line": 124
+            "line": 126
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
             "kind": "call",
             "name": "join",
-            "line": 124
+            "line": 126
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
             "kind": "call",
             "name": "String",
-            "line": 124
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
-            "kind": "call",
-            "name": "killer.on",
-            "line": 125
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
-            "kind": "call",
-            "name": "child.kill",
-            "line": 125
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
-            "kind": "call",
-            "name": "killer.on",
             "line": 126
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
             "kind": "call",
+            "name": "killer.on",
+            "line": 127
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
+            "kind": "call",
             "name": "child.kill",
-            "line": 126
+            "line": 127
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
+            "kind": "call",
+            "name": "killer.on",
+            "line": 128
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
+            "kind": "call",
+            "name": "child.kill",
+            "line": 128
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
             "kind": "call",
             "name": "process.kill",
-            "line": 128
+            "line": 130
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.stop:0",
             "kind": "call",
             "name": "child.kill",
-            "line": 128
+            "line": 130
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
             "name": "setTimeout",
-            "line": 131
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "kind": "call",
-            "name": "stop",
-            "line": 131
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.abort:0",
-            "kind": "call",
-            "name": "stop",
-            "line": 132
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "kind": "call",
-            "name": "signal?.addEventListener",
             "line": 133
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
-            "name": "abort",
+            "name": "stop",
+            "line": 133
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.abort:0",
+            "kind": "call",
+            "name": "stop",
             "line": 134
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
+            "kind": "call",
+            "name": "signal?.addEventListener",
+            "line": 135
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
+            "kind": "call",
+            "name": "abort",
+            "line": 136
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.finish:0",
             "kind": "call",
             "name": "clearTimeout",
-            "line": 138
+            "line": 140
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.finish:0",
             "kind": "call",
             "name": "signal?.removeEventListener",
-            "line": 139
+            "line": 141
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.finish:0",
             "kind": "call",
             "name": "done",
-            "line": 140
+            "line": 142
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.collect:0",
             "kind": "call",
             "name": "Buffer.byteLength",
-            "line": 143
+            "line": 145
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess.collect:0",
             "kind": "call",
             "name": "stop",
-            "line": 144
+            "line": 146
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 147
+            "line": 149
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
             "name": "child.stdout.setEncoding",
-            "line": 147
+            "line": 149
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
             "name": "collect",
-            "line": 147
+            "line": 149
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 148
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "kind": "call",
-            "name": "child.stderr.setEncoding",
-            "line": 148
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "kind": "call",
-            "name": "collect",
-            "line": 148
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "kind": "call",
-            "name": "child.on",
-            "line": 149
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "kind": "call",
-            "name": "finish",
-            "line": 149
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
-            "kind": "call",
-            "name": "child.on",
             "line": 150
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
-            "name": "child.stdin.on",
+            "name": "child.stderr.setEncoding",
+            "line": 150
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
+            "kind": "call",
+            "name": "collect",
+            "line": 150
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
+            "kind": "call",
+            "name": "child.on",
             "line": 151
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
             "kind": "call",
-            "name": "child.stdin.end",
+            "name": "finish",
+            "line": 151
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
+            "kind": "call",
+            "name": "child.on",
             "line": 152
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
+            "kind": "call",
+            "name": "child.stdin.on",
+            "line": 153
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:runProcess:0",
+            "kind": "call",
+            "name": "child.stdin.end",
+            "line": 154
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
             "name": "resolveControlledExtensions",
-            "line": 158
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
-            "kind": "call",
-            "name": "args.push",
-            "line": 158
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
-            "kind": "call",
-            "name": "args.push",
-            "line": 159
+            "line": 160
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
@@ -22062,38 +22128,44 @@
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
-            "name": "API_PROVIDERS.includes",
+            "name": "args.push",
             "line": 162
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
-            "name": "<dynamic>",
-            "line": 163
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
-            "kind": "construct",
-            "name": "Error",
+            "name": "args.push",
             "line": 163
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
-            "name": "args.push",
+            "name": "API_PROVIDERS.includes",
             "line": 164
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 165
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "construct",
             "name": "Error",
-            "line": 167
+            "line": 165
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
             "name": "args.push",
-            "line": 168
+            "line": 166
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
+            "kind": "construct",
+            "name": "Error",
+            "line": 169
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
@@ -22104,85 +22176,73 @@
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
+            "name": "args.push",
+            "line": 172
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
+            "kind": "call",
             "name": "tools.push",
-            "line": 175
+            "line": 177
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 175
+            "line": 177
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
             "name": "tools.push",
-            "line": 176
+            "line": 178
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
             "name": "args.push",
-            "line": 177
+            "line": 179
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:buildPiArgs:0",
             "kind": "call",
             "name": "tools.join",
-            "line": 177
+            "line": 179
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:childEnvironment:0",
             "kind": "call",
             "name": "Object.keys",
-            "line": 184
+            "line": 186
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:childEnvironment:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 185
+            "line": 187
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:eventsFrom:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 191
+            "line": 193
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:eventsFrom:0",
             "kind": "call",
             "name": "text.split",
-            "line": 191
+            "line": 193
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:eventsFrom:0",
             "kind": "call",
             "name": "JSON.parse",
-            "line": 191
+            "line": 193
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
             "name": "eventsFrom",
-            "line": 195
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 196
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
-            "kind": "call",
-            "name": "events.filter",
-            "line": 196
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
-            "kind": "call",
-            "name": "messages.at",
             "line": 197
           },
           {
@@ -22194,19 +22254,13 @@
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
-            "name": "messages.filter",
-            "line": 198
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 198
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
-            "kind": "call",
             "name": "events.filter",
+            "line": 198
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
+            "kind": "call",
+            "name": "messages.at",
             "line": 199
           },
           {
@@ -22218,350 +22272,404 @@
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
-            "name": "events.filter",
+            "name": "messages.filter",
             "line": 200
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
-            "name": "events.some",
+            "name": "<dynamic>",
+            "line": 200
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
+            "kind": "call",
+            "name": "events.filter",
             "line": 201
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
-            "name": "API_PROVIDERS.includes",
+            "name": "<dynamic>",
             "line": 202
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
+            "name": "events.filter",
+            "line": 202
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
+            "kind": "call",
+            "name": "events.some",
+            "line": 203
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
+            "kind": "call",
+            "name": "API_PROVIDERS.includes",
+            "line": 204
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
+            "kind": "call",
             "name": "raw.stderr.match",
-            "line": 205
+            "line": 207
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
             "name": "errors.join",
-            "line": 207
+            "line": 209
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 207
+            "line": 209
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 207
+            "line": 209
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 207
+            "line": 209
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:summarize:0",
             "kind": "call",
             "name": "raw.stderr.slice",
-            "line": 207
+            "line": 209
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
+            "kind": "call",
+            "name": "performance.now",
+            "line": 213
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "construct",
             "name": "Error",
-            "line": 211
+            "line": 214
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "sandboxRequested",
-            "line": 212
+            "line": 215
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "construct",
             "name": "Error",
-            "line": 212
+            "line": 215
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "Date.now",
-            "line": 215
+            "line": 218
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch.progress:0",
             "kind": "call",
             "name": "onProgress",
-            "line": 217
+            "line": 220
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "<dynamic>",
-            "line": 218
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
-            "kind": "call",
-            "name": "ensureOpenAIAuth",
-            "line": 220
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
-            "kind": "call",
-            "name": "findPiEntry",
-            "line": 220
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
-            "kind": "call",
-            "name": "prepareWindowsApiPacket",
             "line": 221
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
-            "name": "Date.now",
+            "name": "ensureOpenAIAuth",
             "line": 223
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
+            "name": "findPiEntry",
+            "line": 223
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
+            "kind": "call",
+            "name": "prepareWindowsApiPacket",
+            "line": 224
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
+            "kind": "call",
             "name": "Date.now",
-            "line": 225
+            "line": 226
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
+            "kind": "call",
+            "name": "Date.now",
+            "line": 228
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "progress",
-            "line": 225
+            "line": 228
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "compileKetherTask",
-            "line": 227
+            "line": 230
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "childEnvironment",
-            "line": 229
+            "line": 232
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "JSON.stringify",
-            "line": 231
+            "line": 234
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
+            "kind": "call",
+            "name": "calculateExecutionBudget",
+            "line": 236
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
+            "kind": "call",
+            "name": "performance.now",
+            "line": 236
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
+            "kind": "call",
+            "name": "calculateExecutionBudget",
+            "line": 240
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
+            "kind": "call",
+            "name": "performance.now",
+            "line": 240
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "runWslSandbox",
-            "line": 232
+            "line": 243
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "buildPiArgs",
-            "line": 232
+            "line": 243
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:dispatch:0",
             "kind": "call",
             "name": "summarize",
-            "line": 233
+            "line": 244
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
             "kind": "call",
             "name": "args.shift",
-            "line": 237
+            "line": 248
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
             "kind": "construct",
             "name": "Error",
-            "line": 239
+            "line": 250
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
             "kind": "call",
             "name": "findPiEntry",
-            "line": 240
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "runProcess",
-            "line": 242
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "version.stdout.trim",
-            "line": 243
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "runProcess",
-            "line": 245
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 248
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "construct",
-            "name": "Error",
-            "line": 248
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "JSON.parse",
-            "line": 249
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 249
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "readFileSync",
-            "line": 249
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "resolve",
-            "line": 249
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "dispatch",
-            "line": 250
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "validateRequest",
-            "line": 250
-          },
-          {
-            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
-            "kind": "call",
-            "name": "validateKetherInvocation",
             "line": 251
           },
           {
             "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
             "kind": "call",
+            "name": "runProcess",
+            "line": 253
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "version.stdout.trim",
+            "line": 254
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "runProcess",
+            "line": 256
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 259
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "construct",
+            "name": "Error",
+            "line": 259
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 260
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 260
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 260
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "resolve",
+            "line": 260
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
             "name": "dispatch",
-            "line": 252
+            "line": 261
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "validateRequest",
+            "line": 261
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "validateKetherInvocation",
+            "line": 262
+          },
+          {
+            "from": "payload/pi-dispatch/scripts/dispatch.mjs#function:main:0",
+            "kind": "call",
+            "name": "dispatch",
+            "line": 263
           },
           {
             "from": null,
             "kind": "call",
             "name": "pathToFileURL",
-            "line": 255
+            "line": 266
           },
           {
             "from": null,
             "kind": "call",
             "name": "resolve",
-            "line": 255
+            "line": 266
           },
           {
             "from": null,
             "kind": "construct",
             "name": "AbortController",
-            "line": 256
+            "line": 267
           },
           {
             "from": null,
             "kind": "call",
             "name": "process.once",
-            "line": 257
+            "line": 268
           },
           {
             "from": null,
             "kind": "call",
             "name": "controller.abort",
-            "line": 257
+            "line": 268
           },
           {
             "from": null,
             "kind": "call",
             "name": "process.once",
-            "line": 258
+            "line": 269
           },
           {
             "from": null,
             "kind": "call",
             "name": "controller.abort",
-            "line": 258
+            "line": 269
           },
           {
             "from": null,
             "kind": "call",
             "name": "<dynamic>",
-            "line": 259
+            "line": 270
           },
           {
             "from": null,
             "kind": "call",
             "name": "<dynamic>",
-            "line": 259
+            "line": 270
           },
           {
             "from": null,
             "kind": "call",
             "name": "main",
-            "line": 259
+            "line": 270
           },
           {
             "from": null,
             "kind": "call",
             "name": "process.argv.slice",
-            "line": 259
+            "line": 270
           },
           {
             "from": null,
             "kind": "call",
             "name": "console.log",
-            "line": 259
+            "line": 270
           },
           {
             "from": null,
             "kind": "call",
             "name": "JSON.stringify",
-            "line": 259
+            "line": 270
           },
           {
             "from": null,
             "kind": "call",
             "name": "console.error",
-            "line": 259
+            "line": 270
           },
           {
             "from": null,
             "kind": "call",
             "name": "JSON.stringify",
-            "line": 259
+            "line": 270
           }
         ]
       }
@@ -29607,7 +29715,7 @@
     },
     {
       "path": "payload/pi-dispatch/scripts/headless-host.mjs",
-      "sha256": "16c996e2b4eb49b16e1f3870d13467ff73990532cb403d481134641d5417d52e",
+      "sha256": "fba0888f78d3d874b19354f049d21ff940c9b744566a4f9a3bf4fb962dea2255",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -38323,7 +38431,7 @@
     },
     {
       "path": "payload/pi-dispatch/scripts/openai-auth-store.mjs",
-      "sha256": "46eb379659ed0b14d2c3902522b51ca99d7f213709ef687af19580b09e89a47d",
+      "sha256": "bd4e6499c08dac97cc643725182798cdb398f9d16346cc6848ce24968d9e5c7b",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -42937,7 +43045,7 @@
     },
     {
       "path": "payload/pi-dispatch/scripts/provider-policy.mjs",
-      "sha256": "4396661e6cd5e586c92ffd3e62063cd7afaf73d7743d852ca31fe209364d6c04",
+      "sha256": "370cca619e07737d3ae1a2da56bc78798489c579fa899540ae2df9fc5ca6d351",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -44866,7 +44974,7 @@
     },
     {
       "path": "payload/pi-dispatch/scripts/upgrade-service.mjs",
-      "sha256": "81a55ec42e79215334f16479262c7807579ad0ef40bf0e9cd384e990dc10e1c4",
+      "sha256": "8df46e475bd81d6e3d909d16034049cf4bf43df442239dcd6dee81ab05b91cb3",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -49395,7 +49503,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/claude-api-auth.test.mjs",
-      "sha256": "6dc12a41009ea086e19128eb623173feef59184da0cff45ad43d43e6ae20556c",
+      "sha256": "df0acc99ab21f653492ec71135806d1ff229176453b5a63db00abae82b1e68ab",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -54926,7 +55034,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/dispatch.test.mjs",
-      "sha256": "6337c38aa867e5aadc73081d5f6e6aa58d2cb48c93a8bb7614867b3f84e30552",
+      "sha256": "8f597e1c862d8a5af9695fb3da9e050b1d7768853333f5a3f11f8ba53e39e6e4",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -54937,8 +55045,8 @@
             "qualified": "validate",
             "kind": "function",
             "parent": null,
-            "line": 15,
-            "endLine": 15
+            "line": 17,
+            "endLine": 17
           },
           {
             "id": "payload/pi-dispatch/tests/dispatch.test.mjs#method:on:0",
@@ -54946,8 +55054,8 @@
             "qualified": "on",
             "kind": "method",
             "parent": null,
-            "line": 78,
-            "endLine": 78
+            "line": 86,
+            "endLine": 86
           },
           {
             "id": "payload/pi-dispatch/tests/dispatch.test.mjs#method:on:1",
@@ -54955,8 +55063,8 @@
             "qualified": "on",
             "kind": "method",
             "parent": null,
-            "line": 100,
-            "endLine": 100
+            "line": 108,
+            "endLine": 108
           },
           {
             "id": "payload/pi-dispatch/tests/dispatch.test.mjs#method:registerCommand:0",
@@ -54964,8 +55072,8 @@
             "qualified": "registerCommand",
             "kind": "method",
             "parent": null,
-            "line": 126,
-            "endLine": 126
+            "line": 134,
+            "endLine": 134
           },
           {
             "id": "payload/pi-dispatch/tests/dispatch.test.mjs#method:sendUserMessage:0",
@@ -54973,8 +55081,8 @@
             "qualified": "sendUserMessage",
             "kind": "method",
             "parent": null,
-            "line": 127,
-            "endLine": 127
+            "line": 135,
+            "endLine": 135
           },
           {
             "id": "payload/pi-dispatch/tests/dispatch.test.mjs#method:notify:0",
@@ -54982,8 +55090,8 @@
             "qualified": "notify",
             "kind": "method",
             "parent": null,
-            "line": 131,
-            "endLine": 131
+            "line": 139,
+            "endLine": 139
           },
           {
             "id": "payload/pi-dispatch/tests/dispatch.test.mjs#method:notify:1",
@@ -54991,65 +55099,75 @@
             "qualified": "notify",
             "kind": "method",
             "parent": null,
-            "line": 136,
-            "endLine": 136
+            "line": 144,
+            "endLine": 144
           }
         ],
         "imports": [
           {
-            "specifier": "node:test",
+            "specifier": "node:fs",
             "form": "import_statement",
             "line": 1
           },
           {
-            "specifier": "node:assert/strict",
+            "specifier": "node:os",
             "form": "import_statement",
             "line": 2
           },
           {
-            "specifier": "node:path",
+            "specifier": "node:test",
             "form": "import_statement",
             "line": 3
           },
           {
-            "specifier": "node:url",
+            "specifier": "node:assert/strict",
             "form": "import_statement",
             "line": 4
           },
           {
-            "specifier": "../scripts/dispatch.mjs",
+            "specifier": "node:path",
             "form": "import_statement",
             "line": 5
           },
           {
-            "specifier": "../extensions/kether-envelope.js",
+            "specifier": "node:url",
             "form": "import_statement",
             "line": 6
           },
           {
-            "specifier": "../extensions/write-scope-guard.js",
+            "specifier": "../scripts/dispatch.mjs",
             "form": "import_statement",
             "line": 7
           },
           {
-            "specifier": "../extensions/auth-scrub.js",
+            "specifier": "../extensions/kether-envelope.js",
             "form": "import_statement",
             "line": 8
           },
           {
-            "specifier": "../extensions/resource-limits.js",
+            "specifier": "../extensions/write-scope-guard.js",
             "form": "import_statement",
             "line": 9
           },
           {
-            "specifier": "node:fs",
-            "form": "import",
-            "line": 74
+            "specifier": "../extensions/auth-scrub.js",
+            "form": "import_statement",
+            "line": 10
+          },
+          {
+            "specifier": "../extensions/resource-limits.js",
+            "form": "import_statement",
+            "line": 11
           },
           {
             "specifier": "node:fs",
             "form": "import",
-            "line": 96
+            "line": 82
+          },
+          {
+            "specifier": "node:fs",
+            "form": "import",
+            "line": 104
           }
         ],
         "mentions": [
@@ -55057,288 +55175,282 @@
             "from": null,
             "kind": "call",
             "name": "dirname",
-            "line": 11
+            "line": 13
           },
           {
             "from": null,
             "kind": "call",
             "name": "fileURLToPath",
-            "line": 11
+            "line": 13
           },
           {
             "from": null,
             "kind": "call",
             "name": "resolve",
-            "line": 12
+            "line": 14
           },
           {
             "from": "payload/pi-dispatch/tests/dispatch.test.mjs#function:validate:0",
             "kind": "call",
             "name": "validateRequest",
-            "line": 15
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
             "line": 17
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
-            "line": 18
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 18
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 19
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 19
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 20
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 20
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 21
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 21
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 22
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 22
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 23
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 23
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 24
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 24
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 25
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateRequest",
-            "line": 25
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "dirname",
-            "line": 25
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 26
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 26
-          },
-          {
-            "from": null,
-            "kind": "call",
             "name": "test",
+            "line": 19
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 20
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 20
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 21
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 21
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 25
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 25
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 26
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 26
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 27
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 27
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
             "line": 28
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.deepEqual",
-            "line": 29
+            "name": "validateRequest",
+            "line": 28
           },
           {
             "from": null,
             "kind": "call",
-            "name": "Object.keys",
-            "line": 29
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "publicResourceProfiles",
-            "line": 29
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 30
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolveResourceLimits",
-            "line": 30
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 31
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolveResourceLimits",
-            "line": 31
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 32
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolveResourceLimits",
-            "line": 32
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 33
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolveResourceLimits",
-            "line": 33
+            "name": "dirname",
+            "line": 28
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.throws",
-            "line": 34
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolveResourceLimits",
-            "line": 34
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 35
+            "line": 29
           },
           {
             "from": null,
             "kind": "call",
             "name": "validate",
-            "line": 35
+            "line": 29
           },
           {
             "from": null,
             "kind": "call",
             "name": "test",
+            "line": 31
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 32
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "Object.keys",
+            "line": 32
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "publicResourceProfiles",
+            "line": 32
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolveResourceLimits",
+            "line": 33
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolveResourceLimits",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 35
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolveResourceLimits",
+            "line": 35
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 36
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolveResourceLimits",
+            "line": 36
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolveResourceLimits",
             "line": 37
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.throws",
-            "line": 39
+            "line": 38
           },
           {
             "from": null,
             "kind": "call",
-            "name": "validateKetherInvocation",
-            "line": 39
+            "name": "validate",
+            "line": 38
           },
           {
             "from": null,
             "kind": "call",
             "name": "test",
+            "line": 40
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
             "line": 42
           },
           {
             "from": null,
             "kind": "call",
             "name": "validateKetherInvocation",
-            "line": 43
+            "line": 42
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
-            "line": 44
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
+            "name": "test",
             "line": 45
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "validateKetherInvocation",
             "line": 46
           },
           {
@@ -55350,512 +55462,536 @@
           {
             "from": null,
             "kind": "call",
-            "name": "assert.match",
+            "name": "assert.equal",
             "line": 48
           },
           {
             "from": null,
             "kind": "call",
-            "name": "compileKetherTask",
-            "line": 48
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
+            "name": "assert.equal",
             "line": 49
           },
           {
             "from": null,
             "kind": "call",
-            "name": "compileKetherTask",
-            "line": 49
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
+            "name": "assert.equal",
             "line": 50
           },
           {
             "from": null,
             "kind": "call",
-            "name": "validateKetherInvocation",
-            "line": 50
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
+            "name": "assert.equal",
             "line": 51
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateKetherInvocation",
-            "line": 51
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 52
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateKetherInvocation",
-            "line": 52
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 53
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateKetherInvocation",
-            "line": 53
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 54
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateKetherInvocation",
-            "line": 54
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 55
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateKetherInvocation",
-            "line": 55
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 56
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateKetherTask",
-            "line": 56
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 57
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateKetherTask",
-            "line": 57
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 60
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "compileWriteScope",
-            "line": 61
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 62
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "normalizeScopedPath",
-            "line": 62
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 63
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "isAllowedPath",
-            "line": 63
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 64
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "isAllowedPath",
-            "line": 64
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 65
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "isAllowedPath",
-            "line": 65
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 66
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "isAllowedPath",
-            "line": 66
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 67
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "normalizeScopedPath",
-            "line": 67
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 70
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolve",
-            "line": 73
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "import",
-            "line": 74
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "writeFileSync",
-            "line": 75
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 75
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "writeScopeGuard",
-            "line": 78
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 80
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "toolHandler",
-            "line": 80
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 81
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "toolHandler",
-            "line": 81
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
-            "line": 82
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "toolHandler",
-            "line": 82
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
-            "line": 83
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "toolHandler",
-            "line": 83
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
-            "line": 84
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "toolHandler",
-            "line": 84
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "unlinkSync",
-            "line": 87
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 91
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolve",
-            "line": 95
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "import",
-            "line": 96
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "writeFileSync",
-            "line": 97
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "authScrubExtension",
-            "line": 100
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 101
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 102
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "existsSync",
-            "line": 102
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "handler",
-            "line": 103
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 104
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "existsSync",
-            "line": 104
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 105
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "existsSync",
-            "line": 107
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "unlinkSync",
-            "line": 107
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 112
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.deepEqual",
-            "line": 116
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateUnifiedPatch",
-            "line": 116
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "allowed.replaceAll",
-            "line": 117
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 118
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateUnifiedPatch",
-            "line": 118
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 119
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateUnifiedPatch",
-            "line": 119
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 121
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 122
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validateKetherTask",
-            "line": 122
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "ketherEnvelopeExtension",
-            "line": 125
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 129
           },
           {
             "from": null,
             "kind": "call",
             "name": "<dynamic>",
-            "line": 130
+            "line": 51
           },
           {
             "from": null,
             "kind": "call",
-            "name": "Buffer.from",
-            "line": 130
+            "name": "buildPiArgs",
+            "line": 51
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 51
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 51
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 53
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherInvocation",
+            "line": 53
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 55
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "compileKetherTask",
+            "line": 55
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 56
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "compileKetherTask",
+            "line": 56
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 57
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 57
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 58
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherInvocation",
+            "line": 58
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 59
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherInvocation",
+            "line": 59
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 60
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherInvocation",
+            "line": 60
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 61
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherInvocation",
+            "line": 61
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 62
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherInvocation",
+            "line": 62
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 63
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherInvocation",
+            "line": 63
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 64
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherTask",
+            "line": 64
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 65
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateKetherTask",
+            "line": 65
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 68
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "compileWriteScope",
+            "line": 69
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 70
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "normalizeScopedPath",
+            "line": 70
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 71
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "isAllowedPath",
+            "line": 71
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 72
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "isAllowedPath",
+            "line": 72
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 73
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "isAllowedPath",
+            "line": 73
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 74
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "isAllowedPath",
+            "line": 74
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 75
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "normalizeScopedPath",
+            "line": 75
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 78
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolve",
+            "line": 81
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "import",
+            "line": 82
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 83
           },
           {
             "from": null,
             "kind": "call",
             "name": "JSON.stringify",
+            "line": 83
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeScopeGuard",
+            "line": 86
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 88
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "toolHandler",
+            "line": 88
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 89
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "toolHandler",
+            "line": 89
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 90
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "toolHandler",
+            "line": 90
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 91
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "toolHandler",
+            "line": 91
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 92
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "toolHandler",
+            "line": 92
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "unlinkSync",
+            "line": 95
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 99
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolve",
+            "line": 103
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "import",
+            "line": 104
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 105
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "authScrubExtension",
+            "line": 108
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 109
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 110
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "existsSync",
+            "line": 110
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "handler",
+            "line": 111
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 112
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "existsSync",
+            "line": 112
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 113
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "existsSync",
+            "line": 115
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "unlinkSync",
+            "line": 115
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 120
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 124
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateUnifiedPatch",
+            "line": 124
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "allowed.replaceAll",
+            "line": 125
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 126
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateUnifiedPatch",
+            "line": 126
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 127
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validateUnifiedPatch",
+            "line": 127
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 129
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
             "line": 130
           },
           {
             "from": null,
             "kind": "call",
-            "name": "command.definition.handler",
-            "line": 131
+            "name": "validateKetherTask",
+            "line": 130
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.match",
-            "line": 132
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
+            "name": "ketherEnvelopeExtension",
             "line": 133
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "command.definition.handler",
-            "line": 136
           },
           {
             "from": null,
@@ -55866,67 +56002,49 @@
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "<dynamic>",
             "line": 138
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.match",
+            "name": "Buffer.from",
+            "line": 138
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 138
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "command.definition.handler",
             "line": 139
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
+            "name": "assert.match",
+            "line": 140
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
             "line": 141
           },
           {
             "from": null,
             "kind": "call",
-            "name": "buildPiArgs",
-            "line": 142
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 142
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 143
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "args.includes",
-            "line": 143
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
+            "name": "command.definition.handler",
             "line": 144
           },
           {
             "from": null,
             "kind": "call",
-            "name": "args.includes",
-            "line": 144
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 145
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "args.includes",
+            "name": "assert.equal",
             "line": 145
           },
           {
@@ -55938,439 +56056,331 @@
           {
             "from": null,
             "kind": "call",
-            "name": "args.indexOf",
-            "line": 146
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
+            "name": "assert.match",
             "line": 147
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 147
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "buildPiArgs",
-            "line": 147
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 147
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 148
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "readList.includes",
-            "line": 148
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 149
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "readList.includes",
-            "line": 149
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 150
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "readList.includes",
-            "line": 150
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 151
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 151
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "buildPiArgs",
-            "line": 151
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 151
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 152
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "writeList.includes",
-            "line": 152
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 153
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "writeList.includes",
-            "line": 153
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 154
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "writeList.includes",
-            "line": 154
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 155
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "args.includes",
-            "line": 155
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 156
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 156
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "buildPiArgs",
-            "line": 156
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 156
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 157
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 157
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "buildPiArgs",
-            "line": 157
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 157
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "buildPiArgs",
-            "line": 158
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "validate",
-            "line": 158
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 159
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "wslArgs.includes",
-            "line": 159
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 160
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 160
-          },
-          {
-            "from": null,
-            "kind": "construct",
-            "name": "Set",
-            "line": 160
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.deepEqual",
-            "line": 161
-          },
-          {
-            "from": null,
-            "kind": "construct",
-            "name": "Set",
-            "line": 161
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 161
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "wslArgs.at",
-            "line": 161
-          },
-          {
-            "from": null,
-            "kind": "construct",
-            "name": "Set",
-            "line": 161
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 162
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "wslArgs.includes",
-            "line": 162
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 163
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 163
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 163
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "wslArgs.at",
-            "line": 163
           },
           {
             "from": null,
             "kind": "call",
             "name": "test",
+            "line": 149
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "mkdtempSync",
+            "line": 151
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolve",
+            "line": 151
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "tmpdir",
+            "line": 151
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolve",
+            "line": 152
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "mkdirSync",
+            "line": 162
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "dirname",
+            "line": 162
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 163
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.after",
             "line": 165
           },
           {
             "from": null,
             "kind": "call",
-            "name": "childEnvironment",
-            "line": 166
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 167
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 168
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 169
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 170
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
+            "name": "rmSync",
             "line": 171
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
+            "name": "buildPiArgs",
             "line": 173
           },
           {
             "from": null,
             "kind": "call",
-            "name": "runProcess",
+            "name": "validate",
+            "line": 173
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 174
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "args.includes",
+            "line": 174
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 175
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.deepEqual",
+            "name": "args.includes",
+            "line": 175
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 176
           },
           {
             "from": null,
             "kind": "call",
-            "name": "JSON.parse",
+            "name": "args.includes",
             "line": 176
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
+            "name": "assert.equal",
+            "line": 177
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "args.indexOf",
+            "line": 177
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
             "line": 178
           },
           {
             "from": null,
             "kind": "call",
-            "name": "runProcess",
+            "name": "<dynamic>",
+            "line": 178
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 178
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 178
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 179
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "readList.includes",
+            "line": 179
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 180
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
+            "name": "readList.includes",
+            "line": 180
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 181
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "readList.includes",
+            "line": 181
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
             "line": 182
           },
           {
             "from": null,
-            "kind": "construct",
-            "name": "AbortController",
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 182
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 182
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 182
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 183
           },
           {
             "from": null,
             "kind": "call",
-            "name": "setTimeout",
+            "name": "writeList.includes",
+            "line": 183
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 184
           },
           {
             "from": null,
             "kind": "call",
-            "name": "controller.abort",
+            "name": "writeList.includes",
             "line": 184
           },
           {
             "from": null,
             "kind": "call",
-            "name": "runProcess",
+            "name": "assert.ok",
             "line": 185
           },
           {
             "from": null,
             "kind": "call",
-            "name": "clearTimeout",
+            "name": "writeList.includes",
+            "line": 185
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 186
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "args.includes",
+            "line": 186
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 187
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
+            "name": "<dynamic>",
+            "line": 187
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 187
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 187
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 188
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 188
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
+            "line": 188
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "validate",
+            "line": 188
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "buildPiArgs",
             "line": 189
           },
           {
             "from": null,
             "kind": "call",
-            "name": "runProcess",
+            "name": "validate",
+            "line": 189
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 190
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "wslArgs.includes",
             "line": 190
           },
           {
@@ -56382,230 +56392,518 @@
           {
             "from": null,
             "kind": "call",
-            "name": "assert.ok",
+            "name": "<dynamic>",
+            "line": 191
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 191
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 192
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
             "line": 192
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
+            "name": "<dynamic>",
+            "line": 192
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "wslArgs.at",
+            "line": 192
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "Set",
+            "line": 192
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 193
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "wslArgs.includes",
+            "line": 193
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 194
           },
           {
             "from": null,
             "kind": "call",
-            "name": "JSON.stringify",
-            "line": 195
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 195
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 196
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "summarize",
-            "line": 196
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
-            "line": 197
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "summarize",
-            "line": 197
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 198
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "summarize",
-            "line": 198
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 200
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 201
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 201
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 202
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "summarize",
-            "line": 202
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 203
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "summarize",
-            "line": 203
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 204
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "summarize",
-            "line": 204
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.deepEqual",
-            "line": 205
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "summarize",
-            "line": 205
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 207
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 208
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 208
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.stringify",
-            "line": 208
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.deepEqual",
-            "line": 209
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "summarize",
-            "line": 209
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 211
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "runProcess",
-            "line": 212
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "resolve",
-            "line": 212
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 213
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 215
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.throws",
-            "line": 216
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "findPiEntry",
-            "line": 216
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
-            "line": 218
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 219
+            "name": "<dynamic>",
+            "line": 194
           },
           {
             "from": null,
             "kind": "call",
             "name": "<dynamic>",
-            "line": 219
+            "line": 194
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "wslArgs.at",
+            "line": 194
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 196
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "childEnvironment",
+            "line": 197
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 198
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 199
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 200
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 201
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 202
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 204
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "runProcess",
+            "line": 205
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 206
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 207
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 207
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 209
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "runProcess",
+            "line": 210
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 211
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 213
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "AbortController",
+            "line": 214
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "setTimeout",
+            "line": 215
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "controller.abort",
+            "line": 215
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "runProcess",
+            "line": 216
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "clearTimeout",
+            "line": 217
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 218
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 220
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "runProcess",
+            "line": 221
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 222
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 223
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 225
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 226
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 226
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 227
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 227
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 228
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 228
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 229
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 229
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 231
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 232
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 232
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 233
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 233
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 234
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 234
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 235
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 235
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 236
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 236
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 238
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 239
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 239
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 239
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 240
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "summarize",
+            "line": 240
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 242
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "runProcess",
+            "line": 243
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolve",
+            "line": 243
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 244
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 246
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 247
           },
           {
             "from": null,
             "kind": "call",
             "name": "findPiEntry",
-            "line": 219
+            "line": 247
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 249
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "mkdtempSync",
+            "line": 250
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolve",
+            "line": 250
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "tmpdir",
+            "line": 250
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolve",
+            "line": 251
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "resolve",
+            "line": 252
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 253
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.after",
+            "line": 254
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "rmSync",
+            "line": 255
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 257
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "findPiEntry",
+            "line": 258
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "realpathSync",
+            "line": 259
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.throws",
+            "line": 261
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "findPiEntry",
+            "line": 262
           }
         ]
       }
@@ -59482,6 +59780,100 @@
             "kind": "call",
             "name": "process.listenerCount",
             "line": 12
+          }
+        ]
+      }
+    },
+    {
+      "path": "payload/pi-dispatch/tests/execution-budget.test.mjs",
+      "sha256": "edebddd78592d43b3e5ca810f948e1e8d3e5e7f7c63044c9c1de6b0ca657461c",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [],
+        "imports": [
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "../extensions/execution-budget.js",
+            "form": "import_statement",
+            "line": 3
+          }
+        ],
+        "mentions": [
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 5
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 6
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "calculateExecutionBudget",
+            "line": 6
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "calculateExecutionBudget",
+            "line": 9
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 10
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 11
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "calculateExecutionBudget",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 15
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 26
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "calculateExecutionBudget",
+            "line": 26
           }
         ]
       }
@@ -82570,7 +82962,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/priority-improvements.test.mjs",
-      "sha256": "6196d19a8208355de0a4ec77753c55e9d69d8c1f9905a562660ef3e2b8220a15",
+      "sha256": "b5dbb558144ee35407e86f7006b5def075cdc8549c46738906052572cab55726",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -82665,254 +83057,260 @@
           {
             "from": null,
             "kind": "call",
-            "name": "assert.deepEqual",
-            "line": 13
-          },
-          {
-            "from": null,
-            "kind": "call",
             "name": "t.snapshot",
             "line": 13
           },
           {
             "from": null,
             "kind": "call",
-            "name": "createExecutionTimeline",
-            "line": 14
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "silent.close",
+            "name": "assert.deepEqual",
             "line": 14
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 14
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "silent.snapshot",
-            "line": 14
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
             "line": 15
           },
           {
             "from": null,
             "kind": "call",
-            "name": "test",
+            "name": "createExecutionTimeline",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "silent.close",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "silent.snapshot",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
             "line": 17
           },
           {
             "from": null,
             "kind": "call",
-            "name": "<dynamic>",
-            "line": 18
+            "name": "test",
+            "line": 19
           },
           {
             "from": null,
             "kind": "call",
-            "name": "exportResult",
+            "name": "<dynamic>",
             "line": 20
           },
           {
             "from": null,
             "kind": "call",
+            "name": "exportResult",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
             "name": "assert.doesNotMatch",
-            "line": 21
+            "line": 23
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 22
+            "line": 24
           },
           {
             "from": null,
             "kind": "call",
             "name": "JSON.parse",
-            "line": 22
+            "line": 24
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 23
+            "line": 25
           },
           {
             "from": null,
             "kind": "call",
             "name": "<dynamic>",
-            "line": 23
+            "line": 25
           },
           {
             "from": null,
             "kind": "call",
             "name": "<dynamic>",
-            "line": 23
+            "line": 25
           },
           {
             "from": null,
             "kind": "call",
             "name": "createHash",
-            "line": 23
+            "line": 25
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.throws",
-            "line": 24
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "exportResult",
-            "line": 24
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "test",
             "line": 26
           },
           {
             "from": null,
             "kind": "call",
-            "name": "createTaskMonitor",
-            "line": 27
+            "name": "exportResult",
+            "line": 26
           },
           {
             "from": null,
             "kind": "call",
-            "name": "monitor.submit",
+            "name": "test",
             "line": 28
           },
           {
             "from": null,
             "kind": "call",
-            "name": "running",
+            "name": "createTaskMonitor",
             "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "monitor.submit",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "running",
+            "line": 31
           },
           {
             "from": null,
             "kind": "call",
             "name": "progress",
-            "line": 29
+            "line": 31
           },
           {
             "from": null,
             "kind": "construct",
             "name": "Promise",
-            "line": 29
+            "line": 31
           },
           {
             "from": null,
             "kind": "construct",
             "name": "Promise",
-            "line": 32
+            "line": 34
           },
           {
             "from": null,
             "kind": "call",
             "name": "setImmediate",
-            "line": 32
+            "line": 34
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 33
+            "line": 35
           },
           {
             "from": null,
             "kind": "call",
             "name": "monitor.getResult",
-            "line": 33
+            "line": 35
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 33
+            "line": 35
           },
           {
             "from": null,
             "kind": "call",
             "name": "monitor.get",
-            "line": 33
+            "line": 35
           },
           {
             "from": null,
             "kind": "call",
             "name": "release",
-            "line": 34
+            "line": 36
           },
           {
             "from": null,
             "kind": "construct",
             "name": "Promise",
-            "line": 34
+            "line": 36
           },
           {
             "from": null,
             "kind": "call",
             "name": "setImmediate",
-            "line": 34
+            "line": 36
           },
           {
             "from": null,
             "kind": "call",
             "name": "monitor.getResult",
-            "line": 35
+            "line": 37
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 35
+            "line": 37
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 35
+            "line": 37
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 35
+            "line": 37
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.doesNotMatch",
-            "line": 36
+            "line": 38
           },
           {
             "from": null,
             "kind": "call",
             "name": "JSON.stringify",
-            "line": 36
+            "line": 38
           },
           {
             "from": null,
             "kind": "call",
             "name": "assert.equal",
-            "line": 36
+            "line": 38
           },
           {
             "from": null,
             "kind": "call",
             "name": "monitor.getResult",
-            "line": 36
+            "line": 38
           }
         ]
       }
@@ -88812,6 +89210,440 @@
       }
     },
     {
+      "path": "payload/pi-dispatch/tests/stream-diagnostics.test.mjs",
+      "sha256": "f885f7a1122cfb2566ecd3c208ec392b239dc2b1396e912f5027c62244245ddd",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/tests/stream-diagnostics.test.mjs#function:line:0",
+            "name": "line",
+            "qualified": "line",
+            "kind": "function",
+            "parent": null,
+            "line": 5,
+            "endLine": 5
+          }
+        ],
+        "imports": [
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "../extensions/execution-timeline.js",
+            "form": "import_statement",
+            "line": 3
+          }
+        ],
+        "mentions": [
+          {
+            "from": "payload/pi-dispatch/tests/stream-diagnostics.test.mjs#function:line:0",
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 5
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 7
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "createExecutionTimeline",
+            "line": 9
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 10
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 10
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 11
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 11
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 13
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 13
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 14
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 14
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 15
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 15
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 17
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.snapshot",
+            "line": 17
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 20
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "createExecutionTimeline",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.snapshot",
+            "line": 25
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.snapshot",
+            "line": 26
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.notEqual",
+            "line": 27
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.snapshot",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.snapshot",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 31
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.snapshot",
+            "line": 31
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 34
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "createExecutionTimeline",
+            "line": 36
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "progress.push",
+            "line": 36
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 38
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "chunk.slice",
+            "line": 38
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 39
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "chunk.slice",
+            "line": 39
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 40
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 40
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 41
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 41
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.close",
+            "line": 42
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.cleaned",
+            "line": 42
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.snapshot",
+            "line": 43
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 44
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 45
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 46
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 47
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 48
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 51
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "createExecutionTimeline",
+            "line": 52
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 53
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 53
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.feed",
+            "line": 54
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "line",
+            "line": 54
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "t.snapshot",
+            "line": 55
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 56
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 57
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 58
+          }
+        ]
+      }
+    },
+    {
       "path": "payload/pi-dispatch/tests/task-heartbeat.test.mjs",
       "sha256": "5710f8a64cf661a8096ad0cbb5335515df4b5d03791d3e454a95320f38818112",
       "facts": {
@@ -90033,7 +90865,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/upgrade-process-identity.test.mjs",
-      "sha256": "788c56fa678cc7e887ec65fb2b7e30f3eab8c79c300d6baf63733ca78128385a",
+      "sha256": "716360361ffabaa418b0a92e11743541473d27706fc71d395ef34c3fc8a34e24",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -90904,7 +91736,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/windows-api-credential.test.mjs",
-      "sha256": "f684825625970042998539e5cb49093b57d6a5ac541e62d111b85adf44ce06d0",
+      "sha256": "978bd8bd858167d7d37ef8cd7ac2e00192dbb7f2ca2a07cc3b05750d3615bccc",
       "facts": {
         "language": "javascript",
         "status": "parsed",

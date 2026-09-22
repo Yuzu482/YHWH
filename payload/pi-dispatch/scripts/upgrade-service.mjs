@@ -29,7 +29,7 @@ async function main() {
         if (r.ok !== true || !Number.isInteger(r.pid) || r.pid <= 0 || r.pid === process.pid || process.platform !== 'win32') throw Error('invalid_runtime_identity');
         const verifier = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../install/Assert-GatewayProcess.ps1');
         execFileSync(path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
-          ['-NoProfile', '-File', verifier, '-TargetPid', String(r.pid), '-Executable', fs.realpathSync(s.nodePath), '-GatewayScript', fs.realpathSync(s.gatewayScript)],
+          ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', verifier, '-TargetPid', String(r.pid), '-Executable', fs.realpathSync(s.nodePath), '-GatewayScript', fs.realpathSync(s.gatewayScript)],
           { windowsHide: true, stdio: 'pipe', timeout: 10000 });
         pid = r.pid; return true;
       } catch {

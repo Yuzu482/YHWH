@@ -1,3 +1,5 @@
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
@@ -17,6 +19,7 @@ const validate = (value, allowWrite = false) => validateRequest(value, allowWrit
 test('validation is strict and writing is opt-in', () => {
   assert.equal(validate(base).access, 'none');
   assert.equal(validate(base).resourceLimits.profile, 'standard');
+  assert.equal(validate(base).thinking, 'medium');
   assert.throws(() => validate({ ...base, access: 'workspace-write' }), /allow-write/);
   assert.equal(validate({ ...base, access: 'workspace-write' }, true).access, 'workspace-write');
   assert.throws(() => validate({ target: 'codex-cli', cwd, prompt: 'blocked' }), /route is disabled/);
@@ -44,9 +47,14 @@ test('Kether invocation compiles a fixed openai-codex envelope without duplicate
   assert.equal(invocation.request.target, 'model');
   assert.equal(invocation.request.provider, 'openai-codex');
   assert.equal(invocation.request.model, 'gpt-5.6-luna');
-  assert.equal(invocation.request.thinking, 'max');
+  assert.equal(invocation.request.thinking, 'medium');
+  assert.equal(buildPiArgs(invocation.request, 'wsl2').at(buildPiArgs(invocation.request, 'wsl2').indexOf('--thinking') + 1), 'medium');
+  for (const thinking of ['low', 'medium', 'high', 'max']) {
+    assert.equal(validateKetherInvocation({ cwd, access: 'read', thinking, task: semanticTask }, false, cwd).request.thinking, thinking);
+  }
   assert.match(compileKetherTask(invocation.task), /TASK_PACKET_JSON=/);
   assert.match(compileKetherTask(invocation.task), /KETHER_RESULT_JSON=/);
+  assert.equal(validate({ ...base, provider: 'anthropic', model: 'claude-sonnet-5' }).thinking, 'max');
   assert.throws(() => validateKetherInvocation({ cwd, access: 'read', provider: 'other', task: semanticTask }, false, cwd), /allowlist/);
   assert.throws(() => validateKetherInvocation({ cwd, access: 'none', task: semanticTask }, false, cwd), /none access/);
   assert.throws(() => validateKetherInvocation({ cwd, access: 'read', task: { ...semanticTask, writeScope: ['x'] } }, false, cwd), /read access/);
@@ -138,7 +146,30 @@ test('Kether task schema rejects transport fields and extension injects the comp
   assert.equal(notice.level, 'error');
   assert.match(notice.message, /provider\/model/);
 });
-test('model allowlists and exact provider/model routing', () => {
+test('model allowlists and exact provider/model routing', (t) => {
+  const previousUserProfile = process.env.USERPROFILE;
+  const temporaryUserProfile = mkdtempSync(resolve(tmpdir(), 'pi-lsp-routing-'));
+  const inertExtensionEntry = resolve(
+    temporaryUserProfile,
+    '.pi',
+    'agent',
+    'npm',
+    'node_modules',
+    'pi-lsp-extension',
+    'src',
+    'index.ts',
+  );
+  mkdirSync(dirname(inertExtensionEntry), { recursive: true });
+  writeFileSync(inertExtensionEntry, '');
+  process.env.USERPROFILE = temporaryUserProfile;
+  t.after(() => {
+    if (previousUserProfile === undefined) {
+      delete process.env.USERPROFILE;
+    } else {
+      process.env.USERPROFILE = previousUserProfile;
+    }
+    rmSync(temporaryUserProfile, { recursive: true, force: true });
+  });
   const args = buildPiArgs(validate(base));
   assert.ok(args.includes('--no-tools'));
   assert.ok(args.includes('--no-context-files'));
@@ -215,6 +246,19 @@ test('spawn failure reported', async () => {
 test('bad Pi entrypoint override rejected', () => {
   assert.throws(() => findPiEntry({ PI_DISPATCH_PI_ENTRY: 'pi.cmd' }));
 });
-test('installed Pi entrypoint resolves', () => {
-  assert.ok(findPiEntry().endsWith('cli.js'));
+test('installed Pi entrypoint resolves', (t) => {
+  const temporaryDirectory = mkdtempSync(resolve(tmpdir(), 'pi-lsp-entry-'));
+  const absolutePath = resolve(temporaryDirectory, 'cli.js');
+  const missingPath = resolve(temporaryDirectory, 'missing-cli.js');
+  writeFileSync(absolutePath, '');
+  t.after(() => {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  });
+  assert.equal(
+    findPiEntry({ PI_DISPATCH_PI_ENTRY: absolutePath }),
+    realpathSync(absolutePath),
+  );
+  assert.throws(() => {
+    findPiEntry({ PI_DISPATCH_PI_ENTRY: missingPath });
+  });
 });

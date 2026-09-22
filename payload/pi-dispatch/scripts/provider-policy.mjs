@@ -7,7 +7,7 @@ export const PROVIDER_POLICY = Object.freeze({
   'anthropic': Object.freeze({defaultModel:'claude-sonnet-5',defaultThinking:'max',models:Object.freeze(['claude-sonnet-5'])}),
   'openai-codex': Object.freeze({
     defaultModel: 'gpt-5.6-luna',
-    defaultThinking: 'max',
+    defaultThinking: 'medium',
     models: Object.freeze(['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra']),
   }),
 

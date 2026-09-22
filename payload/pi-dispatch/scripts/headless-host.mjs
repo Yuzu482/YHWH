@@ -56,7 +56,7 @@ export function runProcess(executable, args, { cwd, input = '', timeoutMs, maxOu
     let bytes = 0, failure = null, stdout = [], stderr = [], settled = false, killTimer;
     if (processTreeMode === 'job-object') {
       if (process.platform !== 'win32') return resolve({ failure: 'job_object_requires_windows', exitCode: null, stdout: '', stderr: '' });
-      args = ['-NoProfile', '-NonInteractive', '-File', path.join(ownRoot, 'scripts/headless-job.ps1'), '-Executable', executable,
+      args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(ownRoot, 'scripts/headless-job.ps1'), '-Executable', executable,
         '-ArgumentsBase64', Buffer.from(JSON.stringify(args)).toString('base64'), '-WorkingDirectory', cwd, '-ParentPid', String(process.pid)];
       executable = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
     }

@@ -2,9 +2,11 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
-**Primary reasoning and orchestration only:** Astra (or the host-selected primary model) owns planning, scheduling, patch integration and acceptance. Pi subagents, normally Luna/max, author code, tests and implementation repairs. Worker failure never silently falls back to primary coding. This is a host instruction policy, not a mechanism disabling every client's editing tools; see [ownership and failure handling](docs/coordinator-only.en.md).
+**Primary reasoning and orchestration only:** Astra (or the host-selected primary model) owns planning, scheduling, patch integration and acceptance. Pi subagents author code, tests and implementation repairs. Native workers default to Luna/medium, with explicit low, high or max effort chosen for task complexity. Worker failure never silently falls back to primary coding. This is a host instruction policy, not a mechanism disabling every client's editing tools; see [ownership and failure handling](docs/coordinator-only.en.md) and [worker thinking and delivery budgets](docs/worker-budgets.en.md).
 
 **Subagent supervision heartbeats:** Local timers provide heartbeats without model calls and track execution progress separately; silence never triggers automatic retries. This does not prove remote-model health or automatically wake the primary; see [heartbeat behavior and deployment boundaries](docs/subagent-heartbeat.en.md).
+
+**Delivery diagnostics (unreleased):** Thinking, text and tool event counts plus recent activity timings help explain worker timeouts, without retaining raw content or changing budgets and success criteria. Existing installations require an upgrade. This is not a completion-wait interface; see [diagnostic fields and evidence boundaries](docs/worker-delivery-diagnostics.en.md).
 
 Sequential-call improvements: `HeadlessBatchEvents` streams per-request phases, waiting status and results. Session caches reduce repeated file reads and hashing while retaining exact version checks. Entire batches are validated before execution; session calls are serialized and stop after failure, with cache and phase timings reported. See [operations and acceptance boundaries](docs/workflow-operations.md#english).
 
@@ -16,7 +18,7 @@ New optional feature: official Codex, Claude Code and Antigravity headless prima
 
 A private source repository for Kether governance rules and the Pi execution workflow. The primary agent owns intent, authorization, task decomposition, integration and acceptance. Pi provides governed model calls, deterministic LSP, resource limits, result validation and runtime monitoring.
 
-**v0.12.0:** Collects sequential CLI improvements, managed service upgrades, primary coordination with Luna implementation, model-free heartbeats and strict no-polling rules since v0.11.0. Retains code relationships, project knowledge and multilingual deterministic probes. Local services require an explicit upgrade; see [bilingual release notes](docs/release-notes-0.12.0.md) for capabilities, licensing, CI failures and verification limits.
+**v0.13.0:** Native Luna workers now use task-proportional thinking (medium by default), with delivery and cleanup budgets, separate thinking/text/tool diagnostics, and Windows plus credential-free test compatibility fixes. Retains sequential calls, heartbeats, code relationships and deterministic probes. Local services need a separate upgrade and performance benefits have not been benchmarked; see [bilingual release notes](docs/release-notes-0.13.0.md).
 
 See the [architecture development history (Chinese)](docs/architecture-history.md) for the background, evolution, key decisions and historical verification limits. The [history evidence index (Chinese)](docs/history-evidence.json) contains the corresponding sanitized records.
 
@@ -38,7 +40,7 @@ Every maintained README in this repository has complete Chinese and English vers
 - `templates/agent-references/`: on-demand governance, routing, contract, authentication and evidence rules.
 - `install/`: installation, validation, host authentication configuration and WSL sandbox provisioning tools.
 
-The current policy pins workers to Luna/max and reviewers to Sonnet/max. Actual availability still depends on the destination account, model service and gateway capability checks. Lifecycle management supports dependency-ordered startup, failure rollback and reverse-order disposal. Only a trusted host may replace dispatch/LSP adapters while the gateway is idle. See [module lifecycle](payload/pi-dispatch/MODULE-LIFECYCLE.md).
+The current policy pins native workers to Luna, with the primary selecting task-proportional thinking (medium by default); reviewers remain Sonnet/max. Actual availability still depends on the destination account, model service and gateway capability checks. Lifecycle management supports dependency-ordered startup, failure rollback and reverse-order disposal. Only a trusted host may replace dispatch/LSP adapters while the gateway is idle. See [module lifecycle](payload/pi-dispatch/MODULE-LIFECYCLE.md).
 
 The repository excludes credentials, personal runtime configuration, request ledgers, audit logs, caches, dependency directories and machine backups. The image workflow's `image-prompt-review` plugin must be installed separately; this repository contains only the policy reference.
 
@@ -60,10 +62,10 @@ It provides:
 
 ### One-click installation (Windows 11 x64)
 
-The generated `YHWH-OneClick-0.12.0.zip` contains a self-contained script, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
+The generated `YHWH-OneClick-0.13.0.zip` contains a self-contained script, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.12.0.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps1
 ```
 
 The default exports generic MCP configuration without changing Codex global settings. Select hosts with `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"`; including `codex` enables the original Codex integration. Import the generated connection profile and load the primary instructions in each host. The exporter never overwrites existing host configuration.
@@ -78,14 +80,14 @@ An existing Pi installation is protected by default. Once tasks have ended and i
 
 ```powershell
 # Read-only preview: no downloads or host changes
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.12.0.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps1 -PlanOnly
 # Unattended installation with a fixed workspace (WSL must be ready; login is separate)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.12.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
 # Verify and extract only; destination must be a new absolute directory
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.12.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` to generate the portable ZIP, self-contained PS1, SHA256 file and double-click bundle under `release/`. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.12.0.ps1`.
+Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` to generate the portable ZIP, self-contained PS1, SHA256 file and double-click bundle under `release/`. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.13.0.ps1`.
 
 This version has script and package validation, but a full online installation in a fresh Windows VM has not been performed. Windows and WSL Pi use the same dependency lockfile; Ubuntu repositories, WSL system components and the .NET installer remain mutable external dependencies. This is not a completely offline or byte-for-byte reproducible system image.
 

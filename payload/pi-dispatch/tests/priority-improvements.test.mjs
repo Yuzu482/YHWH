@@ -10,7 +10,9 @@ test('stream timings survive split JSON chunks and distinguish missing response'
   time=120;t.feed('{"type":"agent_');t.feed('start"}\n');
   time=150;t.feed('{"type":"message_update","assistantMessageEvent":{"type":"thinking_delta"}}\n');
   time=210;t.feed('{"type":"agent_end"}\n');time=220;t.close();t.cleaned(12);
-  assert.deepEqual(t.snapshot(),{startupMs:20,timeToFirstResponseMs:50,firstResponseSource:'stream-delta',generationMs:60,processMs:120,processTailMs:10,cleanupMs:12});
+  const {stream,...snapshot}=t.snapshot();
+  assert.deepEqual(snapshot,{startupMs:20,timeToFirstResponseMs:50,firstResponseSource:'stream-delta',generationMs:60,processMs:120,processTailMs:10,cleanupMs:12});
+  assert.equal(stream.thinkingDeltas,1);
   const silent=createExecutionTimeline({now:()=>time});silent.close();assert.equal(silent.snapshot().timeToFirstResponseMs,null);
   assert.ok(progress.length>=4);
 });

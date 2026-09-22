@@ -18,7 +18,7 @@ test('Windows gateway process identity rejects a different executable or script'
   await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
   const verifier = fileURLToPath(new URL('../../../install/Assert-GatewayProcess.ps1', import.meta.url));
   const ps = path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe');
-  const check = (exe, file) => execFileSync(ps, ['-NoProfile', '-File', verifier, '-TargetPid', String(child.pid), '-Executable', exe, '-GatewayScript', file], { windowsHide: true, stdio: 'pipe', timeout: 10000 });
+  const check = (exe, file) => execFileSync(ps, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', verifier, '-TargetPid', String(child.pid), '-Executable', exe, '-GatewayScript', file], { windowsHide: true, stdio: 'pipe', timeout: 10000 });
   check(fs.realpathSync(process.execPath), fs.realpathSync(script));
   assert.throws(() => check(path.join(root, 'other.exe'), script));
   assert.throws(() => check(process.execPath, path.join(root, 'other.mjs')));

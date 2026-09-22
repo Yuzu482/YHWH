@@ -15,7 +15,7 @@ test('API preflight reads only the dedicated local key file and reports configur
   const dir=join(root,'.local/state/pi-kether');mkdirSync(dir,{recursive:true});const file=join(dir,'anthropic-api-key.json');
   writeFileSync(file,JSON.stringify({anthropic:{type:'api_key',key:'sk-ant-api03-'+'fixture'.repeat(8)}}));
   await assert.rejects(checkClaudeAuth({env}),{code:'PI_AUTH_MIGRATION_REQUIRED'});
-  const migrated=spawnSync('powershell.exe',['-NoProfile','-File',fileURLToPath(new URL('../../../install/Migrate-ApiCredentials.ps1',import.meta.url)),'-TargetHome',root],{encoding:'utf8'});assert.equal(migrated.status,0,migrated.stderr);
+  const migrated=spawnSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('../../../install/Migrate-ApiCredentials.ps1',import.meta.url)),'-TargetHome',root],{encoding:'utf8'});assert.equal(migrated.status,0,migrated.stderr);
   assert.deepEqual(await checkClaudeAuth({env}),{ok:true,status:'configured',authentication:'api_key',atRestEncryption:'Windows DPAPI CurrentUser',networkValidated:false,modelCalls:0});
   for(const invalid of ['bad json',JSON.stringify({anthropic:{type:'oauth',access:'private'}}),'x'.repeat(262145)]){
    writeFileSync(file,invalid);await assert.rejects(checkClaudeAuth({env}),{code:'PI_AUTH_INVALID'});

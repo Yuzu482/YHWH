@@ -1,6 +1,6 @@
 # Coordinator-only primary execution
 
-The user's selected primary model (Astra on this host) owns reasoning, requirements, architecture, decomposition, scheduling, evidence review, integration decisions and final acceptance. Actual implementation is delegated to Pi subagents, normally `openai-codex / gpt-5.6-luna / max` as Chesed. This rule takes precedence over older instructions to keep simple coding local, fix worker output directly, or implement locally when Pi is unavailable. It does not change higher-priority host permissions or reviewer role bindings.
+The user's selected primary model (Astra on this host) owns reasoning, requirements, architecture, decomposition, scheduling, evidence review, integration decisions and final acceptance. Actual implementation is delegated to Pi subagents, normally `openai-codex / gpt-5.6-luna` as Chesed with task-proportional thinking (medium by default; see pi-routing). This rule takes precedence over older instructions to keep simple coding local, fix worker output directly, or implement locally when Pi is unavailable. It does not change higher-priority host permissions or reviewer role bindings.
 
 ## Ownership
 
@@ -11,7 +11,7 @@ The user's selected primary model (Astra on this host) owns reasoning, requireme
 
 ## Dispatch and acceptance
 
-1. Read current Pi capabilities. Compile a small packet with one deliverable, explicit file scopes, exclusions, dependency boundaries, verification and a stable request/run ID. Preserve the live Luna/max binding; do not substitute a provider or role to evade a failure.
+1. Read current Pi capabilities. Compile a small packet with one deliverable, explicit file scopes, exclusions, dependency boundaries, verification and a stable request/run ID. Preserve the live Luna provider/model binding and select thinking under pi-routing; do not substitute a provider or role to evade a failure.
 2. Perform host planning and pre-review. If no independent review was performed, label that fact. A standalone implementation packet records local host pre-review and cannot claim a runtime-attested linked chain; real linked predecessors retain all typed handoff requirements.
 3. Choose a supported resource profile that fits current admission. Start with a small file scope and bounded output rather than a repository-wide investigation. Inspect queue versus execution timing before revising the budget. Do not reduce host reserve or other safety limits.
 4. Submit asynchronously. Do useful independent coordination while waiting. Astra must not repeatedly poll, including sleep/query loops or script-wrapped polling. Follow [async results](pi-results.md): actual completion waits or query-free waiting until a genuine event, predeclared deadline or user request. Retrieve the full terminal result once, with required pagination/digest checks; a pending response does not authorize another polling loop.

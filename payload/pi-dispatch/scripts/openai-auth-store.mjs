@@ -32,7 +32,7 @@ export function atomicAuthWrite(path,value,{preserveAclFrom}={}){
       if(process.platform==='win32'){
         const command=join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
         const aclEnv={...process.env};delete aclEnv.PSModulePath;delete aclEnv.PSModuleAnalysisCachePath;
-        const outcome=spawnSync(command,['-NoProfile','-NonInteractive','-File',fileURLToPath(new URL('./preserve-auth-acl.ps1',import.meta.url)),'-Source',preserveAclFrom,'-Destination',temporary],{env:aclEnv,shell:false,windowsHide:true,stdio:'ignore',timeout:10000});
+        const outcome=spawnSync(command,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('./preserve-auth-acl.ps1',import.meta.url)),'-Source',preserveAclFrom,'-Destination',temporary],{env:aclEnv,shell:false,windowsHide:true,stdio:'ignore',timeout:10000});
         if(outcome.error||outcome.status!==0)throw fail('PI_AUTH_RENEW_PERSIST_FAILED');
       }else fchmodSync(fd,lstatSync(preserveAclFrom).mode&0o777);
     }

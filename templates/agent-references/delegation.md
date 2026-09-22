@@ -18,8 +18,8 @@ Apply this policy to every task and every agent operating under this Codex home.
 
 ### Default delegated model
 
-- For delegated reasoning work through Pi, request `gpt-5.6-luna` with `max` reasoning effort when the Pi catalog supports both values.
-- If the required binding is unavailable, report the blocker; do not substitute a model/provider or lower effort to evade it.
+- For delegated reasoning work through Pi, request `gpt-5.6-luna` with explicit task-proportional thinking under pi-routing: medium by default, low/high/max when justified and supported.
+- If the required binding is unavailable, report the blocker; do not substitute a model/provider or evade the task-proportional thinking policy.
 
 ### Worker roles
 

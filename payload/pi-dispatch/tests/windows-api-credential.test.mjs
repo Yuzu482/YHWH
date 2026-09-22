@@ -16,7 +16,7 @@ test('encrypted worker key crosses Windows decryption, root validation and boots
  writeFileSync(join(state,'provider-config.json'),JSON.stringify(config));writeFileSync(file,JSON.stringify({'opencode-go':{type:'api_key',key}}));
  const env={...process.env,USERPROFILE:root};const request={provider:'yhwh-worker-api',providerConfigDigest:configDigest(config)};
  await assert.rejects(prepareWindowsApiPacket(request,{env}),{code:'PI_AUTH_MIGRATION_REQUIRED'});
- const run=spawnSync('powershell.exe',['-NoProfile','-File',fileURLToPath(new URL('../../../install/Migrate-ApiCredentials.ps1',import.meta.url)),'-TargetHome',root],{encoding:'utf8'});assert.equal(run.status,0,run.stderr);assert.ok(!run.stdout.includes(key));
+ const run=spawnSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('../../../install/Migrate-ApiCredentials.ps1',import.meta.url)),'-TargetHome',root],{encoding:'utf8'});assert.equal(run.status,0,run.stderr);assert.ok(!run.stdout.includes(key));
  const packet=await prepareWindowsApiPacket(request,{env});assert.ok(!readFileSync(file,'utf8').includes(key));
  const selected=acceptApiPacket(request.provider,packet,config,request.providerConfigDigest);
  const result=controlledBootstrap(selected,['--provider',request.provider,'--model','gpt-5.6-luna','--thinking','max','--no-tools','--yhwh-config',request.providerConfigDigest]);
