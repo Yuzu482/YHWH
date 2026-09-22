@@ -92914,6 +92914,343 @@
       }
     },
     {
+      "path": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs",
+      "sha256": "127af6aaa9b202140c3eaa4985cc67611f199ffb4929eb9a2a41d6649a855195",
+      "facts": {
+        "language": "javascript",
+        "status": "parsed",
+        "symbols": [
+          {
+            "id": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs#function:run:0",
+            "name": "run",
+            "qualified": "run",
+            "kind": "function",
+            "parent": null,
+            "line": 21,
+            "endLine": 21
+          },
+          {
+            "id": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs#function:check:0",
+            "name": "check",
+            "qualified": "check",
+            "kind": "function",
+            "parent": null,
+            "line": 25,
+            "endLine": 25
+          }
+        ],
+        "imports": [
+          {
+            "specifier": "node:assert/strict",
+            "form": "import_statement",
+            "line": 1
+          },
+          {
+            "specifier": "node:child_process",
+            "form": "import_statement",
+            "line": 2
+          },
+          {
+            "specifier": "node:fs",
+            "form": "import_statement",
+            "line": 3
+          },
+          {
+            "specifier": "node:os",
+            "form": "import_statement",
+            "line": 4
+          },
+          {
+            "specifier": "node:path",
+            "form": "import_statement",
+            "line": 5
+          },
+          {
+            "specifier": "node:url",
+            "form": "import_statement",
+            "line": 6
+          },
+          {
+            "specifier": "node:test",
+            "form": "import_statement",
+            "line": 7
+          }
+        ],
+        "mentions": [
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 9
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "mkdtempSync",
+            "line": 10
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 10
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "tmpdir",
+            "line": 10
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "mkdirSync",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 12
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "mkdirSync",
+            "line": 13
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 13
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "mkdirSync",
+            "line": 14
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 14
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "mkdirSync",
+            "line": 15
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 15
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 16
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "copyFileSync",
+            "line": 17
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "fileURLToPath",
+            "line": 17
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "URL",
+            "line": 17
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 18
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 18
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 19
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 19
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 20
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 20
+          },
+          {
+            "from": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs#function:run:0",
+            "kind": "call",
+            "name": "spawnSync",
+            "line": 21
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "run",
+            "line": 22
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "join",
+            "line": 23
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 24
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 24
+          },
+          {
+            "from": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs#function:check:0",
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 25
+          },
+          {
+            "from": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs#function:check:0",
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 25
+          },
+          {
+            "from": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs#function:check:0",
+            "kind": "call",
+            "name": "run",
+            "line": 25
+          },
+          {
+            "from": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs#function:check:0",
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 25
+          },
+          {
+            "from": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs#function:check:0",
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 25
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "check",
+            "line": 26
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 27
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 27
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 27
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "check",
+            "line": 28
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "writeFileSync",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.stringify",
+            "line": 30
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "check",
+            "line": 31
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "rmSync",
+            "line": 32
+          }
+        ]
+      }
+    },
+    {
       "path": "payload/pi-dispatch/tests/workflow-input-boundary.test.mjs",
       "sha256": "40799abdc264e5e99acc1172243d38f89e76a17e12b6c2e4a6b6a24327f0d9e8",
       "facts": {
