@@ -2,6 +2,10 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+YHWH 是面向 Windows 11 + WSL2 的便携式 Kether 治理规则与 Pi 执行环境，适合希望为 AI 编码工作流配置受控 worker、沙箱和 LSP 工具的开发者与维护者。它提供宿主接入配置、主代理规则、资源限制与结果校验；不安装主代理客户端，也不代表所有宿主或模型均已实机验证。
+
+**快速开始：** 查看[一键安装](#一键安装windows-11-x64)（需 Windows 11、WSL2 与硬件虚拟化），或先读[常见客户端接入](docs/common-clients.md)；项目结构见下方，安装细节与验证边界见[安装](#安装)和[验证与卸载](#验证与卸载)。
+
 **主代理只负责思考与调度：** Astra（或宿主选择的主模型）负责方案、调度、补丁整合与验收；代码、测试和实现修复由 Pi 子代理编写，原生 worker 默认 Luna/medium，并按任务复杂度显式选择 low、high 或 max。子代理失败不自动回退为主代理编码。该策略是宿主指令约束，不能禁用所有客户端的编辑工具；详见[职责与失败处理](docs/coordinator-only.md)与[思考档位和交付预算](docs/worker-budgets.md)。
 
 **子代理监管心跳：** 本地计时器提供不调用模型的心跳，并单独记录最近执行进度；静默不触发自动重试。它不证明远端模型健康，也不自动唤醒主代理；详见[心跳说明与部署边界](docs/subagent-heartbeat.md)。
@@ -13,8 +17,6 @@
 **v0.12 工作流优化：** CLI 实机回显验收、连续批次与耗时证据、可选 Windows Job Object 清理、受管插件升级/回滚、Git 变更影响候选及 Windows CI 配置。Antigravity 路径留空、默认禁用；CI 尚有失败项。源码能力与已部署/已发布状态分别记录，见[操作与验收指南](docs/workflow-operations.md#简体中文)。
 
 新增可选特性：Codex、Claude Code、Antigravity 官方 CLI 无头主代理入口，包含版本锁定、统一结果、运行预算和发布/本地文件比对。现有 Pi 路由保持不变，默认不启用客户端。见 [使用说明](docs/headless-cli.md#简体中文)。
-
-Kether 治理规则与 Pi 执行工作流的私有源码仓库。主代理负责意图、授权、任务拆分、整合和验收；Pi 提供受控的模型调用、确定性 LSP、资源限制、结果验证和运行监控。
 
 **v0.13.0：** 原生 Luna worker 改为按任务选择思考档位（默认 medium），加入交付和清理预算、思考／正文／工具活动诊断，以及 Windows 与无凭据测试兼容性修复。保留此前的连续调用、心跳、关系记忆和确定性探针。本地服务需单独升级，性能收益尚未做对照验证；详见[双语发布说明](docs/release-notes-0.13.0.md)。
 

@@ -2,6 +2,10 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
+YHWH is a portable Kether governance and Pi execution environment for Windows 11 + WSL2. It is for developers and maintainers who want governed workers, sandboxing and LSP tools in an AI coding workflow. It provides host connection profiles, primary-agent rules, resource limits and result validation; it does not install primary-agent clients or imply hands-on validation of every host or model.
+
+**Quick start:** See [one-click installation](#one-click-installation-windows-11-x64) (requires Windows 11, WSL2 and hardware virtualization), or start with the [common client guide](docs/common-clients.en.md). The project layout is below; installation details and verification boundaries are in [Installation](#installation) and [Verification and removal](#verification-and-removal).
+
 **Primary reasoning and orchestration only:** Astra (or the host-selected primary model) owns planning, scheduling, patch integration and acceptance. Pi subagents author code, tests and implementation repairs. Native workers default to Luna/medium, with explicit low, high or max effort chosen for task complexity. Worker failure never silently falls back to primary coding. This is a host instruction policy, not a mechanism disabling every client's editing tools; see [ownership and failure handling](docs/coordinator-only.en.md) and [worker thinking and delivery budgets](docs/worker-budgets.en.md).
 
 **Subagent supervision heartbeats:** Local timers provide heartbeats without model calls and track execution progress separately; silence never triggers automatic retries. This does not prove remote-model health or automatically wake the primary; see [heartbeat behavior and deployment boundaries](docs/subagent-heartbeat.en.md).
@@ -15,8 +19,6 @@ Sequential-call improvements: `HeadlessBatchEvents` streams per-request phases, 
 New optional feature: official Codex, Claude Code and Antigravity headless primary-host entries, with exact version checks, normalized results, bounded execution and release/local file comparison. Existing Pi routes are unchanged; clients are disabled by default. See the [guide](docs/headless-cli.md#english).
 
 **0.11 persistent code relationships.** `.yhwh/code-graph/index.json` initially covers files, classes, functions and syntax relationships in JS/TS (including JSX/TSX) and Python. Read-only `code_graph` searches relationships and reverse relative-import impact; the host CLI incrementally refreshes by source hash and offers explicit bounded watching. Unresolved calls, syntax errors and stale state are reported; this is not a complete semantic call graph. See [usage, Git management and limits](docs/code-graph.md#english). The maintainer's local Pi has been updated and verified through actual MCP and incremental refresh checks; this feature shipped in v0.11.0.
-
-A private source repository for Kether governance rules and the Pi execution workflow. The primary agent owns intent, authorization, task decomposition, integration and acceptance. Pi provides governed model calls, deterministic LSP, resource limits, result validation and runtime monitoring.
 
 **v0.13.0:** Native Luna workers now use task-proportional thinking (medium by default), with delivery and cleanup budgets, separate thinking/text/tool diagnostics, and Windows plus credential-free test compatibility fixes. Retains sequential calls, heartbeats, code relationships and deterministic probes. Local services need a separate upgrade and performance benefits have not been benchmarked; see [bilingual release notes](docs/release-notes-0.13.0.md).
 
