@@ -2,7 +2,7 @@
 
 [简体中文](provider-configuration.md) | [English](provider-configuration.en.md)
 
-0.7.0 adds an optional aggregator transport layer. Default workers remain `openai-codex / gpt-5.6-luna / max`; default reviewers remain `anthropic / claude-sonnet-5 / max`. Configuration never switches roles automatically or attempts fallback platforms.
+0.7.0 adds an optional aggregator transport layer. Current native workers use `openai-codex / gpt-6-luna` with task-proportional thinking (`medium` by default); default reviewers remain `anthropic / claude-sonnet-5 / max`. Configuration never switches roles automatically or attempts fallback platforms.
 
 ## Platforms and boundaries
 

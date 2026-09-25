@@ -2,7 +2,7 @@
 
 [简体中文](provider-configuration.md) | [English](provider-configuration.en.md)
 
-0.7.0 增加可选的聚合 API 传输层。默认工作者仍为 `openai-codex / gpt-5.6-luna / max`，审查者仍为 `anthropic / claude-sonnet-5 / max`。配置不会自动切换角色，也不会自动尝试备用平台。
+0.7.0 增加可选的聚合 API 传输层。当前原生工作者为 `openai-codex / gpt-6-luna`，按任务选择思考深度（默认 `medium`）；审查者仍为 `anthropic / claude-sonnet-5 / max`。配置不会自动切换角色，也不会自动尝试备用平台。
 
 ## 平台与边界
 

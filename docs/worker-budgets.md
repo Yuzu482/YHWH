@@ -2,7 +2,7 @@
 
 [简体中文](worker-budgets.md) · [English](worker-budgets.en.md)
 
-2026-09-22 用户授权调整原生 OpenAI Codex worker 的固定 Luna/max 策略。模型仍为 `gpt-5.6-luna`；主代理负责选择档位、拆分任务和最终验收，Pi 负责代码与测试编写。Reviewer、聚合 API 路由、文件权限和资源上限保持原有策略。
+2026-09-22 用户授权调整原生 OpenAI Codex worker 的固定 Luna/max 策略。当前原生模型为 `gpt-6-luna`；主代理负责选择档位、拆分任务和最终验收，Pi 负责代码与测试编写。Reviewer、聚合 API 路由、文件权限和资源上限保持原有策略。
 
 | 任务 | 显式 thinking | 使用条件 |
 | --- | --- | --- |

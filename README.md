@@ -6,11 +6,15 @@ YHWH 是面向 Windows 11 + WSL2 的便携式 Kether 治理规则与 Pi 执行�
 
 **快速开始：** 查看[一键安装](#一键安装windows-11-x64)（需 Windows 11、WSL2 与硬件虚拟化），或先读[常见客户端接入](docs/common-clients.md)；项目结构见下方，安装细节与验证边界见[安装](#安装)和[验证与卸载](#验证与卸载)。
 
+**可切换的 worker 硬限制。** 新源码默认在 YHWH 受管入口拒绝非 Luna worker，保留受控 reviewer/心跳例外；独立无头 CLI 模型执行在严格模式下停用。宿主可通过 `YHWH_WORKER_ENFORCEMENT=strict|off` 切换，任务不能覆盖。已有服务需要单独升级；不包含对宿主自身终端/编辑器的操作系统隔离。详见[开关与约束范围](docs/worker-enforcement.md)。
+
 **主代理只负责思考与调度：** Astra（或宿主选择的主模型）负责方案、调度、补丁整合与验收；代码、测试和实现修复由 Pi 子代理编写，原生 worker 默认 Luna/medium，并按任务复杂度显式选择 low、high 或 max。子代理失败不自动回退为主代理编码。该策略是宿主指令约束，不能禁用所有客户端的编辑工具；详见[职责与失败处理](docs/coordinator-only.md)与[思考档位和交付预算](docs/worker-budgets.md)。
 
 **子代理监管心跳：** 本地计时器提供不调用模型的心跳，并单独记录最近执行进度；静默不触发自动重试。它不证明远端模型健康，也不自动唤醒主代理；详见[心跳说明与部署边界](docs/subagent-heartbeat.md)。
 
-**交付诊断（待发布）：** 新增思考、正文、工具事件计数及最近活动时间，帮助解释子代理超时；不保存原始内容，不改变预算或成功判定。现有安装需升级；它不是完成等待接口。详见[诊断字段与证据边界](docs/worker-delivery-diagnostics.md)。
+**协作式小任务包（源码命令行）：** 可将同一目标拆成 2–4 个文件范围互不冲突的 Pi 子任务，共享任务身份并由现有网关并发调度；主代理仍负责结果汇总与验收。查看[使用方法与验证边界](docs/cooperative-runs.md)。
+
+**交付诊断：** 新增思考、正文、工具事件计数及最近活动时间，帮助解释子代理超时；不保存原始内容，不改变预算或成功判定。现有安装需升级；它不是完成等待接口。详见[诊断字段与证据边界](docs/worker-delivery-diagnostics.md)。
 
 连续调用改进：`HeadlessBatchEvents` 实时显示各项阶段、等待状态和结果；会话缓存减少重复文件读取与哈希，保留每次版本检查。整批执行前校验，同会话串行调用，失败即停止；报告缓存命中及分段耗时。详见[操作与验收边界](docs/workflow-operations.md#简体中文)。
 
@@ -18,7 +22,7 @@ YHWH 是面向 Windows 11 + WSL2 的便携式 Kether 治理规则与 Pi 执行�
 
 新增可选特性：Codex、Claude Code、Antigravity 官方 CLI 无头主代理入口，包含版本锁定、统一结果、运行预算和发布/本地文件比对。现有 Pi 路由保持不变，默认不启用客户端。见 [使用说明](docs/headless-cli.md#简体中文)。
 
-**v0.13.0：** 原生 Luna worker 改为按任务选择思考档位（默认 medium），加入交付和清理预算、思考／正文／工具活动诊断，以及 Windows 与无凭据测试兼容性修复。保留此前的连续调用、心跳、关系记忆和确定性探针。本地服务需单独升级，性能收益尚未做对照验证；详见[双语发布说明](docs/release-notes-0.13.0.md)。
+v0.14.0 发布：Luna 支持可切换的严格/关闭执行模式及角色预设，并提供确定性结果提交与类型化交接，便于协作完成小任务；新增 Electron 网关控制台源码，并修复 Windows 安装程序问题。已安装的服务仍需升级；此版本不作量化提速声明。根据用户此前的例外，公开发布门禁仍因固定版 pi-lsp-extension 1.3.0 缺少完整通知且其适用范围未获确认而受阻。详见[发布说明](docs/release-notes-0.14.0.md)。
 
 开发背景、架构演进、关键决策及历史验证边界见 [架构开发历史](docs/architecture-history.md)；对应的脱敏记录见 [历史证据索引](docs/history-evidence.json)。
 
@@ -64,10 +68,10 @@ YHWH 是面向 Windows 11 + WSL2 的便携式 Kether 治理规则与 Pi 执行�
 
 ### 一键安装（Windows 11 x64）
 
-构建后的 `YHWH-OneClick-0.13.0.zip` 包含自包含脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
+构建后的 `YHWH-OneClick-0.14.0.zip` 包含自包含脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1
 ```
 
 默认导出通用 MCP 接入配置，不修改 Codex 全局设置。用 `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"` 选择宿主；包含 `codex` 时才执行原有 Codex 集成。接入文件还需按宿主提示导入，并加载主代理规则；已有配置不会被导出器覆盖。
@@ -82,14 +86,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps
 
 ```powershell
 # 只读预览，不下载、不改宿主
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -PlanOnly
 # 固定目录，免交互安装（WSL 必须已经就绪；账号登录另行完成）
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
 # 仅校验并解包，目标必须是尚不存在的绝对路径
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.13.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-维护者运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/` 同时生成便携 ZIP、自包含 PS1、SHA256 和双击安装包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.13.0.ps1`。
+维护者运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/` 同时生成便携 ZIP、自包含 PS1、SHA256 和双击安装包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.14.0.ps1`。
 
 本版本已做脚本和包级验证，尚未在全新 Windows 虚拟机完成联网全量安装。Windows 与 WSL 的 Pi 使用同一依赖锁文件，但 Ubuntu 软件源、WSL 系统组件和 .NET 安装脚本仍是外部可变依赖；这不是完全离线或逐字节可复现的系统镜像。
 

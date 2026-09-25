@@ -2,7 +2,7 @@
 
 [简体中文](worker-budgets.md) · [English](worker-budgets.en.md)
 
-On 2026-09-22 the user authorized replacing fixed Luna/max thinking for native OpenAI Codex workers. The model remains `gpt-5.6-luna`; the primary chooses effort, decomposes tasks and accepts results, while Pi authors code and tests. Reviewer policy, aggregator API routes, file permissions and resource caps remain unchanged.
+On 2026-09-22 the user authorized replacing fixed Luna/max thinking for native OpenAI Codex workers. The current native model is `gpt-6-luna`; the primary chooses effort, decomposes tasks and accepts results, while Pi authors code and tests. Reviewer policy, aggregator API routes, file permissions and resource caps remain unchanged.
 
 | Task | Explicit thinking | Conditions |
 | --- | --- | --- |

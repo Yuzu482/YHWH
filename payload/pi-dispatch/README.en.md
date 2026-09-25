@@ -16,12 +16,12 @@ The primary can run in any host with MCP tool calling and persistent instruction
 
 Pi is the lower-agent execution, model-probe and LSP layer controlled by Tifereth. The default installation uses stdio; an optional shared runtime uses the local Streamable HTTP MCP endpoint `http://127.0.0.1:17331/mcp`. Model tasks first pass through a Kether execution envelope, then route through an exact allowlist to:
 
-- `openai-codex` (workers: `gpt-5.6-luna` / `max`).
+- `openai-codex` (workers: `gpt-6-luna`, task-proportional thinking with `medium` by default).
 - `anthropic` (Geburah/reviewer: `claude-sonnet-5` / `max`, restricted to `access:none`).
 
 The gateway provides synchronous execution, asynchronous monitoring, model probes and LSP tools. Monitoring uses `submit_subagent`, `get_subagent_status`, `get_subagent_result`, `list_subagents`, `cancel_subagent` and `render_subagent_monitor`. The last tool returns an MCP Apps conversation card that refreshes the task tree by `parentRunId`. Callers cannot supply raw Pi arguments, environment variables or arbitrary tool lists. Pi starts with automatic extension discovery disabled and loads only controlled provider and LSP extensions for the task. Actual provider, model and `toolsUsed` are returned for Tifereth's acceptance checks.
 
-`result-format-validator` deterministically validates ordinary model subagent output without another model call. A lower agent must return only `KETHER_RESULT_JSON=<JSON object>`. JSON keys must match the v2 role result schema; requests normally omit `returnFields` so the gateway selects the complete role schema. `status` is restricted to `completed / failed / blocked / unverified`. Extra prose, Markdown fences, missing or additional fields, invalid JSON, output over 512 KiB, or structures exceeding 12 levels or 4096 nodes produce `result_format_invalid`. Validated objects appear in `structuredResult`, with a summary in `formatValidation`. A format failure is a Netzach result-quality failure and does not open the provider circuit. Model heartbeats continue to use exact plain-text tokens rather than this format.
+WSL Kether JSON tasks using `read` or `workspace-write` submit results through the controlled `yhwh_submit_result` extension. It accepts a payload object and returns marked canonical `KETHER_RESULT_JSON=` text through a genuine tool event. The gateway requires exactly one submission, replaces the assistant's final text with the canonical text, and deterministically validates exact `returnFields` and the v2 role schema with the existing `result-format-validator`; no model translation is involved. The prompt tells a tool-enabled worker to submit once and then acknowledge briefly. Missing, malformed or multiple submissions fail closed, even if final assistant text resembles the legacy envelope. Roles without tool access (including the Claude reviewer) retain the legacy single-line final envelope. Plain-text probes are unchanged. Validation failures remain Netzach result-quality failures and do not open the provider circuit. The validator continues to enforce the four status values, exact fields, the 512 KiB result limit, 12-level depth and 4096-node limit. For legacy envelopes only, one safe preface line may be recovered; duplicate envelopes, trailing text and invalid JSON still fail. Accepted objects appear in `structuredResult`, with a summary in `formatValidation`.
 
 For each admitted call, the audit extension appends a JSONL record containing `requestId`, task-envelope SHA-256 and structural counts, requested and actual provider/model, tool-call counts, duration, token usage, patch hash/size/file/line summaries, and redacted failure reasons. Audit records exclude raw tasks, model replies, diagnostic text and patch bodies. Bearer credentials, API keys, tokens, passwords, private keys, JWTs and URL credentials are removed before writing. When permitted to omit `requestId`, the caller receives a gateway-generated ID in the response.
 
@@ -73,8 +73,8 @@ Standalone read-only example, which does not attest a complete stage chain. For 
   "priority": 5,
   "cwd": "D:\\Projects\\Example",
   "provider": "openai-codex",
-  "model": "gpt-5.6-luna",
-  "thinking": "max",
+  "model": "gpt-6-luna",
+  "thinking": "medium",
   "access": "read",
   "resourceProfile": "standard",
   "timeoutSeconds": 180,

@@ -17,3 +17,5 @@ Record each implementation requestId, role/model, outcome, patch scope, verifica
 The primary follows this as an instruction policy. Pi sandbox and contract checks govern Pi calls; they cannot disable every host client's own editing tools. Portable templates, skills and workflow catalog carry the policy; existing hosts need corresponding policy synchronization. Repository changes do not mean the running Pi service has been upgraded and do not authorize publishing or pushing.
 
 See the complete [coordinator-only policy](../templates/agent-references/coordinator-only.md).
+
+Development source additionally provides default-on, host-switchable [worker runtime enforcement](worker-enforcement.en.md). It rejects disallowed routes at YHWH-managed entry points; external primary-client tool permissions remain outside that boundary. Existing services require a separate upgrade for enforcement to take effect.

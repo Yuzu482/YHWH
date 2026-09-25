@@ -16,12 +16,12 @@
 
 Pi 作为受 Tifereth 控制的下级 Agent 执行层、模型探针层和 LSP 层。默认安装使用 stdio；可选共享运行时使用本机 Streamable HTTP MCP 端点 `http://127.0.0.1:17331/mcp`。模型任务先经过 Kether 运行信封，再按精确 allowlist 路由到：
 
-- `openai-codex`（worker：`gpt-5.6-luna` / `max`）
+- `openai-codex`（worker：`gpt-6-luna`，按任务选择思考深度，默认 `medium`）
 - `anthropic`（Geburah/reviewer：`claude-sonnet-5` / `max`，仅限 `access:none`）
 
 网关提供同步执行、异步监控、模型探针和 LSP 工具。监控路径使用 `submit_subagent`、`get_subagent_status`、`get_subagent_result`、`list_subagents`、`cancel_subagent` 和 `render_subagent_monitor`；最后一个工具返回 MCP Apps 对话内卡片，按 `parentRunId` 自动刷新任务树。调用方不能提交原始 Pi 参数、环境变量或自由工具列表；Pi 启动时禁用自动扩展发现，只按任务加载受控 provider 与 LSP extension。实际响应中的 provider、model 和 `toolsUsed` 会返回给 Tifereth 验收。
 
-`result-format-validator` 对普通模型子 Agent 的最终文本执行确定性验证，不调用模型。下级 Agent 必须只返回 `KETHER_RESULT_JSON=<JSON object>`；JSON 键必须符合 v2 角色结果结构；请求通常省略 `returnFields`，由网关选用完整角色结构，`status` 只能是 `completed / failed / blocked / unverified`。额外说明、Markdown 围栏、缺失或多余字段、无效 JSON、超过 512 KiB、超过 12 层或 4096 个节点都会返回 `result_format_invalid`。验证通过的对象放在响应的 `structuredResult`，验证摘要放在 `formatValidation`。格式失败属于 Netzach 结果质量失败，不会打开 Provider 熔断。模型心跳继续使用精确纯文本令牌，不套用该格式。
+WSL Kether 的 `read` 与 `workspace-write` JSON 任务由受控扩展 `yhwh_submit_result` 提交结果：工具接受 payload 对象，并通过真实工具事件返回带标记的规范 `KETHER_RESULT_JSON=` 文本；网关要求恰好一次提交，将最终文本替换为规范文本，并用现有 `result-format-validator` 对精确 `returnFields` 和 v2 角色结构作确定性验证，不调用模型翻译。提示要求启用该工具的 worker 提交一次，随后简短确认。缺失、格式错误或多次提交均失败关闭，即使助手最终文本看似旧格式信封也不接受。此流程仅适用于 WSL Kether 的 read / workspace-write JSON 任务；无工具访问角色（包括 Claude reviewer）仍须以单行旧式信封作为最终文本。纯文本探针不变。验证失败仍属于 Netzach 结果质量失败，不会打开 Provider 熔断。 验证器继续限制四种 status、精确字段、512 KiB 结果大小、12 层深度和 4096 个节点。仅旧式信封可以恢复一行安全的前置说明；重复信封、尾随文本与无效 JSON 仍然失败。通过的对象放在 `structuredResult`，验证摘要放在 `formatValidation`。
 
 审计扩展对每次已接纳调用追加一条 JSONL 记录，包含 `requestId`、任务信封 SHA-256 与结构计数、请求和实际 provider/model、工具调用计数、耗时、token 统计、补丁哈希/大小/文件与行数摘要，以及脱敏后的失败原因。审计记录不保存原始任务、模型回复、诊断文本或补丁正文；Bearer、API key、token、密码、私钥、JWT 和 URL 凭据会在写入前清除。未提供 `requestId` 时网关会生成一个并随响应返回。
 
@@ -73,8 +73,8 @@ Tifereth 是唯一的任务分解和派发决策层。每次 `dispatch_subagent`
   "priority": 5,
   "cwd": "D:\\Projects\\Example",
   "provider": "openai-codex",
-  "model": "gpt-5.6-luna",
-  "thinking": "max",
+  "model": "gpt-6-luna",
+  "thinking": "medium",
   "access": "read",
   "resourceProfile": "standard",
   "timeoutSeconds": 180,
