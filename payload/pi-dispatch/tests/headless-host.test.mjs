@@ -9,6 +9,16 @@ import { adapters, invocation, parseResult } from '../scripts/headless-adapters.
 import { doctor, fingerprint, resolveWorkspace, runHeadless, runProcess, validateConfig, createHeadlessSession, classifyFailure, runHeadlessBatch } from '../scripts/headless-host.mjs';
 import { acceptHeadless } from '../scripts/headless-acceptance.mjs';
 
+let previousWorkerEnforcement;
+test.beforeEach(() => {
+  previousWorkerEnforcement = process.env.YHWH_WORKER_ENFORCEMENT;
+  process.env.YHWH_WORKER_ENFORCEMENT = 'off';
+});
+test.afterEach(() => {
+  if (previousWorkerEnforcement === undefined) delete process.env.YHWH_WORKER_ENFORCEMENT;
+  else process.env.YHWH_WORKER_ENFORCEMENT = previousWorkerEnforcement;
+});
+
 function fixture(t, { behavior = 'success', client = 'codex', delayMs = 0 } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yhwh-headless-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -155,7 +165,7 @@ test('warm calls avoid file reads but still recheck versions; clear and TTL forc
   assert(first.evidence.digestCache.bytesRead >= fs.statSync(process.execPath).size);
   assert.equal(first.evidence.digestCache.hits, 0);
   assert.equal(second.evidence.digestCache.bytesRead, 0);
-  assert.equal(second.evidence.digestCache.hits, 8);
+  assert.equal(second.evidence.digestCache.hits, 10);
   assert.deepEqual(fs.readFileSync(path.join(f.root, 'calls.log'), 'utf8').trim().split('\n'), ['version','help','run','version','run']);
   session.clear();
   const fresh = await session.run(f.config, f.request);
@@ -206,7 +216,7 @@ test('batch events arrive before completion, heartbeat during silence, and summa
   assert.equal(result.status, 'completed'); assert.equal(result.notRun, 0);
   assert(events.some(e => e.type === 'waiting' && e.phase === 'running'));
   assert(events.every(e => e.count === 2 && e.batchElapsedMs >= 0));
-  assert.equal(result.summary.helpCacheHits, 1); assert.equal(result.summary.digestCacheHits, 8);
+  assert.equal(result.summary.helpCacheHits, 1); assert.equal(result.summary.digestCacheHits, 10);
   assert.equal(result.summary.digestBytesRead, result.results[0].evidence.digestCache.bytesRead);
   assert.doesNotMatch(JSON.stringify(events.filter(e => e.type !== 'request-result')), /untrusted|User task|literal/);
 });

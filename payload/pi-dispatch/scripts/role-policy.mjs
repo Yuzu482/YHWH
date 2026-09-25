@@ -1,7 +1,7 @@
 import { API_PROVIDERS, configuredRoute } from './controlled-provider.mjs';
 export const ROLE_MODELS = Object.freeze({
-  Yesod: 'gpt-5.6-luna', Binah: 'gpt-5.6-luna', Malkuth: 'gpt-5.6-luna',
-  Hod: 'gpt-5.6-luna', Chochmah: 'gpt-5.6-luna', Chesed: 'gpt-5.6-luna', Netzach: 'gpt-5.6-luna',
+  Yesod: 'gpt-6-luna', Binah: 'gpt-6-luna', Malkuth: 'gpt-6-luna',
+  Hod: 'gpt-6-luna', Chochmah: 'gpt-6-luna', Chesed: 'gpt-6-luna', Netzach: 'gpt-6-luna',
   Geburah: 'claude-sonnet-5',
 });
 export const ROLE_ALIASES = Object.freeze({worker:'Chesed',researcher:'Malkuth',reviewer:'Geburah'});
@@ -12,7 +12,7 @@ export function resolveRoleModel(role, requestedModel, requestedProvider) {
   if (API_PROVIDERS.includes(requestedProvider)) {
     const route=configuredRoute(requestedProvider);
     const expected=canonical==='Geburah'?'yhwh-reviewer-api':'yhwh-worker-api';
-    if (!route || requestedProvider!==expected || route.semanticModel!==ROLE_MODELS[canonical]) throw new Error('Controlled API role binding rejected');
+    if (!route || requestedProvider!==expected || (route.semanticModel!==ROLE_MODELS[canonical] && !(requestedProvider==='yhwh-worker-api' && canonical!=='Geburah' && route.semanticModel==='gpt-5.6-luna'))) throw new Error('Controlled API role binding rejected');
     if (requestedModel!==undefined && requestedModel!==route.model) throw new Error('Controlled API model binding rejected');
     return {role:canonical,provider:requestedProvider,model:route.model};
   }

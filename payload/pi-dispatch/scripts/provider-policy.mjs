@@ -2,13 +2,14 @@ import { API_PROVIDERS, loadProviderConfig, providerPolicy, PLATFORM_PROFILES } 
 import { existsSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getWorkerEnforcementStatus } from './worker-enforcement.mjs';
 
 export const PROVIDER_POLICY = Object.freeze({
   'anthropic': Object.freeze({defaultModel:'claude-sonnet-5',defaultThinking:'max',models:Object.freeze(['claude-sonnet-5'])}),
   'openai-codex': Object.freeze({
-    defaultModel: 'gpt-5.6-luna',
+    defaultModel: 'gpt-6-luna',
     defaultThinking: 'medium',
-    models: Object.freeze(['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra']),
+    models: Object.freeze(['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-luna', 'gpt-6-sol']),
   }),
 
 });
@@ -50,6 +51,8 @@ export function resolveControlledExtensions(provider, access, env = process.env,
 export function publicCapabilities() {
   const config=loadProviderConfig();
   return {
+    workerEnforcement: getWorkerEnforcementStatus(),
+    providerCatalog: { purpose:'discovery/probe list; listed models are not implicitly worker-authorized' },
     controlledApi: { configuration:'host-only', atRestEncryption:'Windows DPAPI CurrentUser', credentialTransport:'private stdin frame -> kernel pipe FD3', plaintextFallback:false, platforms:PLATFORM_PROFILES, configured:config.routes, automaticFallback:false, capabilityEvidence:'operator-declared; live verification required', pricing:'not estimated' },
     providers: Object.fromEntries(Object.entries({...PROVIDER_POLICY, ...Object.fromEntries(Object.keys(config.routes).map(p=>[p,providerPolicy(p,config)]))}).map(([provider, policy]) => [provider, {
       defaultModel: policy.defaultModel,

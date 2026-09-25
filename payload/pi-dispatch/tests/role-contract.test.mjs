@@ -32,6 +32,31 @@ test('handoffs reject skipped stages, wrong roles, duplicate inputs and undeclar
   assert.throws(()=>prepareHandoff({role:'Chesed'},{dependsOnRequestIds:['x']},'root',{}),/explicit typed handoff/);
 });
 
+test('v2 handoffs bind goal and acceptance, version, run and phase; only approved post-review advances a phase',()=>{
+  const cwd='workspace-v2';
+  const reviewTask={role:'Geburah',reviewPacket:{stage:'post-change'},handoff:{version:2,stage:'post-review',runGoal:'Ship feature',runAcceptance:['works'],phaseIndex:1,inputs:[ref('verify','Netzach','verifying')]}};
+  const verifying={version:2,mode:'linked',parentRunId:'run-v2',workspaceSha256:'',resultSha256:'',role:'Netzach',stage:'verifying',handoffVersion:2,runAnchorSha256:'',phaseIndex:1};
+  const reviewContract=completedContract(reviewTask,{parentRunId:'run-v2'},cwd,roleValue('Geburah'));
+  const scouted={role:'Malkuth',handoff:{version:2,stage:'scouted',runGoal:'Ship feature',runAcceptance:['works'],phaseIndex:2,inputs:[ref('review','Geburah','post-review',reviewContract.resultSha256)]}};
+  const input={requestId:'scout-2',parentRunId:'run-v2',dependsOnRequestIds:['review']};
+  const ledgerFor=contract=>({enabled:true,getOutcome:id=>({state:'completed',contract:id==='review'?contract:verifying})});
+  assert.equal(prepareHandoff(scouted,input,cwd,ledgerFor(reviewContract))(),true);
+  const mismatch={...scouted,handoff:{...scouted.handoff,runGoal:'Other goal'}};
+  assert.throws(()=>prepareHandoff(mismatch,input,cwd,ledgerFor(reviewContract))(),/Predecessor contract/);
+  const v1={...scouted,handoff:{...scouted.handoff,version:1}};
+  assert.throws(()=>validateHandoff(v1.handoff,v1),/Invalid/);
+  for (const bad of [
+    {...reviewContract,parentRunId:'other-run'},
+    {...reviewContract,phaseIndex:2},
+    {...reviewContract,runAnchorSha256:'f'.repeat(64)},
+    {...reviewContract,reviewDecision:'request-changes'},
+  ]) assert.throws(()=>prepareHandoff(scouted,input,cwd,ledgerFor(bad))(),/Predecessor contract/);
+  const skipped={...scouted,handoff:{...scouted.handoff,inputs:[ref('planned','Chochmah','planned')]}};
+  assert.throws(()=>validateHandoff(skipped,skipped),/Invalid/);
+  const bypass={...scouted,handoff:{...scouted.handoff,phaseIndex:3,inputs:[ref('review','Geburah','post-review',reviewContract.resultSha256)]}};
+  assert.throws(()=>prepareHandoff(bypass,input,cwd,ledgerFor(reviewContract))(),/Predecessor contract/);
+});
+
 test('persisted upstream contracts bind role, stage, run, workspace, digest and actual sanitized content',()=>{
   const dir=mkdtempSync(join(tmpdir(),'pi-handoff-'));
   try {

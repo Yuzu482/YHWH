@@ -230,6 +230,8 @@ if ($installWsl) {
     (Join-Path $pluginTarget 'extensions\write-scope-guard.js')='/tmp/pi-kether-install/write-scope-guard.js'
     (Join-Path $pluginTarget 'extensions\auth-scrub.js')='/tmp/pi-kether-install/auth-scrub.js'
     (Join-Path $pluginTarget 'extensions\read-scope-guard.js')='/tmp/pi-kether-install/read-scope-guard.js'
+    (Join-Path $payload 'pi-dispatch\extensions\role-presets.js')='/tmp/pi-kether-install/role-presets.js'
+    (Join-Path $payload 'pi-dispatch\extensions\result-submit.js')='/tmp/pi-kether-install/result-submit.js'
     (Join-Path $pluginTarget 'scripts\snapshot-scope.py')='/tmp/pi-kether-install/snapshot-scope.py'
     (Join-Path $pluginTarget 'scripts\lsp-result.mjs')='/tmp/pi-kether-install/lsp-result.mjs'
     (Join-Path $pluginTarget 'scripts\prepare-credentials.mjs')='/tmp/pi-kether-install/prepare-credentials.mjs'

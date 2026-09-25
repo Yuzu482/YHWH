@@ -42,10 +42,41 @@ export function validateKetherResult(text, expectedFields) {
   if (!trimmed.startsWith(RESULT_PREFIX)) return invalid('missing_prefix', `agent output must start with ${RESULT_PREFIX}`, expectedFields);
   const payload = trimmed.slice(RESULT_PREFIX.length);
   let value;
-  try { value = JSON.parse(payload); } catch (error) { return invalid('invalid_json', `result payload is not valid JSON: ${error.message}`, expectedFields); }
+  try { value = JSON.parse(payload); } catch (error) {
+    const message = typeof error?.message === 'string' ? error.message : '';
+    const offsetMatch = message.match(/\bposition (\d+)\b/i);
+    const offset = offsetMatch ? Number(offsetMatch[1]) : null;
+    let category = 'syntax_error/unknown';
+    if (offset !== null && offset >= payload.length) category = 'incomplete';
+    else if (/unexpected end|unterminated|end of JSON input/i.test(message)) category = 'incomplete';
+    else if (offset !== null && /unexpected non-whitespace character/i.test(message)) category = 'trailing_data';
+    return {
+      ...invalid('invalid_json', 'result payload is not valid JSON', expectedFields),
+      diagnostic: { category, categoryIsHeuristic: true, payloadLength: payload.length, parseErrorOffset: offset },
+    };
+  }
   return validateShape(value, expectedFields);
 }
 
+export function recoverPrefacedKetherResult(text, expectedFields) {
+  if (typeof text !== 'string' || !text) return null;
+  if (Buffer.byteLength(text, 'utf8') > MAX_RESULT_BYTES) return null;
+  const newline = text.indexOf('\n');
+  if (newline === -1) return null;
+  let preface = text.slice(0, newline);
+  if (preface.endsWith('\r')) preface = preface.slice(0, -1);
+  if (!preface || Buffer.byteLength(preface, 'utf8') > 256 || /[\u0000-\u001f\u007f-\u009f]/.test(preface)) return null;
+  const envelope = text.slice(newline + 1);
+  if (!envelope.startsWith(RESULT_PREFIX)) return null;
+  if (text.indexOf(RESULT_PREFIX) !== text.lastIndexOf(RESULT_PREFIX)) return null;
+  let validation;
+  try { validation = validateKetherResult(envelope, expectedFields); } catch { return null; }
+  if (!validation.ok) return null;
+  return { canonicalText: RESULT_PREFIX + JSON.stringify(validation.value), validation };
+}
+
 export function publicFormatValidation(value) {
-  return { ok: value.ok, code: value.code, message: value.message, expectedFields: value.expectedFields };
+  const result = { ok: value.ok, code: value.code, message: value.message, expectedFields: value.expectedFields };
+  if (value.code === 'invalid_json' && value.diagnostic) result.diagnostic = { ...value.diagnostic };
+  return result;
 }

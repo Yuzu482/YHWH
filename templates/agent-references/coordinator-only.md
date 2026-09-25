@@ -1,6 +1,6 @@
 # Coordinator-only primary execution
 
-The user's selected primary model (Astra on this host) owns reasoning, requirements, architecture, decomposition, scheduling, evidence review, integration decisions and final acceptance. Actual implementation is delegated to Pi subagents, normally `openai-codex / gpt-5.6-luna` as Chesed with task-proportional thinking (medium by default; see pi-routing). This rule takes precedence over older instructions to keep simple coding local, fix worker output directly, or implement locally when Pi is unavailable. It does not change higher-priority host permissions or reviewer role bindings.
+The user's selected primary model (Astra on this host) owns reasoning, requirements, architecture, decomposition, scheduling, evidence review, integration decisions and final acceptance. Actual implementation is delegated to Pi subagents, normally `openai-codex / gpt-6-luna` as Chesed with task-proportional thinking (medium by default; see pi-routing). This rule takes precedence over older instructions to keep simple coding local, fix worker output directly, or implement locally when Pi is unavailable. It does not change higher-priority host permissions or reviewer role bindings.
 
 ## Ownership
 

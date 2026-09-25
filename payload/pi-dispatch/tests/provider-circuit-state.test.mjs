@@ -25,6 +25,23 @@ test('unsupported account model opens immediately and never records success', ()
   assert.equal(classifyProviderResult({provider,model,requestedProvider:provider,requestedModel:model,ok:false,failure:'Unhandled provider failure'}).healthy,false);
 });
 
+test('a completed model response overrides a nonfatal custom-model warning', () => {
+  const circuit = createMemoryProviderCircuitState();
+  const matched = { provider, model, requestedProvider: provider, requestedModel: model };
+  circuit.record({ provider, model, healthy: false, category: 'model_unavailable', probe: true });
+  const assessment = classifyProviderResult({
+    ...matched, ok: true, exitCode: 0, failure: null,
+    diagnostics: `Warning: Model "${model}" not found for provider "${provider}". Using custom model id.`,
+  });
+  assert.deepEqual(assessment, { healthy: true, category: 'provider_reachable', impact: true });
+  assert.deepEqual(classifyProviderResult({
+    ...matched, ok: false, exitCode: 10, failure: null,
+    diagnostics: `Warning: Model "${model}" not found for provider "${provider}". Using custom model id.`,
+  }), assessment);
+  circuit.record({ provider, model, ...assessment, probe: true, heartbeatPassed: true });
+  assert.equal(circuit.state(provider, model).state, 'closed');
+});
+
 test('authentication opens indefinitely and needs an explicit recovery probe', () => {
   let now = 1_700_000_000_000;
   const circuit = createMemoryProviderCircuitState({ clock: () => now });

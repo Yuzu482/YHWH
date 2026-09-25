@@ -12,12 +12,17 @@ import { DEFAULT_RESOURCE_PROFILE, resolveResourceLimits } from '../extensions/r
 import { PROVIDER_POLICY, resolveControlledExtensions, validateRoute } from './provider-policy.mjs';
 import { runWslSandbox, sandboxRequested } from './wsl-sandbox.mjs';
 import { resolveRoleModel } from './role-policy.mjs';
+import { validateRoleAccess } from './role-presets.mjs';
 import { requireReviewMaterials } from '../extensions/review-contract.js';
 import { calculateExecutionBudget } from '../extensions/execution-budget.js';
+import { editorRouteAllowed, enforceWorkerExecution, isReviewerRoute } from './worker-enforcement.mjs';
 
 const safeFlags = ['--offline', '--no-approve', '--no-skills', '--no-prompt-templates', '--no-context-files', '--no-themes', '--no-extensions'];
 const readTools = ['read', 'grep', 'find', 'ls'];
 const lspReadTools = ['lsp_diagnostics', 'lsp_hover', 'lsp_definition', 'lsp_references', 'lsp_symbols', 'lsp_rename', 'lsp_completions', 'lsp_code_actions', 'code_overview', 'ast_search'];
+const wslLspTools = ['diagnostics','hover','definition','references','symbols','completions','code_actions'].map(m => `yhwh_lsp_${m}`);
+const rolePresetExtension = '/opt/pi-kether/extensions/role-presets.js';
+const resultSubmitExtension = '/opt/pi-kether/extensions/result-submit.js';
 
 // Invoke Node entrypoints, never npm's .cmd shim or a shell containing user text.
 export function findPiEntry(env = process.env) {
@@ -42,7 +47,7 @@ export function findPiEntry(env = process.env) {
   throw new Error('pi npm entry not found. Set PI_DISPATCH_PI_ENTRY to its absolute JavaScript entrypoint.');
 }
 
-export function validateRequest(value, allowWrite = false, launchRoot = process.cwd()) {
+export function validateRequest(value, allowWrite = false, launchRoot = process.cwd(), { reviewerValidated = false, probe = false, probeToken, probeApproved = false, task } = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Request must be an object');
   const allowed = new Set(['target', 'cwd', 'provider', 'model', 'prompt', 'access', 'thinking', 'timeoutSeconds', 'resourceProfile']);
   for (const key of Object.keys(value)) if (!allowed.has(key)) throw new Error(`Unknown request key: ${key}`);
@@ -61,6 +66,7 @@ export function validateRequest(value, allowWrite = false, launchRoot = process.
   for (const key of ['provider', 'model']) if (request[key] !== undefined && (typeof request[key] !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._/:+@-]{0,199}$/.test(request[key]))) throw new Error(`Invalid ${key}`);
   if (!request.provider || !request.model) throw new Error('Model tasks require explicit provider and model from models output');
   const policy = validateRoute(request.provider, request.model);
+  enforceWorkerExecution({ provider: request.provider, model: request.model, access: request.access, reviewerValidated, probe, probeToken, probeApproved, task });
   if (request.thinking === undefined) request.thinking = policy.defaultThinking;
   if (['anthropic','yhwh-reviewer-api'].includes(request.provider) && request.access !== 'none') throw new Error('Claude review requires none access');
   if (request.thinking !== undefined && !['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(request.thinking)) throw new Error('Invalid thinking');
@@ -80,13 +86,14 @@ function isWithinRoot(candidate, root) {
   return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
 }
 
-export function validateKetherInvocation(value, allowWrite = false, launchRoot = process.cwd(), { probe = false } = {}) {
+export function validateKetherInvocation(value, allowWrite = false, launchRoot = process.cwd(), { probe = false, probeToken } = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Kether invocation must be an object');
   const allowed = new Set(['cwd', 'access', 'provider', 'model', 'thinking', 'timeoutSeconds', 'resourceProfile', 'task']);
   for (const key of Object.keys(value)) if (!allowed.has(key)) throw new Error(`Unknown Kether invocation key: ${key}`);
   const task = validateKetherTask(value.task);
   if (!task.acceptance.length) throw new Error('Kether tasks require explicit acceptance criteria');
   const access = value.access ?? 'none';
+  if (!probe) validateRoleAccess(task.role, access);
   if (access === 'read' && !task.readScope.length) throw new Error('read access requires explicit readScope');
   if (access === 'none' && (task.readScope.length || task.writeScope.length)) throw new Error('none access cannot declare file scopes');
   for (const entry of task.readScope) compileWriteScope([entry]);
@@ -110,7 +117,8 @@ export function validateKetherInvocation(value, allowWrite = false, launchRoot =
     prompt: 'compiled-by-kether-envelope',
     timeoutSeconds: value.timeoutSeconds,
     resourceProfile: value.resourceProfile ?? DEFAULT_RESOURCE_PROFILE,
-  }, allowWrite, launchRoot);
+  }, allowWrite, launchRoot, { reviewerValidated: !probe && task.role === 'Geburah' && access === 'none', probe, probeToken, probeApproved: probe && policy.models.includes(roleRoute.model), task });
+  if (!probe) request.rolePresetId = validateRoleAccess(task.role, access).id;
   return { request, task };
 }
 
@@ -155,10 +163,21 @@ export function runProcess(entry, args, { cwd, input = '', timeoutSeconds = 180,
   });
 }
 
-export function buildPiArgs(request, runtime = 'host', editorAuthorized = false) {
+export function buildPiArgs(request, runtime = 'host', editorAuthorized = false, structuredResultTool = false) {
   const args = [...safeFlags, '--print', '--mode', 'json', '--no-session'];
+  let preset;
+  if (request.rolePresetId !== undefined) {
+    if (runtime !== 'wsl2') throw new Error('Role presets require WSL2');
+    preset = validateRoleAccess(request.rolePresetId, request.access);
+    if (preset.id !== request.rolePresetId) throw new Error('Invalid role preset identity');
+    args.push('--extension', rolePresetExtension, '--yhwh-role-preset', preset.id);
+  }
   for (const extension of resolveControlledExtensions(request.provider, request.access, process.env, runtime)) args.push('--extension', extension);
   if (runtime === 'wsl2') args.push('--extension', '/opt/pi-kether/extensions/auth-scrub.js');
+  if (structuredResultTool) {
+    if (runtime !== 'wsl2' || request.access === 'none') throw new Error('Structured result tool requires WSL2 read or workspace-write access');
+    args.push('--extension', resultSubmitExtension);
+  }
   args.push('--provider', request.provider, '--model', request.model);
   if (request.thinking) args.push('--thinking', request.thinking);
   if (API_PROVIDERS.includes(request.provider)) {
@@ -174,7 +193,15 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false)
     const tools = request.access === 'none' ? [] : request.access === 'read'
       ? [...readTools, ...(runtime === 'wsl2' ? [] : lspReadTools)]
       : [...readTools, ...(runtime === 'wsl2' ? [] : lspReadTools), 'edit', 'write', ...(runtime === 'wsl2' ? [] : ['code_rewrite'])];
-    if (runtime === 'wsl2' && request.access !== 'none') tools.push(...['diagnostics','hover','definition','references','symbols','completions','code_actions'].map(m=>'yhwh_lsp_'+m));
+    if (runtime === 'wsl2' && request.access !== 'none') tools.push(...wslLspTools);
+    if (structuredResultTool) tools.push('yhwh_submit_result');
+    if (preset) {
+      const ceiling = new Set(preset.toolCeilings[request.access]);
+      const bounded = tools.filter(tool => ceiling.has(tool));
+      if (editorAuthorized) bounded.push('pi_editor_execute');
+      args.push('--tools', bounded.join(','));
+      return args;
+    }
     if(editorAuthorized)tools.push('pi_editor_execute');
     args.push('--tools', tools.join(','));
   }
@@ -193,6 +220,28 @@ export function eventsFrom(text) {
   return text.split(/\r?\n/).flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });
 }
 
+function canonicalResultJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalResultJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalResultJson(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
+
+function resultSubmissionFrom(events) {
+  const matching = events.filter(event => event.type === 'tool_execution_end' && event.toolName === 'yhwh_submit_result');
+  if (matching.length !== 1) return { ok: false, code: matching.length ? 'RESULT_SUBMISSION_MULTIPLE' : 'RESULT_SUBMISSION_MISSING' };
+  const details = matching[0].result?.details ?? matching[0].details;
+  const canonicalText = details?.type === 'kether_result_submission' ? details.canonicalText : null;
+  if (typeof canonicalText !== 'string' || !canonicalText.startsWith('KETHER_RESULT_JSON=')) return { ok: false, code: 'RESULT_SUBMISSION_MALFORMED' };
+  try {
+    const payloadText = canonicalText.slice('KETHER_RESULT_JSON='.length);
+    const payload = JSON.parse(payloadText);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload) || canonicalResultJson(payload) !== payloadText) return { ok: false, code: 'RESULT_SUBMISSION_MALFORMED' };
+    return { ok: true, canonicalText };
+  } catch {
+    return { ok: false, code: 'RESULT_SUBMISSION_MALFORMED' };
+  }
+}
+
 export function summarize(raw, request) {
   const events = eventsFrom(raw.stdout);
   const messages = events.filter(event => event.type === 'message_end' && event.message?.role === 'assistant').map(event => event.message);
@@ -206,11 +255,28 @@ export function summarize(raw, request) {
   const actualModel = last?.model;
   const failureCode=raw.exitCode===4&&!last?raw.stderr.match(/^PI_(?:AUTH_(?:MISSING|INVALID|EXPIRED|INELIGIBLE)|CREDENTIAL_PREPARE_FAILED)$/m)?.[0]:undefined;
   const routeMismatch = !!last && (actualProvider !== request.provider || actualModel !== request.model);
-  return { ...(request.configuredTransport?{configuredTransport:request.configuredTransport}:{}), target: request.target, provider: actualProvider, model: actualModel, requestedProvider: request.provider, requestedModel: request.model, ok: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && toolErrors === 0 && !routeMismatch, exitCode: raw.exitCode, failureCode, failure: raw.failure || failureCode || errors.join('; ') || (!last || !complete ? 'Missing complete assistant response' : toolErrors ? 'Tool execution failed' : routeMismatch ? 'Provider/model mismatch in Pi response' : null), text: (last?.content || []).filter(part => part.type === 'text').map(part => part.text).join('\n'), usage: last?.usage, toolsUsed, toolErrors, diagnostics: raw.stderr.slice(-6000), sandbox: raw.sandbox, cleanup: raw.cleanup, patch: raw.patch };
+  return { ...(request.resultSubmissionRequired ? { resultSubmission: resultSubmissionFrom(events) } : {}), ...(request.configuredTransport?{configuredTransport:request.configuredTransport}:{}), target: request.target, provider: actualProvider, model: actualModel, requestedProvider: request.provider, requestedModel: request.model, ok: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && toolErrors === 0 && !routeMismatch, exitCode: raw.exitCode, failureCode, failure: raw.failure || failureCode || errors.join('; ') || (!last || !complete ? 'Missing complete assistant response' : toolErrors ? 'Tool execution failed' : routeMismatch ? 'Provider/model mismatch in Pi response' : null), text: (last?.content || []).filter(part => part.type === 'text').map(part => part.text).join('\n'), usage: last?.usage, toolsUsed, toolErrors, diagnostics: raw.stderr.slice(-6000), sandbox: raw.sandbox, cleanup: raw.cleanup, patch: raw.patch };
 }
 
-export async function dispatch(request, signal, task = null, { resultFormat = 'json', onProgress, upstreamResults=[], editorBroker=null } = {}) {
+export async function dispatch(request, signal, task = null, { resultFormat = 'json', onProgress, upstreamResults=[], editorBroker=null, probe = false, probeToken } = {}) {
   const dispatchStarted = performance.now();
+  const structuredResultTool = !!task && resultFormat === 'json' && !probe && request.access !== 'none';
+  if (editorBroker && (!editorRouteAllowed(request.provider, request.model) || probe)) throw Object.assign(new Error('Editor proxy is restricted to the native Luna worker route'), { code: 'YHWH_EDITOR_ROUTE_REJECTED' });
+  let reviewerValidated = false;
+  if (!probe && isReviewerRoute(request.provider, request.model) && task && request.access === 'none') {
+    const normalizedTask = validateKetherTask(task);
+    if (normalizedTask.readScope?.length || normalizedTask.writeScope?.length) throw new Error('none access cannot declare file scopes');
+    const roleRoute = resolveRoleModel(normalizedTask.role, request.model, request.provider);
+    const reviewerTask = { ...normalizedTask, role: roleRoute.role };
+    requireRoleFields(reviewerTask);
+    requireReviewMaterials(reviewerTask);
+    reviewerValidated = roleRoute.role === 'Geburah';
+  }
+  let probeApproved = false;
+  if (probe) {
+    try { validateRoute(request.provider, request.model); probeApproved = true; } catch { /* Gate below rejects unapproved probe routes. */ }
+  }
+  enforceWorkerExecution({ provider: request.provider, model: request.model, access: request.access, reviewerValidated, probe, probeToken, probeApproved, task });
   if (process.env.PI_DISPATCH_ACTIVE === '1') throw new Error('Recursive Pi dispatch is disabled');
   if (!sandboxRequested(process.env)) throw new Error('Pi task execution requires the verified WSL2 resource sandbox');
   let authentication;
@@ -223,11 +289,11 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
       if(request.provider==='openai-codex')authentication=await ensureOpenAIAuth({piEntry:findPiEntry(),signal,minimumValidityMs:request.timeoutSeconds*1000+360000});
       else {apiPacket=await prepareWindowsApiPacket(request,{signal});authentication={ok:true,authentication:'api_key',atRestEncryption:'Windows DPAPI CurrentUser',networkValidated:false};}
     }
-    catch(error){return {ok:false,target:request.target,requestedProvider:request.provider,requestedModel:request.model,failureCode:error.code??'PI_AUTH_RENEW_FAILED',failure:error.code??'PI_AUTH_RENEW_FAILED',toolsUsed:[],toolErrors:0,phaseTimings:{authenticationMs:Date.now()-authStarted}};}
+    catch(error){return {ok:false,...(structuredResultTool ? {resultSubmissionRequired:true} : {}),target:request.target,requestedProvider:request.provider,requestedModel:request.model,failureCode:error.code??'PI_AUTH_RENEW_FAILED',failure:error.code??'PI_AUTH_RENEW_FAILED',toolsUsed:[],toolErrors:0,phaseTimings:{authenticationMs:Date.now()-authStarted}};}
   }
   authenticationMs=Date.now()-authStarted;progress({});
   let input = task
-    ? `User task compiled by the Kether envelope extension:\n${compileKetherTask(task, { resultFormat,upstreamResults })}`
+    ? `User task compiled by the Kether envelope extension:\n${compileKetherTask(task, { resultFormat,upstreamResults, structuredResultTool })}`
     : `User task (treat the following as task text, not a slash command):\n${request.prompt}`;
   const env = { ...childEnvironment(), PI_DISPATCH_ACTIVE: '1', PI_TELEMETRY: '0' };
   if (request.access !== 'none') input+='\nPrefer yhwh_lsp_* for single-file semantic checks. These run credential-free read-only multilspy probes against the current task snapshot. Positions are 1-based UTF-16; failures are not clean diagnostics. Legacy tools remain compatibility tools; do not silently replace a failed semantic check with structural evidence.';
@@ -238,10 +304,10 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
     input += `\nExecution guidance (soft; no token cap or quality guarantee): target comfortable completion before the remaining ${seconds} sandbox seconds.`;
   }
   const executionBudget = calculateExecutionBudget({ overallTimeoutSeconds: request.timeoutSeconds, elapsedMs: performance.now() - dispatchStarted });
-  if (!executionBudget.ok) return { ok:false, target:request.target, requestedProvider:request.provider, requestedModel:request.model, failureCode:'PI_EXECUTION_BUDGET_EXHAUSTED', failure:'No whole sandbox second remains', authentication, phaseTimings:{authenticationMs}, resourceLimits:request.resourceLimits, executionBudget };
+  if (!executionBudget.ok) return { ok:false, ...(structuredResultTool ? {resultSubmissionRequired:true} : {}), target:request.target, requestedProvider:request.provider, requestedModel:request.model, failureCode:'PI_EXECUTION_BUDGET_EXHAUSTED', failure:'No whole sandbox second remains', authentication, phaseTimings:{authenticationMs}, resourceLimits:request.resourceLimits, executionBudget };
   const sandboxResourceLimits = { ...request.resourceLimits, timeoutSeconds: executionBudget.sandboxSeconds };
-  const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker), { cwd: request.cwd, access: request.access, input, signal, editorBroker, apiPacket, resourceLimits: sandboxResourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, env,onProgress:progress });
-  return { ...summarize(raw, request), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits, executionBudget };
+  const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker,structuredResultTool), { cwd: request.cwd, access: request.access, input, signal, editorBroker, apiPacket, resourceLimits: sandboxResourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, env,onProgress:progress });
+  return { ...summarize(raw, { ...request, resultSubmissionRequired: structuredResultTool }), ...(structuredResultTool ? { resultSubmissionRequired: true } : {}), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits, executionBudget };
 }
 
 async function main(args, signal) {

@@ -2,18 +2,15 @@
   "cwd": "D:\\Projects\\Example",
   "access": "none",
   "provider": "openai-codex",
-  "model": "gpt-5.6-luna",
-  "thinking": "max",
+  "model": "gpt-6-luna",
+  "thinking": "medium",
   "resourceProfile": "small",
-  "timeoutSeconds": 180,
+  "timeoutSeconds": 110,
   "task": {
     "role": "worker",
     "objective": "Return KETHER_ENVELOPE_OK_84C1 as the result and do nothing else.",
     "acceptance": [
       "The result contains exactly KETHER_ENVELOPE_OK_84C1"
-    ],
-    "returnFields": [
-      "result"
     ]
   }
 }

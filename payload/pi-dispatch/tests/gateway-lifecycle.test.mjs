@@ -13,7 +13,7 @@ const sandboxStatus = { ok:true, backend:'fixture', resourceLimits:true };
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 const parsed = result => JSON.parse(result.content[0].text);
 const reply = (request, task, label) => ({ ok:true, provider:request.provider, model:request.model, text:'KETHER_RESULT_JSON=' + JSON.stringify(roleValue(task.role, label)) });
-const input = { cwd:root, provider:'openai-codex', model:'gpt-5.6-luna', access:'none', resourceProfile:'small', task:{ role:'worker', objective:'Fixture', acceptance:['Return fixture evidence'] } };
+const input = { cwd:root, provider:'openai-codex', model:'gpt-6-luna', access:'none', resourceProfile:'small', task:{ role:'worker', objective:'Fixture', acceptance:['Return fixture evidence'] } };
 const baseOptions = () => ({ host:'127.0.0.1', port:0, roots:[root], token, sandboxStatus, schedulerOptions:{ availableMemoryBytes:() => Number.MAX_SAFE_INTEGER, pollIntervalMs:5 } });
 
 async function withGateway(run, overrides = {}) {

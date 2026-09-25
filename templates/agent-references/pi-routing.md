@@ -1,6 +1,6 @@
 ## Current Pi routing policy
 
-Query list_capabilities.governance.roleModels and roleProviders before model dispatch. Model-backed workers/researchers and Yesod/Binah/Malkuth/Hod/Chochmah/Chesed/Netzach use openai-codex / gpt-5.6-luna with task-proportional thinking. worker maps to Chesed; researcher maps to Malkuth.
+Query list_capabilities.governance.roleModels and roleProviders before model dispatch. Model-backed workers/researchers and Yesod/Binah/Malkuth/Hod/Chochmah/Chesed/Netzach use openai-codex / gpt-6-luna with task-proportional thinking (medium default; low/high/max when justified and supported). worker maps to Chesed; researcher maps to Malkuth.
 
 ## Task-proportional native worker thinking (2026-09-22)
 

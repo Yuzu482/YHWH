@@ -17,14 +17,34 @@ export function stageFor(task) {
 
 export function validateHandoff(value, task) {
   if (value===undefined) return undefined;
-  if (!exact(value,['version','stage','inputs']) || value.version!==1 || !Object.hasOwn(STAGES,value.stage) || value.stage!==stageFor(task) || !Array.isArray(value.inputs) || value.inputs.length>16) fail('Invalid handoff version, stage, role or inputs');
+  if (!value || typeof value!=='object' || Array.isArray(value) || ![1,2].includes(value.version) || !Object.hasOwn(STAGES,value.stage) || value.stage!==stageFor(task) || !Array.isArray(value.inputs) || value.inputs.length>16) fail('Invalid handoff version, stage, role or inputs');
+  if (value.version===1) {
+    if (!exact(value,['version','stage','inputs'])) fail('Invalid v1 handoff fields');
+  } else {
+    if (!exact(value,['version','stage','inputs','runGoal','runAcceptance','phaseIndex']) || typeof value.runGoal!=='string' || !value.runGoal.trim() || value.runGoal.length>20000 || !Array.isArray(value.runAcceptance) || value.runAcceptance.length===0 || value.runAcceptance.length>64 || !value.runAcceptance.every(item=>typeof item==='string' && !!item.trim() && item.length<=4000) || !Number.isSafeInteger(value.phaseIndex) || value.phaseIndex<=0) fail('Invalid v2 handoff fields');
+  }
   const seen=new Set();
   for (const input of value.inputs) {
-    if (!exact(input,['requestId','role','stage','resultSha256']) || !id(input.requestId) || !sha(input.resultSha256) || !Object.hasOwn(STAGES,input.stage) || STAGES[input.stage]!==input.role || !allowed[value.stage].includes(input.stage) || seen.has(input.requestId)) fail('Invalid, duplicate or disallowed handoff input');
+    const v2ScoutContinuation=value.version===2 && value.stage==='scouted' && value.phaseIndex>1;
+    const allowedInput=v2ScoutContinuation ? input.stage==='post-review' : allowed[value.stage].includes(input.stage);
+    if (!exact(input,['requestId','role','stage','resultSha256']) || !id(input.requestId) || !sha(input.resultSha256) || !Object.hasOwn(STAGES,input.stage) || STAGES[input.stage]!==input.role || !allowedInput || seen.has(input.requestId)) fail('Invalid, duplicate or disallowed handoff input');
     seen.add(input.requestId);
   }
-  if (required[value.stage].some(stage=>!value.inputs.some(input=>input.stage===stage))) fail(`Stage ${value.stage} requires predecessor ${required[value.stage].join(', ')}`);
-  return {version:1,stage:value.stage,inputs:value.inputs.map(input=>({...input}))};
+  if (value.version===1) {
+    if (required[value.stage].some(stage=>!value.inputs.some(input=>input.stage===stage))) fail(`Stage ${value.stage} requires predecessor ${required[value.stage].join(', ')}`);
+    return {version:1,stage:value.stage,inputs:value.inputs.map(input=>({...input}))};
+  }
+  if (value.stage==='scouted') {
+    if (value.phaseIndex===1 ? value.inputs.length!==0 : value.inputs.length!==1 || value.inputs[0].stage!=='post-review') fail('Scouted v2 continuation requires phase 1 root or one post-review predecessor');
+  } else if (required[value.stage].some(stage=>!value.inputs.some(input=>input.stage===stage))) {
+    fail(`Stage ${value.stage} requires predecessor ${required[value.stage].join(', ')}`);
+  }
+  if (value.inputs.length===0 && value.phaseIndex!==1) fail('V2 root handoffs must be phase 1');
+  return {version:2,stage:value.stage,inputs:value.inputs.map(input=>({...input})),runGoal:value.runGoal,runAcceptance:[...value.runAcceptance],phaseIndex:value.phaseIndex};
+}
+
+function runAnchor(handoff) {
+  return createHash('sha256').update(JSON.stringify({runGoal:handoff.runGoal,runAcceptance:handoff.runAcceptance})).digest('hex');
 }
 
 export function prepareHandoff(task, input, cwd, ledger) {
@@ -41,15 +61,17 @@ export function prepareHandoff(task, input, cwd, ledger) {
       const prior=ledger.getOutcome(ref.requestId);
       if (prior.state==='pending') return false;
       const c=prior.contract;
-      if (prior.state!=='completed' || !c || c.version!==2 || c.mode!=='linked' || c.parentRunId!==input.parentRunId || c.workspaceSha256!==workspaceDigest(cwd) || c.role!==ref.role || c.stage!==ref.stage || c.resultSha256!==ref.resultSha256 || (ref.role==='Geburah' && c.reviewDecision!=='approve')) fail(`Predecessor contract does not match: ${ref.requestId}`);
+      const expectedPhase=handoff.version===2 ? handoff.phaseIndex-(handoff.stage==='scouted' && handoff.phaseIndex>1 ? 1 : 0) : undefined;
+      if (prior.state!=='completed' || !c || c.version!==2 || c.mode!=='linked' || c.parentRunId!==input.parentRunId || c.workspaceSha256!==workspaceDigest(cwd) || c.role!==ref.role || c.stage!==ref.stage || c.resultSha256!==ref.resultSha256 || (ref.role==='Geburah' && c.reviewDecision!=='approve') || (handoff.version===2 && (c.handoffVersion!==2 || c.runAnchorSha256!==runAnchor(handoff) || c.phaseIndex!==expectedPhase))) fail(`Predecessor contract does not match: ${ref.requestId}`);
     }
     return true;
   };
 }
 
 export function completedContract(task,input,cwd,value) {
-  return {version:2,role:canonicalRole(task.role),stage:stageFor(task),mode:task.handoff?'linked':'standalone',parentRunId:input.parentRunId??null,
-    workspaceSha256:workspaceDigest(cwd),resultSha256:resultDigest(value),...(canonicalRole(task.role)==='Geburah'?{reviewDecision:value.reviewDecision}:{})};
+  const handoff=validateHandoff(task.handoff,task);
+  return {version:2,role:canonicalRole(task.role),stage:stageFor(task),mode:handoff?'linked':'standalone',parentRunId:input.parentRunId??null,
+    workspaceSha256:workspaceDigest(cwd),resultSha256:resultDigest(value),...(handoff?.version===2?{handoffVersion:2,runAnchorSha256:runAnchor(handoff),phaseIndex:handoff.phaseIndex}:{}),...(canonicalRole(task.role)==='Geburah'?{reviewDecision:value.reviewDecision}:{})};
 }
 
 export function collectHandoffResults(task, ledger) {
@@ -62,4 +84,4 @@ export function collectHandoffResults(task, ledger) {
   return results;
 }
 
-export const HANDOFF_POLICY={version:1,requiredPredecessors:required,allowedPredecessors:allowed,rootStages:['compiled','classified','scouted'],standaloneAllowed:true};
+export const HANDOFF_POLICY={version:2,supportedVersions:[1,2],requiredPredecessors:required,allowedPredecessors:allowed,rootStages:['compiled','classified','scouted'],standaloneAllowed:true,v2Continuation:{stage:'scouted',phaseIndexRule:'phase 1 is a root; phase N requires exactly one approved post-review predecessor at phase N-1'}};

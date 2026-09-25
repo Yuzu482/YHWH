@@ -21,7 +21,7 @@ import { buildAuditRecord, createAuditLogger, ensureRequestId, redactSensitiveTe
 import { createModuleLifecycle } from '../extensions/module-lifecycle.js';
 import { classifyProviderResult, createMemoryProviderCircuitState, createProviderCircuitState } from '../extensions/provider-circuit-state.js';
 import { DEFAULT_RESOURCE_PROFILE, publicResourceProfiles, resolveResourceLimits } from '../extensions/resource-limits.js';
-import { publicFormatValidation, validateKetherResult } from '../extensions/result-format-validator.js';
+import { publicFormatValidation, recoverPrefacedKetherResult, validateKetherResult } from '../extensions/result-format-validator.js';
 import { createRequestLedger, RequestLedgerError } from '../extensions/request-ledger.js';
 import { ResourceAwareExecutor, SCHEDULER_POLICY } from '../extensions/admission-scheduler.js';
 import { createWriteScopeLockManager } from '../extensions/write-scope-locks.js';
@@ -99,7 +99,9 @@ export function registerMcpResponseCleanup(res, transport, server) {
 const stringList = z.array(z.string().min(1).max(4000)).max(64).optional();
 const reviewSectionSchema=z.object({status:z.enum(['provided','missing','not-applicable']),content:z.array(z.string().min(1).max(8000)).max(32).optional(),reason:z.string().min(1).max(2000).optional()}).strict();
 const reviewPacketSchema=z.object({version:z.literal(1),stage:z.enum(['pre-change','post-change']),requirements:reviewSectionSchema.optional(),changes:reviewSectionSchema.optional(),context:reviewSectionSchema.optional(),verification:reviewSectionSchema.optional()}).strict();
-const handoffSchema=z.object({version:z.literal(1),stage:z.string().max(32),inputs:z.array(z.object({requestId:z.string().max(128),role:z.string().max(64),stage:z.string().max(32),resultSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()).max(16)}).strict();
+const handoffV1Schema=z.object({version:z.literal(1),stage:z.string().max(32),inputs:z.array(z.object({requestId:z.string().max(128),role:z.string().max(64),stage:z.string().max(32),resultSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()).max(16)}).strict();
+const handoffV2Schema=z.object({version:z.literal(2),stage:z.string().max(32),inputs:z.array(z.object({requestId:z.string().max(128),role:z.string().max(64),stage:z.string().max(32),resultSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()).max(16),runGoal:z.string().trim().min(1).max(20000),runAcceptance:z.array(z.string().trim().min(1).max(4000)).min(1).max(64),phaseIndex:z.number().int().positive().safe()}).strict();
+const handoffSchema=z.discriminatedUnion('version',[handoffV1Schema,handoffV2Schema]);
 const taskSchema = z.object({
   contractVersion:z.literal(2).optional(), handoff:handoffSchema.optional(),
   role: z.string().min(1).max(64), objective: z.string().min(1).max(20000),
@@ -207,7 +209,7 @@ export function createGatewayRuntime(options) {
     writeScopeEnforced: writeEnabled,
     writeScopeSyntax: { exactFile: 'path/to/file', directoryTree: 'path/to/directory/**', shellWrites: false },
     audit: { enabled: audit?.enabled === true, format: 'jsonl', rawTaskStored: false, rawPatchStored: false, sensitiveTextStored: false },
-    resultFormat: { enforced: true, validator: 'deterministic-json', prefix: 'KETHER_RESULT_JSON=', modelValidation: false, probesExcluded: true },
+    resultFormat: { enforced: true, validator: 'deterministic-json', prefix: 'KETHER_RESULT_JSON=', modelValidation: false, probesExcluded: true, tool: 'yhwh_submit_result', toolRequiredFor: ['WSL read and workspace-write Kether JSON tasks'], toolEventSource: 'genuine tool event', legacyEnvelopeFor: ['none access'], probeFormat: 'plain' },
     requestLedger: {
       enabled: ledger?.enabled === true,
       persistent: ledger?.persistent === true,
@@ -285,7 +287,7 @@ export function createGatewayRuntime(options) {
     throw Object.assign(error, { cleanup });
   }
 
-  async function runInvocation(input, signal, forcedTask = null, operation = 'dispatch_subagent', deferRecords = false, lifecycle = null) {
+  async function runInvocation(input, signal, forcedTask = null, operation = 'dispatch_subagent', deferRecords = false, lifecycle = null, trustedProbeToken = null) {
     const requestId = ensureRequestId(input.requestId);
     const started = Date.now();
     const task = forcedTask ?? input.task;
@@ -306,7 +308,7 @@ export function createGatewayRuntime(options) {
         timeoutSeconds: input.timeoutSeconds,
         resourceProfile: input.resourceProfile,
         task,
-      }, writeEnabled, cwd, { probe: operation === 'probe_model' });
+      }, writeEnabled, cwd, { probe: operation === 'probe_model', probeToken: operation === 'probe_model' ? trustedProbeToken : undefined });
       if (input.requestId && input.dependsOnRequestIds?.includes(input.requestId)) throw new Error('a task cannot depend on its own requestId');
       if (input.dependsOnRequestIds?.length && !ledger?.enabled) throw new Error('task dependencies require the persistent request ledger');
       const typedHandoffGate=prepareHandoff(invocation.task,input,cwd,ledger);
@@ -333,7 +335,9 @@ export function createGatewayRuntime(options) {
         const request = { ...invocation.request, timeoutSeconds: Math.min(invocation.request.timeoutSeconds, remainingSeconds) };
         const editorBroker=editorGrant?(options.editorBrokerFactory??createEditorBroker)(editorGrant,{requestId,parentRunId:input.parentRunId,signal:runSignal,audit}):null;
         try {
-          const result=await modules.get('dispatch')({ ...request, gatewayInstanceId, gatewayWindowsPid: process.pid }, runSignal, invocation.task, { editorBroker,upstreamResults:collectHandoffResults(invocation.task,ledger),resultFormat: operation === 'probe_model' ? 'plain' : 'json',onProgress:value=>{phaseTimings=value;lifecycle?.onProgress?.(value);} });
+          const dispatchOptions = { editorBroker, upstreamResults:collectHandoffResults(invocation.task,ledger), resultFormat: operation === 'probe_model' ? 'plain' : 'json', onProgress:value=>{phaseTimings=value;lifecycle?.onProgress?.(value);} };
+          if (operation === 'probe_model') Object.assign(dispatchOptions, { probe: true, probeToken: trustedProbeToken });
+          const result=await modules.get('dispatch')({ ...request, gatewayInstanceId, gatewayWindowsPid: process.pid }, runSignal, invocation.task, dispatchOptions);
           if(editorBroker){await editorBroker.close();result.editorExecution=editorBroker.report();if(!result.editorExecution.ok){result.ok=false;result.failure='EDITOR_OPERATION_FAILED_OR_UNCERTAIN';}}
           return result;
         } finally {await editorBroker?.close();}
@@ -352,8 +356,37 @@ export function createGatewayRuntime(options) {
       const response = { ...result, timings, requestId, parentRunId: input.parentRunId, resourceLimits: invocation.request.resourceLimits, osSandbox, writeEnabled, writeScopeEnforced: input.access === 'workspace-write' };
       delete response.contract;
       if (operation !== 'probe_model') {
-        const validation = validateKetherResult(response.text, invocation.task.returnFields);
+        let validation;
+        if (response.resultSubmissionRequired === true) {
+          const submission = response.resultSubmission;
+          const code = submission?.ok === true && typeof submission.canonicalText === 'string'
+            ? null
+            : ['RESULT_SUBMISSION_MISSING','RESULT_SUBMISSION_MALFORMED','RESULT_SUBMISSION_MULTIPLE'].includes(submission?.code)
+              ? submission.code.toLowerCase()
+              : 'result_submission_malformed';
+          if (code) {
+            validation = { ok:false, code, message:'A single valid structured result submission is required', expectedFields:[...invocation.task.returnFields] };
+          } else {
+            response.text = submission.canonicalText;
+            response.resultSource = 'tool';
+            validation = validateKetherResult(response.text, invocation.task.returnFields);
+            if (['empty_output','missing_prefix','invalid_json','root_not_object'].includes(validation.code)) {
+              validation = { ok:false, code:'result_submission_malformed', message:'Structured result submission is malformed', expectedFields:[...invocation.task.returnFields] };
+            }
+          }
+        } else {
+          validation = validateKetherResult(response.text, invocation.task.returnFields);
+        }
+        if (response.resultSubmissionRequired !== true && response.ok === true && validation.code === 'missing_prefix') {
+          const recovery = recoverPrefacedKetherResult(response.text, invocation.task.returnFields);
+          if (recovery) {
+            validation = recovery.validation;
+            response.text = recovery.canonicalText;
+            response.formatRecovery = { applied: true, rawCode: 'missing_prefix', reason: 'single_preface' };
+          }
+        }
         response.formatValidation = publicFormatValidation(validation);
+        delete response.resultSubmission;
         if (validation.ok) response.structuredResult = validation.value;
         else {
           response.ok = false;
@@ -596,7 +629,7 @@ export function createGatewayRuntime(options) {
       try {
         const requestId = ensureRequestId(input.requestId);
         leaseId = circuit.beginProbe(input.provider, input.model, { recovery: input.recovery });
-        const execution = await runInvocation({ ...input, requestId, access: 'none', task }, extra.signal, task, 'probe_model', true);
+        const execution = await runInvocation({ ...input, requestId, access: 'none', task }, extra.signal, task, 'probe_model', true, null, token);
         const result = execution.response;
         const healthy = result.ok && result.text.includes(token) && result.toolsUsed.length === 0;
         const assessment = classifyProviderResult(result);

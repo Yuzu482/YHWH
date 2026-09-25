@@ -18,12 +18,12 @@ test('rejects mismatched routes, duplicate providers, tools, command-line secret
 });
 
 import {readFileSync} from 'node:fs';
-import {childEnvironment,buildPiArgs,validateRequest} from '../scripts/dispatch.mjs';
+import {childEnvironment,buildPiArgs,validateRequest,validateKetherInvocation} from '../scripts/dispatch.mjs';
 import {redactSensitiveText} from '../extensions/audit-log.js';
 test('review launch preserves no-tools and removes ambient Claude/API credential overrides',()=>{
  const env=childEnvironment({PATH:'retained',ANTHROPIC_API_KEY:key,ANTHROPIC_BASE_URL:'https://invalid.test',CLAUDE_CODE_OAUTH_TOKEN:'oauth',NODE_OPTIONS:'--require unsafe'});
  assert.deepEqual(env,{PATH:'retained'});
- const route=validateRequest({target:'model',cwd:process.cwd(),provider:'anthropic',model:'claude-sonnet-5',thinking:'max',access:'none',prompt:'fixture'});
+ const route=validateKetherInvocation({cwd:process.cwd(),provider:'anthropic',model:'claude-sonnet-5',thinking:'max',access:'none',task:{role:'reviewer',objective:'Review fixture',acceptance:['Return findings'],reviewPacket:{version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(section=>[section,{status:'provided',content:['fixture']}]))}}}).request;
  const launch=buildPiArgs(route,'wsl2');
  assert.ok(launch.includes('--no-tools'));assert.ok(!launch.includes('--tools'));assert.ok(!launch.join(' ').includes('claude-review'));
  assert.throws(()=>validateRequest({...route,provider:'pi-claude-code-provider'}));

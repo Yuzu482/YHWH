@@ -1,4 +1,19 @@
 import test from 'node:test';
+
+let savedYhwhWorkerEnforcement;
+
+test.beforeEach(() => {
+  savedYhwhWorkerEnforcement = process.env.YHWH_WORKER_ENFORCEMENT;
+  process.env.YHWH_WORKER_ENFORCEMENT = 'off';
+});
+
+test.afterEach(() => {
+  if (savedYhwhWorkerEnforcement === undefined) {
+    delete process.env.YHWH_WORKER_ENFORCEMENT;
+  } else {
+    process.env.YHWH_WORKER_ENFORCEMENT = savedYhwhWorkerEnforcement;
+  }
+});
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

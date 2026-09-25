@@ -12,8 +12,8 @@ const smoke = args.has('--smoke');
 if (!smoke && !args.has('--execute')) throw new Error('Real Pi calls are disabled by default; pass --execute for 50-100 tasks or --smoke for one task');
 const requestedCount = Number(process.env.PI_LONG_RUN_COUNT || (smoke ? 1 : 50));
 if (!Number.isInteger(requestedCount) || (smoke ? requestedCount !== 1 : requestedCount < 50 || requestedCount > 100)) throw new Error('PI_LONG_RUN_COUNT must be 50-100, or exactly 1 with --smoke');
-const model = process.env.PI_LONG_RUN_MODEL || 'gpt-5.6-luna';
-const thinking = process.env.PI_LONG_RUN_THINKING || 'max';
+const model = process.env.PI_LONG_RUN_MODEL || 'gpt-6-luna';
+const thinking = process.env.PI_LONG_RUN_THINKING || 'medium';
 const cwd = process.env.PI_LONG_RUN_CWD || process.cwd();
 const stateRoot = join(homedir(), '.local', 'state', 'pi-kether');
 const auditFile = process.env.PI_GATEWAY_AUDIT_FILE || join(stateRoot, 'audit.jsonl');
@@ -67,7 +67,7 @@ try {
       : `Return the integer ${index} in result and perform no tool calls.`;
     const request = {
       requestId, cwd, provider: 'openai-codex', model, thinking, access: 'none', resourceProfile: 'small', timeoutSeconds: mode === 'timeout' ? 1 : 45,
-      task: { role: 'worker', objective, acceptance: ['Return a deterministic result without tools'], returnFields: ['status', 'result', 'evidence', 'uncertainty', 'errors'] },
+      task: { role: 'worker', objective, acceptance: ['Return a deterministic result without tools'] },
     };
     const controller = new AbortController();
     const abortTimer = mode === 'cancel' ? setTimeout(() => controller.abort(), 500) : null;
@@ -75,7 +75,7 @@ try {
     try {
       const response = await client.callTool({ name: 'dispatch_subagent', arguments: request }, undefined, { signal: controller.signal, timeout: 60_000, maxTotalTimeout: 60_000 });
       const value = JSON.parse(response.content[0].text);
-      const injectedFormatRejection = mode === 'format-error' ? validateKetherResult('INTENTIONALLY_INVALID_FORMAT', request.task.returnFields).code : undefined;
+      const injectedFormatRejection = mode === 'format-error' ? validateKetherResult('INTENTIONALLY_INVALID_FORMAT', ['status', 'result', 'evidence', 'changedFiles', 'assumptions', 'uncertainty', 'errors', 'nextAction', 'deliverable']).code : undefined;
       results.push({ requestId, mode, durationMs: Date.now() - started, transportError: false, isError: response.isError === true, ok: value.ok === true, provider: value.provider, model: value.model, formatValidation: value.formatValidation?.code, injectedFormatRejection });
     } catch (error) {
       results.push({ requestId, mode, durationMs: Date.now() - started, transportError: true, error: error.message });

@@ -12,8 +12,9 @@ import { publicResourceProfiles, resolveResourceLimits } from '../extensions/res
 
 const cwd = dirname(fileURLToPath(import.meta.url));
 const fixture = resolve(cwd, 'fixture.mjs');
-const base = { target: 'model', cwd, provider: 'openai-codex', model: 'gpt-5.6-luna', prompt: '中文 " & $(unsafe)\n/command @file --option' };
+const base = { target: 'model', cwd, provider: 'openai-codex', model: 'gpt-6-luna', prompt: '中文 " & $(unsafe)\n/command @file --option' };
 const semanticTask = { role: 'Malkuth', objective: 'Inspect the current route.', readScope: ['scripts/dispatch.mjs'], forbidden: ['Do not modify files'], acceptance: ['Report observed provider and model'] };
+const reviewerTask = { role: 'reviewer', objective: 'Review supplied material', acceptance: ['Return findings'], reviewPacket: { version: 1, stage: 'post-change', ...Object.fromEntries(['requirements', 'changes', 'context', 'verification'].map(k => [k, { status: 'provided', content: ['fixture evidence'] }])) } };
 const validate = (value, allowWrite = false) => validateRequest(value, allowWrite, cwd);
 
 test('validation is strict and writing is opt-in', () => {
@@ -46,7 +47,7 @@ test('Kether invocation compiles a fixed openai-codex envelope without duplicate
   const invocation = validateKetherInvocation({ cwd, access: 'read', task: semanticTask }, false, cwd);
   assert.equal(invocation.request.target, 'model');
   assert.equal(invocation.request.provider, 'openai-codex');
-  assert.equal(invocation.request.model, 'gpt-5.6-luna');
+assert.equal(invocation.request.model, 'gpt-6-luna');
   assert.equal(invocation.request.thinking, 'medium');
   assert.equal(buildPiArgs(invocation.request, 'wsl2').at(buildPiArgs(invocation.request, 'wsl2').indexOf('--thinking') + 1), 'medium');
   for (const thinking of ['low', 'medium', 'high', 'max']) {
@@ -54,13 +55,16 @@ test('Kether invocation compiles a fixed openai-codex envelope without duplicate
   }
   assert.match(compileKetherTask(invocation.task), /TASK_PACKET_JSON=/);
   assert.match(compileKetherTask(invocation.task), /KETHER_RESULT_JSON=/);
-  assert.equal(validate({ ...base, provider: 'anthropic', model: 'claude-sonnet-5' }).thinking, 'max');
+  assert.throws(() => validate({ ...base, provider: 'anthropic', model: 'claude-sonnet-5' }), /YHWH_WORKER_ENFORCEMENT_REJECTED/);
+  const reviewerInvocation = validateKetherInvocation({ cwd, access: 'none', task: reviewerTask }, false, cwd);
+  assert.equal(reviewerInvocation.request.thinking, 'max');
   assert.throws(() => validateKetherInvocation({ cwd, access: 'read', provider: 'other', task: semanticTask }, false, cwd), /allowlist/);
   assert.throws(() => validateKetherInvocation({ cwd, access: 'none', task: semanticTask }, false, cwd), /none access/);
   assert.throws(() => validateKetherInvocation({ cwd, access: 'read', task: { ...semanticTask, writeScope: ['x'] } }, false, cwd), /read access/);
-  assert.throws(() => validateKetherInvocation({ cwd, access: 'workspace-write', task: semanticTask }, true, cwd), /explicit writeScope/);
-  assert.throws(() => validateKetherInvocation({ cwd, access: 'workspace-write', task: { ...semanticTask, writeScope: ['../outside'] } }, true, cwd), /traversal/);
-  assert.throws(() => validateKetherInvocation({ cwd, access: 'workspace-write', task: { ...semanticTask, writeScope: ['src/*'] } }, true, cwd), /terminal \/\*\*/);
+  const chesedTask = { role: 'Chesed', objective: 'Inspect the current route.', readScope: ['scripts/dispatch.mjs'], forbidden: ['Do not modify files'], acceptance: ['Report observed provider and model'] };
+  assert.throws(() => validateKetherInvocation({ cwd, access: 'workspace-write', task: chesedTask }, true, cwd), /explicit writeScope/);
+  assert.throws(() => validateKetherInvocation({ cwd, access: 'workspace-write', task: { ...chesedTask, writeScope: ['../outside'] } }, true, cwd), /traversal/);
+  assert.throws(() => validateKetherInvocation({ cwd, access: 'workspace-write', task: { ...chesedTask, writeScope: ['src/*'] } }, true, cwd), /terminal \/\*\*/);
   assert.throws(() => validateKetherTask({ ...semanticTask, returnFields: ['status', 'status'] }), /duplicates/);
   assert.throws(() => validateKetherTask({ ...semanticTask, returnFields: ['bad-field'] }), /Invalid returnFields/);
 });
@@ -136,7 +140,7 @@ test('Kether task schema rejects transport fields and extension injects the comp
   });
   assert.equal(command.name, 'kether-task');
   const encoded = Buffer.from(JSON.stringify(semanticTask)).toString('base64url');
-  await command.definition.handler(`b64:${encoded}`, { model: { provider: 'openai-codex', id: 'gpt-5.6-luna' }, isIdle: () => true, ui: { notify() {} } });
+await command.definition.handler(`b64:${encoded}`, { model: { provider: 'openai-codex', id: 'gpt-6-luna' }, isIdle: () => true, ui: { notify() {} } });
   assert.match(injected, /Malkuth/);
   assert.match(injected, /Inspect the current route/);
   injected = undefined;

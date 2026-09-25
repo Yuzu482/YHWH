@@ -67,7 +67,7 @@ async function main() {
       child.unref();
     },
     health: async () => {
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 120; i++) {
         try {
           const identity = await request('/admin/upgrade/status', 'POST');
           if (identity.pid === child?.pid && identity.phase === 'running' && (await request('/healthz')).ok === true && (await request('/readyz')).ok === true && child.exitCode === null) return true;

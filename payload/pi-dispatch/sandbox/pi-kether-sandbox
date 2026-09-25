@@ -176,6 +176,7 @@ run_job() {
     local original_status=$?
     trap - EXIT INT TERM
     set +e
+    exec 3<&-
     cleanup_job "$CURRENT_JOB"
     local cleanup_status=$?
     if (( original_status == 0 && cleanup_status != 0 )); then original_status=10; fi

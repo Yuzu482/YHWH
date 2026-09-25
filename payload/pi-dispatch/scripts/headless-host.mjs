@@ -4,9 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { adapters, invocation, parseResult } from './headless-adapters.mjs';
+import { assertHeadlessExecutionAllowed, getWorkerEnforcementStatus } from './worker-enforcement.mjs';
 
 const ownRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const files = ['scripts/headless-host.mjs', 'scripts/headless-adapters.mjs', 'scripts/headless-job.ps1', 'scripts/headless-acceptance.mjs', 'workflow/headless.example.json', 'workflow/catalog.json'];
+const files = ['scripts/headless-host.mjs', 'scripts/headless-adapters.mjs', 'scripts/headless-job.ps1', 'scripts/headless-acceptance.mjs', 'scripts/worker-enforcement.mjs', 'scripts/controlled-provider.mjs', 'workflow/headless.example.json', 'workflow/catalog.json'];
 const fail = code => { throw new Error(code); };
 const hash = value => createHash('sha256').update(value).digest('hex');
 const keys = (value, allowed) => {
@@ -139,6 +140,7 @@ function launch(c, args, options) {
 }
 
 export async function doctor(config, { signal, helpCache, digestCache, onPhase } = {}) {
+  const workerEnforcement = getWorkerEnforcementStatus();
   validateConfig(config);
   const clients = {}, digestMetrics = { hits: 0, misses: 0, bytesRead: 0 };
   for (const id of Object.keys(adapters)) {
@@ -171,7 +173,7 @@ export async function doctor(config, { signal, helpCache, digestCache, onPhase }
   }
   onPhase?.('fingerprint');
   const adapter = fingerprint(ownRoot, digestCache, digestMetrics);
-  return { schemaVersion: 1, feature: 'primary-headless-cli', modelCalls: 0, adapter, clients, digestCache: digestMetrics };
+  return { schemaVersion: 1, feature: 'primary-headless-cli', modelCalls: 0, workerEnforcement, adapter, clients, digestCache: digestMetrics };
 }
 
 function validateRequest(config, request) {
@@ -184,6 +186,7 @@ function validateRequest(config, request) {
 }
 
 export async function runHeadless(config, request, options = {}) {
+  assertHeadlessExecutionAllowed();
   const totalStarted = Date.now(), progressController = new AbortController();
   const signal = options.signal ? AbortSignal.any([options.signal, progressController.signal]) : progressController.signal;
   let phase = 'preflight', progressFailed = false;
@@ -202,6 +205,7 @@ export async function runHeadless(config, request, options = {}) {
 }
 
 async function executeHeadless(config, request, { signal, helpCache, digestCache, onProgress, onStarted, heartbeat = false, totalStarted }) {
+  assertHeadlessExecutionAllowed();
   const cwd = validateRequest(config, request), c = config.clients[request.client];
   if (signal.aborted) return { status: 'blocked', reason: 'cancelled', modelCalls: 0 };
   // Probe only the requested client; unrelated installations cannot block it.
@@ -271,6 +275,7 @@ export function createHeadlessSession() {
   let tail = Promise.resolve(), pending = 0, stopped = false;
   return {
     async run(config, request, options = {}) {
+      assertHeadlessExecutionAllowed();
       const admittedConfig = structuredClone(config), admittedRequest = structuredClone(request);
       validateRequest(admittedConfig, admittedRequest);
       if (pending >= 20) fail('session_queue_full');
@@ -297,6 +302,7 @@ export function createHeadlessSession() {
 const safeReason = e => /^[a-z_]+$/.test(e.message) ? e.message : 'headless_configuration_or_io_error';
 
 export async function runHeadlessBatch(config, requests, { signal, onEvent } = {}) {
+  assertHeadlessExecutionAllowed();
   if (!Array.isArray(requests) || requests.length < 1 || requests.length > 20) fail('invalid_batch');
   config = structuredClone(config); requests = structuredClone(requests);
   // A malformed later request must not be discovered after earlier model calls.

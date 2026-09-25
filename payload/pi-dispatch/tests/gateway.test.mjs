@@ -67,12 +67,12 @@ test('typed failed/unverified outputs and type errors cannot produce successful 
   await withGateway(async({client})=>{
     for (const status of ['failed','blocked','unverified','wrong-type']) {
       mode=status;
-      const result=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-5.6-luna',requestId:`typed-${status}`,access:'none',resourceProfile:'small',task:{role:'worker',objective:'Controlled negative fixture',acceptance:['Report the actual fixture outcome']}}}));
+      const result=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',requestId:`typed-${status}`,access:'none',resourceProfile:'small',task:{role:'worker',objective:'Controlled negative fixture',acceptance:['Report the actual fixture outcome']}}}));
       assert.equal(result.ok,false,status);assert.equal(result.contract,undefined,status);
       if (status==='wrong-type') assert.equal(result.roleValidation.ok,false);
       else {assert.equal(result.roleValidation.ok,true);assert.equal(result.status,status);}
     }
-    const stripped=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-5.6-luna',access:'none',task:{role:'worker',objective:'Strip fields',acceptance:['Must block'],returnFields:['result']}}}));
+    const stripped=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',task:{role:'worker',objective:'Strip fields',acceptance:['Must block'],returnFields:['result']}}}));
     assert.equal(stripped.code,'ROLE_FIELDS_REQUIRED');
   },{dispatchFn:async(request)=>{
     const value=roleValue('Chesed');
@@ -84,7 +84,7 @@ test('typed failed/unverified outputs and type errors cannot produce successful 
 test('editor authorization is explicit, ledger-protected, closed and not inherited by ordinary tasks',async()=>{
  let calls=0,brokers=0,closes=0;const outcomes=[];
  await withGateway(async({client})=>{
-  const input={cwd:root,provider:'openai-codex',model:'gpt-5.6-luna',access:'none',requestId:'editor-parent',parentRunId:'editor-run',resourceProfile:'small',task:{role:'worker',objective:'Execute exact authorized read',acceptance:['Read the scene']},editorAuthorization:{version:1,expiresAt:new Date(Date.now()+60000).toISOString(),operations:[{id:'read',editor:'blender',tool:'blender_scene_info',args:{}}]}};
+  const input={cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',requestId:'editor-parent',parentRunId:'editor-run',resourceProfile:'small',task:{role:'worker',objective:'Execute exact authorized read',acceptance:['Read the scene']},editorAuthorization:{version:1,expiresAt:new Date(Date.now()+60000).toISOString(),operations:[{id:'read',editor:'blender',tool:'blender_scene_info',args:{}}]}};
   const first=parsed(await client.callTool({name:'dispatch_subagent',arguments:input}));assert.equal(first.ok,true);assert.equal(first.editorExecution.authorized,true);
   const replay=parsed(await client.callTool({name:'dispatch_subagent',arguments:input}));assert.equal(replay.idempotency.status,'replayed');assert.equal(calls,1);assert.equal(brokers,1);assert.ok(closes>=1);
   const bad=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...input,requestId:'editor-no-run',parentRunId:undefined}}));assert.equal(bad.ok,false);assert.match(bad.error,/TRACE/);assert.equal(calls,1);
@@ -97,7 +97,7 @@ test('MCP stage chain injects ledger evidence and blocks cross-run/hash/review b
   const invoked=[];let rejectReview=false;
   const packet={version:1,stage:'pre-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['Observed synthetic '+k]}]))};
   await withGateway(async({client})=>{
-    const common={cwd:root,provider:'openai-codex',model:'gpt-5.6-luna',access:'none',resourceProfile:'small',parentRunId:'typed-run',timeoutSeconds:5};
+    const common={cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',resourceProfile:'small',parentRunId:'typed-run',timeoutSeconds:5};
     const run=async(id,role,stage,inputs=[],extras={})=>parsed(await client.callTool({name:'dispatch_subagent',arguments:{...common,...extras,requestId:id,dependsOnRequestIds:inputs.map(i=>i.requestId),task:{role,objective:id,acceptance:['Observe fixture'],handoff:handoff(stage,inputs),...(role==='Geburah'?{reviewPacket:packet}:{})}}}));
     const scout=await run('typed-scout','Malkuth','scouted');assert.equal(scout.ok,true);
     const scoutRef=ref('typed-scout','Malkuth','scouted',scout.contract.resultSha256);
@@ -179,7 +179,7 @@ test('gateway rejects incomplete governance contracts before model execution', a
       {role:'worker',objective:'Inspect file',readScope:['package.json']},
       {role:'worker',objective:'Inspect file',acceptance:['Report observed content']},
     ]) {
-      const response=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-5.6-luna',access:'read',task}}));
+      const response=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'read',task}}));
       assert.equal(response.ok,false);
       assert.match(response.error,/acceptance criteria|explicit readScope/);
     }
@@ -197,7 +197,7 @@ test('review material gate blocks before dispatch and rejects non-approval outco
   assert.equal(missing.status,'blocked');assert.equal(missing.code,'REVIEW_MATERIALS_MISSING');assert.equal(calls,0);
   const rejected=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,requestId:'review-rejected'}}));
   assert.equal(rejected.ok,false);assert.equal(rejected.reviewValidation.decision,'request-changes');assert.equal(calls,1);
-  const dependent=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-5.6-luna',access:'none',resourceProfile:'small',queueTimeoutSeconds:1,dependsOnRequestIds:['review-rejected'],task:{role:'worker',objective:'Must not run after failed review',acceptance:['Blocked']}}}));
+  const dependent=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',resourceProfile:'small',queueTimeoutSeconds:1,dependsOnRequestIds:['review-rejected'],task:{role:'worker',objective:'Must not run after failed review',acceptance:['Blocked']}}}));
   assert.equal(dependent.ok,false);assert.match(dependent.error,/explicit typed handoff/);assert.equal(calls,1);
  },{dispatchFn:async(request,_signal,t)=>{
   calls++;
@@ -209,7 +209,7 @@ test('review material gate blocks before dispatch and rejects non-approval outco
 
 test('async monitor exposes waiting reason and independent deadlines',async()=>{
  await withGateway(async({client})=>{
-  const input={cwd:root,provider:'openai-codex',model:'gpt-5.6-luna',requestId:'queue-reasons',parentRunId:'queue-reasons',access:'none',resourceProfile:'small',timeoutSeconds:2,queueTimeoutSeconds:1,dependsOnRequestIds:['pending-dependency'],task:{role:'worker',objective:'Wait for dependency',acceptance:['No dispatch'],handoff:handoff('implementing',[ref('pending-dependency','Geburah','pre-review')])}};
+  const input={cwd:root,provider:'openai-codex',model:'gpt-6-luna',requestId:'queue-reasons',parentRunId:'queue-reasons',access:'none',resourceProfile:'small',timeoutSeconds:2,queueTimeoutSeconds:1,dependsOnRequestIds:['pending-dependency'],task:{role:'worker',objective:'Wait for dependency',acceptance:['No dispatch'],handoff:handoff('implementing',[ref('pending-dependency','Geburah','pre-review')])}};
   await client.callTool({name:'submit_subagent',arguments:input});
   await new Promise(r=>setTimeout(r,20));
   const status=parsed(await client.callTool({name:'get_subagent_status',arguments:{requestId:input.requestId}}));
@@ -260,7 +260,7 @@ test('asynchronous subagent submission exposes running, completed, list, and can
     return { ok: true, text: formattedTaskResult(task), provider: request.provider, model: request.model, toolsUsed: [], toolErrors: 0, usage: { totalTokens: 7 } };
   };
   await withGateway(async ({ client }) => {
-    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'read', resourceProfile: 'small', timeoutSeconds: 5, parentRunId: 'run-monitor' };
+    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'read', resourceProfile: 'small', timeoutSeconds: 5, parentRunId: 'run-monitor' };
     const first = await client.callTool({ name: 'submit_subagent', arguments: { ...common, requestId: 'async-complete', task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'complete later', readScope: ['package.json'] } } });
     assert.equal(first.structuredContent.accepted, true);
     while (!releaseFirst) await new Promise(resolvePromise => setTimeout(resolvePromise, 5));
@@ -282,12 +282,12 @@ test('asynchronous subagent submission exposes running, completed, list, and can
     assert.equal(fullResult.ready,true);
     assert.equal(fullResult.state,'completed');
     assert.equal(fullResult.result.ok,true);
-    assert.equal(fullResult.result.model,'gpt-5.6-luna');
+    assert.equal(fullResult.result.model,'gpt-6-luna');
     assert.ok(fullResult.result.structuredResult);
     const unknownResult = parsed(await client.callTool({name:'get_subagent_result',arguments:{requestId:'unknown-request'}}));
     assert.equal(unknownResult.code,'RESULT_NOT_FOUND');
 
-    await client.callTool({ name: 'submit_subagent', arguments: { ...common, model: 'gpt-5.6-luna', requestId: 'async-cancel', task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'wait for cancel', readScope: ['package.json'] } } });
+    await client.callTool({ name: 'submit_subagent', arguments: { ...common, model: 'gpt-6-luna', requestId: 'async-cancel', task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'wait for cancel', readScope: ['package.json'] } } });
     let cancellable;
     for (let i = 0; i < 50; i += 1) {
       cancellable = (await client.callTool({ name: 'get_subagent_status', arguments: { requestId: 'async-cancel' } })).structuredContent.task;
@@ -328,7 +328,7 @@ test('dispatch fails closed when kernel resource isolation is unavailable', asyn
   let dispatched = false;
   await withGateway(async ({ client }) => {
     const result = await client.callTool({ name: 'dispatch_subagent', arguments: {
-      cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'read',
+      cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'read',
       task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Must not run.', readScope: ['package.json'] },
     } });
     assert.equal(result.isError, true);
@@ -358,7 +358,7 @@ test('HTTP auth runs before bounded JSON parsing, including chunked bodies', asy
 test('gateway preserves Tifereth trace ids and reports the enforced resource profile', async () => {
   await withGateway(async ({ client }) => {
     const task = { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Inspect package metadata.', readScope: ['package.json'], forbidden: ['Do not modify files'], acceptance: ['Return an observation'] };
-    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', timeoutSeconds: 5, task, requestId: 'req-1', parentRunId: 'tifereth-1' };
+    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', timeoutSeconds: 5, task, requestId: 'req-1', parentRunId: 'tifereth-1' };
     const readResult = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: { ...common, access: 'read' } }));
     assert.equal(readResult.ok, true);
     assert.equal(readResult.requestId, 'req-1');
@@ -383,7 +383,7 @@ test('workspace-write requires requestId and replays one durable result without 
   };
   await withGateway(async ({ client }) => {
     const task = { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Prepare one scoped change.', readScope: ['package.json'], writeScope: ['package.json'] };
-    const base = { cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'workspace-write', timeoutSeconds: 5, task };
+    const base = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', timeoutSeconds: 5, task };
     const missing = await client.callTool({ name: 'dispatch_subagent', arguments: base });
     assert.equal(missing.isError, true);
     assert.match(parsed(missing).error, /stable requestId/);
@@ -410,7 +410,7 @@ test('dependency-aware queue runs a prerequisite before its waiting dependent', 
     return { ok: true, text: formattedTaskResult(task), provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0 };
   };
   await withGateway(async ({ client }) => {
-    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'read', resourceProfile: 'small', timeoutSeconds: 5,parentRunId:'dependency-run' };
+    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'read', resourceProfile: 'small', timeoutSeconds: 5,parentRunId:'dependency-run' };
     const dependent = client.callTool({ name: 'dispatch_subagent', arguments: { ...common, requestId: 'dep-b', priority: 9, dependsOnRequestIds: ['dep-a'], task: { role: 'Chochmah', acceptance: ['Return the requested observable result.'], objective: 'B', readScope: ['package.json'],handoff:handoff('planned',[ref('dep-a','Malkuth','scouted',resultDigest(roleValue('Malkuth','A')))]) } } });
     await new Promise(resolvePromise => setTimeout(resolvePromise, 20));
     const prerequisite = client.callTool({ name: 'dispatch_subagent', arguments: { ...common, requestId: 'dep-a', priority: 1, task: { role: 'Malkuth', acceptance: ['Return the requested observable result.'], objective: 'A', readScope: ['package.json'],handoff:handoff('scouted') } } });
@@ -433,7 +433,7 @@ test('overlapping write scopes are serialized across different requestIds', asyn
     return { ok: true, text: formattedTaskResult(task), provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0, patch: 'safe patch' };
   };
   await withGateway(async ({ client }) => {
-    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'workspace-write', resourceProfile: 'small', timeoutSeconds: 5 };
+    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', resourceProfile: 'small', timeoutSeconds: 5 };
     const first = client.callTool({ name: 'dispatch_subagent', arguments: { ...common, requestId: 'lock-one', task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'first write', readScope: ['package.json'], writeScope: ['package.json'] } } });
     while (!releaseFirst) await new Promise(resolvePromise => setTimeout(resolvePromise, 5));
     const second = client.callTool({ name: 'dispatch_subagent', arguments: { ...common, requestId: 'lock-two', task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'second write', readScope: ['package.json'], writeScope: ['package.json'] } } });
@@ -454,7 +454,7 @@ test('dispatch_subagent marks failed execution as an MCP tool error', async () =
   const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${http.address().port}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } });
   try {
     await client.connect(transport);
-    const result = await client.callTool({ name: 'dispatch_subagent', arguments: { cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'read', timeoutSeconds: 5, task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Fail safely.', readScope: ['package.json'] } } });
+    const result = await client.callTool({ name: 'dispatch_subagent', arguments: { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'read', timeoutSeconds: 5, task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Fail safely.', readScope: ['package.json'] } } });
     assert.equal(result.isError, true);
     assert.equal(parsed(result).ok, false);
   } finally {
@@ -468,7 +468,7 @@ test('dispatch_subagent rejects malformed lower-agent output without opening pro
   const dispatchFn = async request => ({ ok: true, text: 'unstructured prose', provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0 });
   await withGateway(async ({ client }) => {
     const result = await client.callTool({ name: 'dispatch_subagent', arguments: {
-      cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'read', timeoutSeconds: 5,
+      cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'read', timeoutSeconds: 5,
       task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Return structured output.', readScope: ['package.json'] },
     } });
     const response = parsed(result);
@@ -478,6 +478,41 @@ test('dispatch_subagent rejects malformed lower-agent output without opening pro
     assert.equal(response.providerCircuit.state, 'closed');
     assert.equal(response.providerCircuit.consecutiveFailures, 0);
   }, { circuitState, dispatchFn });
+});
+
+test('dispatch_subagent recovers a short preface but rejects ambiguous envelopes', async () => {
+  let mode = 'preface';
+  const dispatchFn = async (request, _signal, task) => {
+    const envelope = formattedTaskResult(task);
+    const text = mode === 'preface'
+      ? `Short preface.\n${envelope}`
+      : mode === 'duplicate'
+        ? `${envelope}\n${envelope}`
+        : `${envelope} trailing prose`;
+    return { ok: true, text, provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0 };
+  };
+
+  await withGateway(async ({ client }) => {
+    const call = requestId => client.callTool({ name: 'dispatch_subagent', arguments: {
+      cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'read', timeoutSeconds: 5, requestId,
+      task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Recover a prefaced envelope.', readScope: ['package.json'] },
+    } });
+
+    const recovered = parsed(await call('prefaced-envelope'));
+    assert.equal(recovered.ok, true);
+    assert.equal(recovered.formatValidation.ok, true);
+    assert.ok(recovered.formatRecovery);
+    assert.deepEqual(recovered.structuredResult, roleValue('worker', 'Recover a prefaced envelope.'));
+
+    for (const [id, invalidMode] of [['duplicate-envelope', 'duplicate'], ['trailing-prose', 'trailing']]) {
+      mode = invalidMode;
+      const rejected = parsed(await call(id));
+      assert.equal(rejected.ok, false);
+      assert.equal(rejected.formatValidation.ok, false);
+      assert.equal(rejected.contract, undefined);
+      assert.equal(rejected.formatRecovery, undefined);
+    }
+  }, { dispatchFn });
 });
 
 test('gateway persists a sanitized audit record and generates requestId', async () => {
@@ -490,7 +525,7 @@ test('gateway persists a sanitized audit record and generates requestId', async 
   });
   await withGateway(async ({ client }) => {
     const result = await client.callTool({ name: 'dispatch_subagent', arguments: {
-      cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'read', timeoutSeconds: 5,
+      cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'read', timeoutSeconds: 5,
       task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Sensitive task text', readScope: ['package.json'] },
     } });
     const response = parsed(result);
@@ -513,7 +548,7 @@ test('probe_model always runs only when Tifereth explicitly requests it', async 
     return { ok: true, text: task.objective, provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0, usage: { input: 2, output: 1, totalTokens: 3 } };
   };
   await withGateway(async ({ client }) => {
-    const args = { cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', timeoutSeconds: 5 };
+    const args = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', timeoutSeconds: 5 };
     const first = parsed(await client.callTool({ name: 'probe_model', arguments: { ...args, requestId: 'probe-one' } }));
     const second = parsed(await client.callTool({ name: 'probe_model', arguments: { ...args, requestId: 'probe-two' } }));
     assert.equal(first.heartbeat, 'passed');
@@ -525,13 +560,13 @@ test('probe_model always runs only when Tifereth explicitly requests it', async 
 test('gateway authentication circuit requires one explicit recovery probe before tasks resume', async () => {
   let dispatchCount = 0;
   const circuitState = createMemoryProviderCircuitState();
-  circuitState.record({ provider: 'openai-codex', model: 'gpt-5.6-luna', healthy: false, category: 'authentication' });
+  circuitState.record({ provider: 'openai-codex', model: 'gpt-6-luna', healthy: false, category: 'authentication' });
   const dispatchFn = async (request, _signal, task, options) => {
     dispatchCount++;
     return { ok: true, text: options?.resultFormat === 'plain' ? task.objective : formattedTaskResult(task), provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0 };
   };
   await withGateway(async ({ client }) => {
-    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', timeoutSeconds: 5 };
+    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', timeoutSeconds: 5 };
     const task = { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Inspect health gate.', readScope: ['package.json'] };
     const disabled = await client.callTool({ name: 'dispatch_subagent', arguments: { ...common, access: 'read', task } });
     assert.equal(disabled.isError, true);
@@ -554,7 +589,7 @@ test('LSP file stays inside selected cwd and exact requested tool is verified', 
   assert.equal(resolveAllowedFile('fixture.mjs', testsDir), resolve(testsDir, 'fixture.mjs'));
   assert.throws(() => resolveAllowedFile('../package.json', testsDir), /outside/);
   await withGateway(async ({ client }) => {
-    const result = parsed(await client.callTool({ name: 'lsp_request', arguments: { cwd: testsDir, provider: 'openai-codex', model: 'gpt-5.6-luna', timeoutSeconds: 5, method: 'hover', query:'fixture', file: 'fixture.mjs', requestId: 'lsp-1' } }));
+    const result = parsed(await client.callTool({ name: 'lsp_request', arguments: { cwd: testsDir, provider: 'openai-codex', model: 'gpt-6-luna', timeoutSeconds: 5, method: 'hover', query:'fixture', file: 'fixture.mjs', requestId: 'lsp-1' } }));
     assert.equal(result.ok, true);
     assert.equal(result.requestedTool, 'lsp_hover');
     assert.deepEqual(result.toolsUsed, ['lsp_hover']);
@@ -566,7 +601,7 @@ test('rejected LSP path is audited without persisting the path', async () => {
   const records = [];
   await withGateway(async ({ client }) => {
     const result = await client.callTool({ name: 'lsp_request', arguments: {
-      cwd: testsDir, provider: 'openai-codex', model: 'gpt-5.6-luna', timeoutSeconds: 5,
+      cwd: testsDir, provider: 'openai-codex', model: 'gpt-6-luna', timeoutSeconds: 5,
       method: 'hover', file: '../package.json', requestId: 'lsp-rejected-1',
     } });
     assert.equal(result.isError, true);
@@ -646,7 +681,7 @@ test('gateway preserves observed phase timings when execution times out', async 
   await new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true}));
  };
  await withGateway(async({client})=>{
-  const response=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-5.6-luna',access:'none',timeoutSeconds:1,resourceProfile:'small',task:{role:'worker',objective:'Controlled timeout',acceptance:['Timeout retains measured phases']}}}));
+  const response=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',timeoutSeconds:1,resourceProfile:'small',task:{role:'worker',objective:'Controlled timeout',acceptance:['Timeout retains measured phases']}}}));
   assert.equal(response.code,'EXECUTION_TIMEOUT');
   assert.deepEqual(response.phaseTimings,observed);
  },{dispatchFn});

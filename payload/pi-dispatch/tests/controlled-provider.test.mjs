@@ -51,10 +51,12 @@ test('host config enables only explicit routes, preserves defaults, role/access 
   assert.throws(()=>resolveRoleModel('reviewer',undefined,'yhwh-worker-api'),/binding rejected/);
   assert.equal(publicCapabilities().providers['yhwh-reviewer-api'].defaultThinking,'max');
   const req={target:'model',cwd:process.cwd(),provider:'yhwh-reviewer-api',model:'claude-sonnet-5',access:'none',thinking:'max',prompt:'fixture'};
-  const request=validateRequest(req);assert.equal(request.providerConfigDigest,configDigest(base));
+  assert.throws(()=>validateRequest(req),/YHWH_WORKER_ENFORCEMENT_REJECTED/);
+  const reviewTask={role:'reviewer',objective:'Review supplied material',acceptance:['Return findings'],reviewPacket:{version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['fixture']}]))}};
+  const request=validateKetherInvocation({cwd:process.cwd(),provider:req.provider,model:req.model,access:'none',task:reviewTask}).request;assert.equal(request.providerConfigDigest,configDigest(base));
   const launch=buildPiArgs(request,'wsl2');assert.ok(launch.includes('--no-tools'));assert.ok(launch.includes('/opt/pi-kether/extensions/controlled-provider.js'));
-  assert.throws(()=>validateRequest({...req,access:'read'}),/none access/);
-  assert.throws(()=>validateRequest({...req,thinking:'high'}),/no downgrade/);
+  assert.throws(()=>validateRequest({...req,access:'read'}),/YHWH_WORKER_ENFORCEMENT_REJECTED/);
+  assert.throws(()=>validateKetherInvocation({cwd:process.cwd(),provider:req.provider,model:req.model,access:'none',thinking:'high',task:reviewTask}),/no downgrade/);
   assert.throws(()=>validateRequest({...req,baseUrl:'https://evil.test'}),/Unknown/);
   const reviewPacket={version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['fixture']}]))};
   assert.equal(validateKetherInvocation({cwd:process.cwd(),provider:'yhwh-reviewer-api',task:{role:'reviewer',objective:'review',acceptance:['findings'],reviewPacket}}).request.provider,'yhwh-reviewer-api');

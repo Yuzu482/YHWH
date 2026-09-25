@@ -250,7 +250,7 @@ class ProbeTests(unittest.TestCase):
         original = probe.TSSERVER
         probe.TSSERVER = str(self.file)
         try:
-            for profile, suffix, language in [("official-jedi", ".py", "python"), ("official-typescript", ".ts", "typescript")]:
+            for profile, suffix, language in [("official-jedi", ".py", "python"), ("official-typescript", ".ts", "typescript"), ("official-typescript", ".mjs", "javascript")]:
                 file = self.root / ("official" + suffix)
                 file.write_text("answer = 42", encoding="utf-8")
                 methods = list(probe.METHODS) + (["lsp_diagnostics"] if language == "typescript" else [])

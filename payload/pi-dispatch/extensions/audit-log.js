@@ -110,8 +110,28 @@ function summarizeTools(result) {
   return { counts, total: Object.values(counts).reduce((sum, count) => sum + count, 0), errors: finiteNumber(result?.toolErrors) || 0 };
 }
 
+function summarizeFormatDiagnostic(validation) {
+  if (validation?.code !== 'invalid_json') return undefined;
+  const diagnostic = validation.diagnostic;
+  if (!diagnostic || typeof diagnostic !== 'object') return undefined;
+  const categories = new Set(['incomplete', 'trailing_data', 'syntax_error/unknown']);
+  const payloadLength = finiteNumber(diagnostic.payloadLength);
+  if (!categories.has(diagnostic.category) || typeof diagnostic.categoryIsHeuristic !== 'boolean'
+      || !Number.isInteger(payloadLength) || payloadLength > 524288) return undefined;
+  const summary = {
+    code: 'invalid_json',
+    category: diagnostic.category,
+    categoryIsHeuristic: diagnostic.categoryIsHeuristic,
+    payloadLength,
+  };
+  const offset = diagnostic.parseErrorOffset;
+  if (Number.isInteger(offset) && offset >= 0 && offset <= payloadLength) summary.parseErrorOffset = offset;
+  return summary;
+}
+
 export function buildAuditRecord({ timestamp = new Date().toISOString(), requestId, operation, input, task, result, durationMs, failure }) {
   const reason = failure ?? result?.failure ?? (result?.ok === false ? 'execution failed' : null);
+  const formatDiagnostic = summarizeFormatDiagnostic(result?.formatValidation);
   return {
     auditVersion: AUDIT_VERSION,
     timestamp,
@@ -135,6 +155,7 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     timings:result?.timings?{queueWaitMs:finiteNumber(result.timings.queueWaitMs),executionMs:finiteNumber(result.timings.executionMs)}:undefined,
     contract:result?.contract,
     roleValidation:result?.roleValidation,
+    ...(formatDiagnostic ? { formatDiagnostic } : {}),
     reviewDecision:result?.reviewValidation?.decision??result?.reviewDecision,
     tokens: summarizeUsage(result?.usage),
     patch: summarizePatch(result?.patch),

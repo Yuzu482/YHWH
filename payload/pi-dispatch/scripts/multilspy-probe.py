@@ -34,7 +34,7 @@ METHODS = {
     "lsp_completions": ("textDocument/completion", "completionProvider"),
     "lsp_code_actions": ("textDocument/codeAction", "codeActionProvider"),
 }
-LANGUAGES = {".py": "python", ".js": "javascript", ".jsx": "javascriptreact",
+LANGUAGES = {".py": "python", ".js": "javascript", ".mjs": "javascript", ".jsx": "javascriptreact",
              ".ts": "typescript", ".tsx": "typescriptreact", ".java": "java",
              ".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp",
              ".cxx": "cpp", ".hpp": "cpp", ".cs": "csharp", ".go": "go", ".rs": "rust"}

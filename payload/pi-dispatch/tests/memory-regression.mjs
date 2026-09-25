@@ -60,7 +60,7 @@ const collect = async () => {
 };
 
 const taskArguments = objective => ({
-  cwd: root, provider: 'openai-codex', model: 'gpt-5.6-luna', access: 'read', resourceProfile: 'small', timeoutSeconds: 30,
+  cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'read', resourceProfile: 'small', timeoutSeconds: 30,
   task: { contractVersion: 2, role: 'Chesed', objective, readScope: ['package.json'], acceptance: ['Return the complete synthetic fixture result.'] },
 });
 

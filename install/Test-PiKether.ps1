@@ -15,7 +15,7 @@ function Check([bool]$Ok, [string]$Name) {
 }
 try { $manifest = Get-Content -LiteralPath (Join-Path $packageRoot 'portable.manifest.json') -Raw | ConvertFrom-Json; Check ($manifest.containsCredentials -eq $false) 'portable manifest' } catch { Check $false 'portable manifest' }
 $payloadPlugin = Join-Path $packageRoot 'payload\pi-dispatch'
-foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','workflow/headless.example.json','workflow/catalog.json')) {
+foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','workflow/headless.example.json','workflow/catalog.json')) {
   Check (Test-Path -LiteralPath (Join-Path $payloadPlugin $headlessFile) -PathType Leaf) ('headless CLI payload: '+$headlessFile)
   if($Installed) {
     $installedFile=Join-Path (Join-Path $TargetHome 'plugins/pi-dispatch') $headlessFile
@@ -69,10 +69,12 @@ if ($Installed) {
     Check ($mcp.mcpServers.'pi-kether-gateway'.env.PI_DISPATCH_PI_ENTRY -eq $piEntry) 'MCP resolves the installed host Pi entry'
   } catch { Check $false 'MCP workspace scope configured' }
   if (-not $SkipWsl) {
+    & wsl.exe -d $WslDistro -u root --exec test -f /opt/pi-kether/extensions/role-presets.js
+    Check ($LASTEXITCODE -eq 0) 'WSL role presets extension installed'
     $probe = & wsl.exe -d $WslDistro -u root -- /usr/local/libexec/pi-kether-sandbox --probe
     $probeObject = try { $probe | ConvertFrom-Json } catch { $null }
     Check ($LASTEXITCODE -eq 0 -and $probeObject.ok -eq $true -and $probeObject.resourceLimits -eq $true) 'WSL isolation and cgroup resource limits'
-    & wsl.exe -d $WslDistro -u root -- sh -c 'export PATH=/opt/node/bin:/opt/pi-kether/node_modules/.bin:/usr/local/bin:/usr/bin:/bin; for tool in pyright-langserver typescript-language-server clangd jdtls csharp-ls; do command -v "$tool" >/dev/null || exit 1; done'
+    & wsl.exe -d $WslDistro -u root --exec sh -c 'export PATH=/opt/node/bin:/opt/pi-kether/node_modules/.bin:/usr/local/bin:/usr/bin:/bin; for tool in pyright-langserver typescript-language-server clangd jdtls csharp-ls; do command -v "$tool" >/dev/null || exit 1; done'
     Check ($LASTEXITCODE -eq 0) 'six-language LSP command set'
     & wsl.exe -d $WslDistro -u root --exec sh -c 'test -x /opt/pi-kether/go/bin/go && test -x /opt/pi-kether/gopls/gopls && test -x /opt/pi-kether/rust/bin/rustc && test -x /opt/pi-kether/rust/bin/rust-analyzer && test -d /opt/pi-kether/rust/lib/rustlib/src/rust/library'
     Check ($LASTEXITCODE -eq 0) 'Go and Rust compiler, analyzer and standard-library source installed'
