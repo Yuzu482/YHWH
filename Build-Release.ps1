@@ -66,16 +66,55 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 try {
   # Enumerate by allowlist and prune local state even when -SkipTests is used.
   $allowed = @('install','payload','templates','docs','.readme-assets','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','THIRD_PARTY.en.md','LICENSE','NOTICE','licenses','.gitignore')
-  function Copy-ReleaseTree([string]$Source, [string]$Destination) {
-    $item = Get-Item -LiteralPath $Source -Force
-    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing release symlink: $Source" }
-    if ($item.Name -match '^(node_modules|\.git|\.test|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { return }
-    if ($item.PSIsContainer) {
-      New-Item -ItemType Directory -Force -Path $Destination | Out-Null
-      foreach ($child in Get-ChildItem -LiteralPath $Source -Force) { Copy-ReleaseTree $child.FullName (Join-Path $Destination $child.Name) }
-    } else { Copy-Item -LiteralPath $Source -Destination $Destination }
+  # Use only paths recorded in the Git index; never recursively enumerate local trees.
+  $gitInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $gitInfo.FileName = 'git'
+  $gitInfo.Arguments = ' -c safe.directory="' + $root.Replace('"','\"') + '" ls-files -z'
+  $gitInfo.WorkingDirectory = $root
+  $gitInfo.UseShellExecute = $false
+  $gitInfo.CreateNoWindow = $true
+  $gitInfo.RedirectStandardOutput = $true
+  $gitInfo.RedirectStandardError = $true
+  $gitInfo.StandardOutputEncoding = [Text.Encoding]::UTF8
+  $gitInfo.StandardErrorEncoding = [Text.Encoding]::UTF8
+  $gitProcess = New-Object System.Diagnostics.Process
+  $gitProcess.StartInfo = $gitInfo
+  try {
+    if (-not $gitProcess.Start()) { throw 'Could not start git.' }
+    $trackedOutput = $gitProcess.StandardOutput.ReadToEnd()
+    $gitError = $gitProcess.StandardError.ReadToEnd()
+    $gitProcess.WaitForExit()
+    if ($gitProcess.ExitCode -ne 0) { throw "git ls-files failed: $gitError" }
+  } catch { throw "Cannot enumerate tracked release files; refusing to build: $($_.Exception.Message)" }
+  finally { $gitProcess.Dispose() }
+  $allowedSet = @{}
+  foreach ($name in $allowed) { $allowedSet[$name] = $true }
+  foreach ($relative in ($trackedOutput -split "`0")) {
+    if (-not $relative) { continue }
+    $relative = $relative.Replace('\\','/')
+    if ($relative.StartsWith('/') -or $relative -match '(^|/)\.\.?(/|$)') { throw "Unsafe tracked path: $relative" }
+    $parts = $relative.Split('/')
+    if (-not $allowedSet.ContainsKey($parts[0])) { continue }
+    $skip = $false
+    foreach ($part in $parts) {
+      if ($part -match '^(node_modules|\.git|\.test|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { $skip = $true; break }
+    }
+    if ($skip) { continue }
+    $source = Join-Path $root ($relative.Replace('/',[IO.Path]::DirectorySeparatorChar))
+    $item = Get-Item -LiteralPath $source -Force -ErrorAction Stop
+    if ($item.PSIsContainer) { continue }
+    $checkPath = $source
+    while ($checkPath -and $checkPath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+      $checkItem = Get-Item -LiteralPath $checkPath -Force -ErrorAction Stop
+      if ($checkItem.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing release symlink: $checkPath" }
+      if ([IO.Path]::GetFullPath($checkPath).TrimEnd([IO.Path]::DirectorySeparatorChar) -eq [IO.Path]::GetFullPath($root).TrimEnd([IO.Path]::DirectorySeparatorChar)) { break }
+      $checkPath = Split-Path -Parent $checkPath
+    }
+    $destination = Join-Path $stage ($relative.Replace('/',[IO.Path]::DirectorySeparatorChar))
+    $parent = Split-Path -Parent $destination
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    Copy-Item -LiteralPath $source -Destination $destination
   }
-  foreach ($name in $allowed) { Copy-ReleaseTree (Join-Path $root $name) (Join-Path $stage $name) }
   $zip = Join-Path $release "pi-kether-portable-$version.zip"
   if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
   Compress-Archive -LiteralPath $stage -DestinationPath $zip -CompressionLevel Optimal
