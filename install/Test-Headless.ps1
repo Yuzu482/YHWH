@@ -4,10 +4,12 @@ $root=Split-Path -Parent $PSScriptRoot
 $plugin=Join-Path $root 'payload/pi-dispatch'
 $runner=Join-Path $PSScriptRoot 'Invoke-Headless.ps1'
 $scratch=Join-Path $root ('.test/headless-package-'+[guid]::NewGuid().ToString('N'))
+$previousEnforcement=[Environment]::GetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT','Process')
+$hadEnforcement=$null -ne $previousEnforcement
 New-Item -ItemType Directory -Force -Path $scratch | Out-Null
 try {
   # Reproduce just this feature's packaged files in an isolated installation.
-  foreach($relative in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','workflow/headless.example.json','workflow/catalog.json')) {
+  foreach($relative in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','workflow/headless.example.json','workflow/catalog.json')) {
     $destination=Join-Path $scratch $relative
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
     Copy-Item -LiteralPath (Join-Path $plugin $relative) -Destination $destination
@@ -19,7 +21,9 @@ try {
   $node=(Get-Command node -CommandType Application | Select-Object -First 1).Source
   $fixture=Join-Path $scratch 'fixture.mjs'
   Set-Content -LiteralPath $fixture -Value @'
+import fs from 'node:fs';
 const args=process.argv.slice(2);
+fs.appendFileSync(new URL('calls.log',import.meta.url), (args.includes('--version')?'version':args.includes('--help')?'help':'run')+'\n');
 if(args.includes('--version')) console.log('fixture 1');
 else if(args.includes('--help')) console.log('--json --ephemeral --sandbox --model --config --color');
 else { for await(const chunk of process.stdin){} console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'ok'}}));console.log(JSON.stringify({type:'turn.completed'})); }
@@ -28,6 +32,14 @@ else { for await(const chunk of process.stdin){} console.log(JSON.stringify({typ
   @{schemaVersion=1;workspaceRoots=@($scratch);timeoutSeconds=10;maxOutputBytes=65536;clients=@{codex=@{enabled=$true;executable=$node;nodeScript=$fixture;expectedVersion='fixture 1';model='fixture-model';policy='read-only'}}} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configFile
   $requestsFile=Join-Path $scratch 'batch.local.json'
   @(@{client='codex';cwd=$scratch;prompt='Return ok.'},@{client='codex';cwd=$scratch;prompt='Return ok.'}) | ConvertTo-Json | Set-Content -LiteralPath $requestsFile
+  [Environment]::SetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT','strict','Process')
+  $strictLines=[Collections.Generic.List[string]]::new(); $strictRejected=$false
+  try {
+    & $runner -Action BatchEvents -PluginRoot $scratch -ConfigFile $configFile -RequestFile $requestsFile 2>&1 | ForEach-Object { $strictLines.Add([string]$_) }
+  } catch { $strictRejected=$true }
+  if(-not $strictRejected -or -not ($strictLines -match 'worker_enforcement_headless_blocked')){throw 'Strict headless execution was not structurally denied.'}
+  if(Test-Path -LiteralPath (Join-Path $scratch 'calls.log')){throw 'Strict denial started","the fixture.'}
+  [Environment]::SetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT','off','Process')
   $events=@(& $runner -Action BatchEvents -PluginRoot $scratch -ConfigFile $configFile -RequestFile $requestsFile | ForEach-Object { $_ | ConvertFrom-Json })
   if($events[0].type -ne 'batch-start' -or $events[-1].result.status -ne 'completed' -or $events[-1].result.summary.helpCacheHits -ne 1){throw 'Packaged batch stream failed.'}
   $workflowEvents=@(& (Join-Path $root 'Workflow.ps1') -Action HeadlessBatchEvents -HeadlessConfigFile $configFile -HeadlessRequestFile $requestsFile | ForEach-Object { $_ | ConvertFrom-Json })
@@ -38,6 +50,8 @@ else { for await(const chunk of process.stdin){} console.log(JSON.stringify({typ
   if(-not $rejected){throw 'Installed drift was not rejected.'}
   Write-Host '[PASS] Headless wrappers, model-free batch streams, inert defaults, isolated packaged runtime and installed drift detection.'
 } finally {
+  if($hadEnforcement){[Environment]::SetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT',$previousEnforcement,'Process')}
+  else {[Environment]::SetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT',$null,'Process')}
   $resolved=[IO.Path]::GetFullPath($scratch)
   $expected=[IO.Path]::GetFullPath((Join-Path $root '.test'))+[IO.Path]::DirectorySeparatorChar
   if(-not $resolved.StartsWith($expected,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe fixture cleanup path.'}
