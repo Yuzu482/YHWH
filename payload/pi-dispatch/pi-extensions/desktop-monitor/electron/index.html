@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <meta name="theme-color" content="#0b1018">
+  <title>YHWH · Pi Dispatch</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="renderer.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#main" aria-label="YHWH 监控首页">
+        <span class="brand-mark" aria-hidden="true">Y</span>
+        <span><span class="brand-name">YHWH</span><span class="brand-product">PI DISPATCH</span></span>
+      </a>
+      <div class="topbar-right"><span class="environment"><span class="pulse" aria-hidden="true"></span>本机网关</span><span id="connection" class="status">连接中</span></div>
+    </header>
+
+    <nav class="view-nav" aria-label="主视图">
+      <button id="monitorTab" type="button" aria-controls="monitorView" aria-selected="true">运行状态</button>
+      <button id="configTab" type="button" aria-controls="configView" aria-selected="false">配置</button>
+    </nav>
+
+    <main id="main">
+      <div id="monitorView">
+        <section class="intro" aria-labelledby="page-title">
+          <div><p class="eyebrow">系统概览 <span>／</span> MONITOR</p><h1 id="page-title">运行状态</h1><p class="intro-copy">掌握当前网关与任务队列的实时概况。</p></div>
+          <div class="live-note"><span class="live-dot" aria-hidden="true"></span>状态自动更新</div>
+        </section>
+
+        <section class="metrics" aria-label="网关指标">
+          <article class="metric-card"><div class="metric-label"><span class="metric-icon icon-mint" aria-hidden="true">↗</span>执行中</div><div class="metric-value"><strong id="active">—</strong><span class="metric-unit">个任务</span></div><p class="metric-hint">当前正在处理</p></article>
+          <article class="metric-card"><div class="metric-label"><span class="metric-icon icon-blue" aria-hidden="true">≡</span>排队中</div><div class="metric-value"><strong id="queued">—</strong><span class="metric-unit">个任务</span></div><p class="metric-hint">等待执行调度</p></article>
+          <article class="metric-card"><div class="metric-label"><span class="metric-icon icon-violet" aria-hidden="true">◫</span>网关内存</div><div class="metric-value"><strong id="rss">—</strong><span class="metric-unit">MiB</span></div><p class="metric-hint">当前常驻内存</p></article>
+        </section>
+
+        <section class="workspace" aria-label="任务工作区">
+          <section class="task-panel" aria-labelledby="tasks-title">
+            <div class="panel-heading"><div><p class="eyebrow">ACTIVITY</p><h2 id="tasks-title">任务活动</h2><p id="updated" class="updated">等待数据</p></div><span class="panel-count">实时列表</span></div>
+            <div class="toolbar">
+              <label class="search-box"><span class="search-icon" aria-hidden="true">⌕</span><span class="visually-hidden">搜索任务</span><input id="taskSearch" type="search" placeholder="搜索任务、路由或 ID" autocomplete="off"></label>
+              <label class="select-wrap"><span class="visually-hidden">按状态筛选</span><select id="stateFilter"><option value="all">所有状态</option><option value="active">执行中</option><option value="queued">排队中</option></select></label>
+              <label class="active-filter"><input id="activeOnly" type="checkbox"><span class="checkmark" aria-hidden="true"></span>仅执行中</label>
+            </div>
+            <div id="tasks" class="tasks" aria-live="polite"></div>
+            <p id="empty" class="empty"><span class="empty-mark" aria-hidden="true">—</span><strong>尚无任务</strong><span>任务出现后将在此显示。</span></p>
+          </section>
+
+          <aside class="detail-panel" aria-labelledby="detail-title">
+            <div class="panel-heading"><div><p class="eyebrow">INSPECTOR</p><h2 id="detail-title">任务详情</h2></div><span class="detail-symbol" aria-hidden="true">⌘</span></div>
+            <div class="detail-placeholder"><span class="placeholder-orbit" aria-hidden="true"><span></span></span><strong>选择一个任务</strong><p>任务的路由、状态与运行信息将在此呈现。</p></div>
+            <div class="detail-foot"><span class="detail-foot-dot" aria-hidden="true"></span>只读监控</div>
+          </aside>
+        </section>
+      </div>
+
+      <section id="configView" hidden aria-labelledby="configTitle">
+        <section class="intro"><div><p class="eyebrow">GATEWAY <span>／</span> CONFIG</p><h1 id="configTitle">网关配置</h1><p class="intro-copy">更改仅在保存后写入；网关重启后生效。</p></div></section>
+        <form id="configForm" novalidate>
+          <fieldset id="configFields"><legend>运行限制</legend>
+            <div class="config-field"><label for="maxConcurrency">最大并发数</label><p id="concurrencyHelp">同时执行任务的上限（1–4）。</p><input id="maxConcurrency" name="maxConcurrency" type="number" min="1" max="4" step="1" required aria-describedby="concurrencyHelp"></div>
+            <div class="config-field"><label for="maxQueue">最大队列长度</label><p id="queueHelp">等待执行任务的上限（1–64）。</p><input id="maxQueue" name="maxQueue" type="number" min="1" max="64" step="1" required aria-describedby="queueHelp"></div>
+            <div class="config-field"><label for="maxRequestBytes">最大请求大小（字节）</label><p id="bytesHelp">单个请求的大小上限（1024–1048576）。</p><input id="maxRequestBytes" name="maxRequestBytes" type="number" min="1024" max="1048576" step="1" required aria-describedby="bytesHelp"></div>
+          </fieldset>
+          <div class="config-actions"><button id="saveConfig" type="submit">保存配置</button><button id="reloadConfig" type="button">重新加载</button></div>
+        </form>
+        <p id="configStatus" role="status" aria-live="polite" aria-atomic="true">尚未加载配置。</p>
+        <p id="effectiveStatus" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <footer><span><span class="footer-mark" aria-hidden="true">Y</span>YHWH <span class="footer-separator">·</span> 本机运行</span><span>本机网关 <span class="footer-separator">·</span> 配置管理</span></footer>
+  </div>
+</body>
+</html>

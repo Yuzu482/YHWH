@@ -55,3 +55,33 @@ powershell.exe -NoProfile -STA -File <pi-dispatch>/tests/desktop-monitor-transit
 ```
 
 该检查会打开临时验证窗口，不使用模型或 Gateway。
+
+## 可选 Electron 页面
+
+除现有 WPF 应用外，仓库还提供可选的 Electron YHWH Pi Gateway 监控与配置页面。Electron 运行时依赖较大；现有 `/pi-monitor` 和 `/pi-pet` WPF 命令保持不变，仍是默认方式。Electron 暂无 Pi 斜杠命令，请手动启动开发版：
+
+```powershell
+cd payload/pi-dispatch/pi-extensions/desktop-monitor/electron
+npm ci
+npm start
+```
+
+### Windows 便携版
+
+在 Windows x64 上从仓库根目录运行以下命令构建便携版：
+
+```powershell
+cd payload/pi-dispatch/pi-extensions/desktop-monitor/electron
+npm ci
+npm run package:win
+```
+
+输出位于仓库根目录 `release/desktop-console/`，启动 `YHWH-Pi-Gateway.exe`。这是便携文件夹，不是单文件程序；必须将 EXE 与同目录 DLL 和 `resources` 文件夹放在一起。使用时，本机 Pi Gateway 必须已运行，且默认配置 `~/.local/state/pi-kether/gateway-silent.json` 或 `PI_GATEWAY_CONFIG` 必须指向有效的本地配置。打包不会部署到 Pi、自动启动 Gateway 或包含凭据。已确认 Windows 构建、打包 feed 导入及隐藏进程 10 秒内保持响应；打包 feed 在一次性测试中已认证连接当前 Gateway（Connected=True、Active=0、Queued=0、TaskCount=6），但 Electron 窗口的渲染状态及交互式配置控件仍未进行视觉验证。
+
+监控通过 Electron `utilityProcess` 调用现有 `feed.mjs`，连接本机 Gateway 并显示清理后的只读任务快照。配置读取固定启动时确定的 `PI_GATEWAY_CONFIG` 路径；未设置时使用 `~/.local/state/pi-kether/gateway-silent.json`。配置页面只允许显式保存三个数值：`maxConcurrency`（1–4）、`maxQueue`（1–64）和 `maxRequestBytes`（1024–1048576），默认值分别为 4、16 和 102400。保存具有乐观修订冲突保护，会保留未知配置项，并通过临时文件和重命名原子写入。渲染器不会接收令牌、配置路径或原始 JSON。
+
+保存只修改磁盘配置；要使其生效，必须重启 Gateway，页面不会替你重启。页面不提供任意配置编辑、任务写入或取消操作。凭据仅限宿主侧处理；不要在文档、命令行或截图中暴露凭据。
+
+YHWH 页面显示 Gateway 连接状态、执行中与排队中任务数量及 Gateway RSS。任务列表支持按任务/路由/ID 搜索、按执行中或排队中状态筛选，以及仅显示执行中任务。选择任务可查看角色、状态、请求 ID、路由和耗时。离线时指标显示占位符且不展示任务；无任务时显示空状态，筛选无匹配时也会提示。
+
+验证范围：宿主对 `config-store.mjs`、`main.mjs`、`preload.cjs` 和 `renderer.js` 执行的 `node --check` 通过；`desktop-monitor.test.mjs` 与 `gateway-console-config.test.mjs` 共 9 项测试通过。当前配置 UI 的视觉内容及点击操作尚未验证；先前监控版本的 Electron 窗口/feed 活性结果不代表当前配置 UI 已验证。此处不表示已部署到本地 Pi、发布正式版本或完成完整视觉 QA。

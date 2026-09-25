@@ -81,3 +81,33 @@ animation times, not a guarantee of frame rate on every host.
 Ship transitions.ps1 with the other UI files. Windows UI regression check:
 `powershell.exe -NoProfile -STA -File <pi-dispatch>/tests/desktop-monitor-transitions.ps1`.
 The check opens a temporary verification window and uses no model or Gateway.
+
+## Optional Electron page
+
+Alongside the existing WPF app, the repository includes an optional Electron YHWH Pi Gateway monitor and configuration page. Electron is a comparatively large runtime dependency; the existing `/pi-monitor` and `/pi-pet` WPF commands are unchanged and remain the default. Electron has no Pi slash command yet; launch the development version manually:
+
+```powershell
+cd payload/pi-dispatch/pi-extensions/desktop-monitor/electron
+npm ci
+npm start
+```
+
+### Windows portable build
+
+On Windows x64, run these commands from the repository root to build the portable version:
+
+```powershell
+cd payload/pi-dispatch/pi-extensions/desktop-monitor/electron
+npm ci
+npm run package:win
+```
+
+Output is in the repository-root `release/desktop-console/`; launch `YHWH-Pi-Gateway.exe`. This is a portable folder, not a single-file executable: keep the EXE together with the DLLs and `resources` directory beside it. The local Pi Gateway must be running, and the default `~/.local/state/pi-kether/gateway-silent.json` or `PI_GATEWAY_CONFIG` must point to a valid local configuration. Packaging does not deploy to Pi, auto-start Gateway, or include credentials. A Windows build, packaged feed import, and a hidden process remaining responsive for 10 seconds were confirmed; in a one-shot test, the packaged feed authenticated to the current Gateway (Connected=True, Active=0, Queued=0, TaskCount=6), but the Electron window's rendered status and interactive configuration controls remain visually unverified.
+
+The monitor uses Electron `utilityProcess` to run the existing `feed.mjs`, connect to the local Gateway, and display sanitized, read-only task snapshots. Configuration is read from the fixed path determined at startup by `PI_GATEWAY_CONFIG`, falling back to `~/.local/state/pi-kether/gateway-silent.json`. The configuration page allows explicit saving of only three numeric fields: `maxConcurrency` (1–4), `maxQueue` (1–64), and `maxRequestBytes` (1024–1048576), with defaults of 4, 16, and 102400. Saving uses an optimistic revision conflict guard, preserves unknown keys, and writes atomically via a temporary file and rename. The renderer is not given tokens, the configuration path, or raw JSON.
+
+Saving changes the on-disk configuration only; the Gateway must be restarted for changes to take effect. The page does not restart it. The page provides no arbitrary configuration editor, task writes, or task cancellation. Credentials remain host-side; do not expose them in documentation, command lines, or screenshots.
+
+The YHWH page shows Gateway connection status, running and queued task counts, and Gateway RSS. The task list supports search by task/route/ID, filtering by running or queued state, and an active-only view. Selecting a task shows its role, state, request ID, route, and elapsed time. Offline, metrics use placeholders and tasks are not shown; with no tasks, an empty state appears, and filters with no matches are reported separately.
+
+Verification scope: host `node --check` checks passed for `config-store.mjs`, `main.mjs`, `preload.cjs`, and `renderer.js`; the `desktop-monitor.test.mjs` and `gateway-console-config.test.mjs` suites passed, 9 tests total. The current configuration UI's visual content and click actions remain unverified; liveness results from the earlier monitor-only version do not verify the current configuration UI. This does not claim deployment to a local Pi, a published release, or complete visual QA.

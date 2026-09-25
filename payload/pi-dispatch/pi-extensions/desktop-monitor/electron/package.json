@@ -1,0 +1,9 @@
+{
+  "name": "pi-kether-desktop-monitor-electron",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": { "start": "electron .", "package:win": "node package-win.mjs" },
+  "devDependencies": { "electron": "44.4.4" }
+}
