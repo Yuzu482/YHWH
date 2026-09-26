@@ -14,7 +14,7 @@ export function describePet(snapshot){
 export function projectSnapshot(data){
   if(data?.ok!==true||!data.gateway||!Array.isArray(data.tasks))throw new Error('Invalid monitor snapshot');
   const text=value=>String(value??'').slice(0,160);
-  const snapshot={ok:true,instance:text(data.gateway.instanceId),active:Number(data.gateway.active)||0,queued:Number(data.gateway.queued)||0,rssMiB:Number(data.gateway.gatewayRssMiB)||0,updatedAt:new Date().toISOString(),tasks:data.tasks.slice(0,50).map(t=>({requestId:text(t.requestId),role:text(t.role),state:text(t.state),route:text(`${t.actualProvider||t.requestedProvider||''}/${t.actualModel||t.requestedModel||''}`),seconds:Math.round((Number(t.elapsedMs)||0)/1000)}))};
+  const snapshot={ok:true,instance:text(data.gateway.instanceId),active:Number(data.gateway.active)||0,queued:Number(data.gateway.queued)||0,rssMiB:Number(data.gateway.gatewayRssMiB)||0,updatedAt:new Date().toISOString(),tasks:data.tasks.slice(0,50).map(t=>({requestId:text(t.requestId),role:text(t.role),displayName:text(t.displayName),displayNameZh:text(t.displayNameZh),state:text(t.state),route:text(`${t.actualProvider||t.requestedProvider||''}/${t.actualModel||t.requestedModel||''}`),seconds:Math.round((Number(t.elapsedMs)||0)/1000)}))};
   return {...snapshot,pet:describePet(snapshot)};
 }
 export async function runFeed(configPath,{onceOnly=false}={}){

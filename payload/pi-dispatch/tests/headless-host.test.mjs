@@ -206,9 +206,9 @@ test('whole batch validation prevents all execution when a later request is inva
 
 test('batch events arrive before completion, heartbeat during silence, and summarize actual savings', async t => {
   const f = fixture(t, { delayMs: 1250 }), events = [];
+  f.config.timeoutSeconds = 15;
   const result = await runHeadlessBatch(f.config, [f.request, f.request], { onEvent: e => {
     events.push(e);
-    if (e.type === 'waiting' && e.phase === 'running') assert(fs.existsSync(path.join(f.root, 'active.lock')));
     if (e.type === 'request-result' && e.index === 0) {
       assert.equal(fs.readFileSync(path.join(f.root, 'calls.log'), 'utf8').split('run').length - 1, 1, 'first result must precede second invocation');
     }

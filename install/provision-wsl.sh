@@ -53,6 +53,7 @@ install -D -o root -g root -m 0755 /tmp/pi-kether-install/pi-kether-sandbox /usr
 install -o root -g root -m 0644 /tmp/pi-kether-install/validate-write-scope.mjs /opt/pi-kether/scripts/validate-write-scope.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/write-scope-guard.js /opt/pi-kether/extensions/write-scope-guard.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/auth-scrub.js /opt/pi-kether/extensions/auth-scrub.js
+install -o root -g root -m 0644 /tmp/pi-kether-install/source-window.js /opt/pi-kether/extensions/source-window.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/read-scope-guard.js /opt/pi-kether/extensions/read-scope-guard.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/role-presets.js /opt/pi-kether/extensions/role-presets.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/result-submit.js /opt/pi-kether/extensions/result-submit.js

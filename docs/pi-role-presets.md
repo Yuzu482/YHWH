@@ -6,16 +6,18 @@ YHWH 为八个 Kether 子代理角色提供固定的 Pi preset。网关先确认
 
 WSL 只读或限定写入任务通过受控 `yhwh_submit_result` 工具恰好提交一次结构化结果，网关确定性校验规范 JSON。无访问权限任务（包括 reviewer）仍使用单行 `KETHER_RESULT_JSON=` 最终封包。角色卡提示本身不能保证模型遵从；格式错误仍会被拒绝。
 
-| 角色 | 职责 | 允许的文件访问 |
-| --- | --- | --- |
-| Yesod | 归一化目标与任务约束 | 无 |
-| Binah | 澄清实质性歧义 | 无 |
-| Hod | 评估复杂度与风险 | 无 |
-| Malkuth | 侦察工作区并记录证据 | 无或只读 |
-| Chochmah | 制定有界执行方案 | 无或只读 |
-| Chesed | 在授权范围内编码与修改 | 无、只读或限定写入 |
-| Netzach | 只读验证与验收记录 | 无或只读 |
-| Geburah | 审查提供的材料 | 无 |
+| 友好运行时名称（中文 / English） | 内部 ID | 职责 | 允许的文件访问 |
+| --- | --- | --- | --- |
+| 任务整理 / Task Intake | Yesod | 归一化目标与任务约束 | 无 |
+| 需求澄清 / Clarifier | Binah | 澄清实质性歧义 | 无 |
+| 风险评估 / Risk Analyst | Hod | 评估复杂度与风险 | 无 |
+| 资料调查 / Researcher | Malkuth | 侦察工作区并记录证据 | 无或只读 |
+| 方案规划 / Planner | Chochmah | 制定有界执行方案 | 无或只读 |
+| 实现开发 / Implementer | Chesed | 在授权范围内编码与修改 | 无、只读或限定写入 |
+| 结果验证 / Verifier | Netzach | 只读验证与验收记录 | 无或只读 |
+| 独立审查 / Reviewer | Geburah | 审查提供的材料 | 无 |
+
+Kether 名称是开发/内部标识符，用于协议兼容；面向用户的 agent 使用任务名称。
 
 `worker`、`researcher`、`reviewer` 分别归一化为 Chesed、Malkuth、Geburah。Kether 和 Tifereth 留在主宿主；Da'at 目前不是可派发的 Pi preset。现有模型绑定保持不变：七个非审查角色使用 Luna，Geburah 使用 Claude Sonnet。无访问权限的任务不获得文件工具；只读任务按角色可用限定的读取与 LSP 工具。Chesed 的只读和限定写入预设开放核心文件工具及结果提交工具 `yhwh_submit_result`，不向编码任务暴露 LSP；确定性探针由主代理直接调用 `lsp_request`。只有 Chesed 在独立授权、明确 `writeScope` 且操作系统沙箱可用时才能写入。
 

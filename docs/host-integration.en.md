@@ -59,7 +59,7 @@ The checker starts a real stdio process, completes MCP initialization, discovers
 
 Next, in a new target-host session, have the primary call `get_workflow(topic="primary")`, `get_workflow(topic="pi-routing")` and `list_capabilities`, and verify roots, role bindings and sandbox status. Hosts prefix tools: use discovered names. Only run worker/reviewer heartbeats after confirming model/cost authorization. A write-task test additionally requires checking the returned patch, primary application and final project result.
 
-A chat host without file-editing tools can coordinate, inspect and return proposals, but cannot automatically apply sandbox patches to the real project. The primary must hand off to a capable, authorized tool/person and must not report fictitious edits.
+A chat host without file-editing tools can coordinate, inspect and return proposals, but cannot automatically apply sandbox patches to the real project. The primary must hand off to a capable, authorized tool/person and must not report fictitious edits. See the [generated-page adaptation guide](generated-page-adapter.en.md) for OpenDesign/source windows, staged task packets and browser-acceptance boundaries.
 
 ## Concurrent hosts and platform limits
 

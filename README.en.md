@@ -6,6 +6,8 @@ YHWH is a portable Kether governance and Pi execution environment for Windows 11
 
 **Quick start:** See [one-click installation](#one-click-installation-windows-11-x64) (requires Windows 11, WSL2 and hardware virtualization), or start with the [common client guide](docs/common-clients.en.md). The project layout is below; installation details and verification boundaries are in [Installation](#installation) and [Verification and removal](#verification-and-removal).
 
+For friendly agent names and their internal Kether IDs, see the [Pi role preset guide](docs/pi-role-presets.en.md) / [简体中文](docs/pi-role-presets.md).
+
 **Switchable worker enforcement.** New source rejects non-Luna workers at YHWH-managed entry points by default, preserving controlled reviewer/heartbeat exceptions; strict mode disables independent headless CLI model execution. The host can select `YHWH_WORKER_ENFORCEMENT=strict|off`; tasks cannot override it. Existing services need a separate upgrade. This does not provide OS isolation for the host's own terminal/editor. See [switch and enforcement scope](docs/worker-enforcement.en.md).
 
 **Primary reasoning and orchestration only:** Astra (or the host-selected primary model) owns planning, scheduling, patch integration and acceptance. Pi subagents author code, tests and implementation repairs. Native workers default to Luna/medium, with explicit low, high or max effort chosen for task complexity. Worker failure never silently falls back to primary coding. This is a host instruction policy, not a mechanism disabling every client's editing tools; see [ownership and failure handling](docs/coordinator-only.en.md) and [worker thinking and delivery budgets](docs/worker-budgets.en.md).

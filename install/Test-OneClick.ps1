@@ -130,6 +130,10 @@ if($Installer) {
     $packed=Join-Path $package $sessionFile
     Check ((Test-Path -LiteralPath $packed) -and ((Get-FileHash -LiteralPath $packed).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo $sessionFile)).Hash)) "Release preserves $sessionFile"
   }
+  foreach($generatedPageFile in @('payload/pi-dispatch/extensions/source-window.js','payload/pi-dispatch/tests/source-window.test.mjs','docs/generated-page-adapter.md','docs/generated-page-adapter.en.md')) {
+    $packed=Join-Path $package $generatedPageFile
+    Check ((Test-Path -LiteralPath $packed) -and ((Get-FileHash -LiteralPath $packed -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo $generatedPageFile) -Algorithm SHA256).Hash)) "Release preserves $generatedPageFile"
+  }
   $files=@(Get-ChildItem -LiteralPath $package -Recurse -Force -File)
   $badFiles=@($files|Where-Object{$_.FullName -match '[\\/](node_modules|\.git|\.runtime)[\\/]|[\\/]auth\.json$|[\\/](anthropic-api-key|provider-config|provider-credentials)\.json$|[\\/]\.env[^\\/]*$'})
   Check ($badFiles.Count -eq 0) 'Release excludes dependencies, credentials and runtime state'

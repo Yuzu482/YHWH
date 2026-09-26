@@ -11,6 +11,15 @@ function options(env = process.env) {
   return { url: `http://${config.host ?? '127.0.0.1'}:${config.port ?? 7331}/mcp`, token };
 }
 
+async function withWriteReceipt(client,requests){
+  if(!requests.some(request=>request.access==='workspace-write'))return requests;
+  const response=await client.callTool({name:'get_workflow',arguments:{topic:'coordinator-only'}});
+  if(response.isError)throw new Error('Cannot retrieve coordinator-only workflow topic');
+  const receipt=JSON.parse(response.content?.find(item=>item.type==='text')?.text??'{}').receipt;
+  if(typeof receipt!=='string'||!receipt)throw new Error('Gateway did not issue a workflow receipt');
+  return requests.map(request=>request.access==='workspace-write'?{...request,workflowReceipt:receipt}:request);
+}
+
 async function main(args) {
   const command = args.shift();
   if ((command === 'cooperative-plan' || command === 'cooperative-submit') && args.length === 1) {
@@ -22,7 +31,8 @@ async function main(args) {
     const transport = new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: { Authorization: `Bearer ${token}` } } });
     try {
       await client.connect(transport);
-      const settled = await Promise.allSettled(plan.requests.map(request => client.callTool({ name: 'submit_subagent', arguments: request }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 })));
+      const requests=await withWriteReceipt(client,plan.requests);
+      const settled = await Promise.allSettled(requests.map(request => client.callTool({ name: 'submit_subagent', arguments: request }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 })));
       const receipts = settled.map((result, index) => {
         const request = plan.requests[index];
         const unitId = spec.units[index].id;
@@ -47,7 +57,8 @@ async function main(args) {
     if (command === 'capabilities' && args.length === 0) return await client.callTool({ name: 'list_capabilities', arguments: {} });
     if (command === 'dispatch' && args.length === 1) {
       const request = JSON.parse(readFileSync(resolve(args[0]), 'utf8').replace(/^\uFEFF/, ''));
-      return await client.callTool({ name: 'dispatch_subagent', arguments: request }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });
+      const [prepared]=await withWriteReceipt(client,[request]);
+      return await client.callTool({ name: 'dispatch_subagent', arguments: prepared }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });
     }
     if (command === 'probe' && args.length >= 2 && args.length <= 3) {
       return await client.callTool({ name: 'probe_model', arguments: { provider: args[0], model: args[1], cwd: process.cwd(), resourceProfile: args[2] ?? 'standard', timeoutSeconds: 180, requestId: `probe-${Date.now()}` } }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });

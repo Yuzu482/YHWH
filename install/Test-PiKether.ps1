@@ -71,6 +71,10 @@ if ($Installed) {
   if (-not $SkipWsl) {
     & wsl.exe -d $WslDistro -u root --exec test -f /opt/pi-kether/extensions/role-presets.js
     Check ($LASTEXITCODE -eq 0) 'WSL role presets extension installed'
+    & wsl.exe -d $WslDistro -u root --exec test -f /opt/pi-kether/extensions/source-window.js
+    Check ($LASTEXITCODE -eq 0) 'WSL source-window extension installed'
+    & wsl.exe -d $WslDistro -u root --exec /opt/node/bin/node --check /opt/pi-kether/extensions/source-window.js
+    Check ($LASTEXITCODE -eq 0) 'WSL source-window ES module parses'
     $probe = & wsl.exe -d $WslDistro -u root -- /usr/local/libexec/pi-kether-sandbox --probe
     $probeObject = try { $probe | ConvertFrom-Json } catch { $null }
     Check ($LASTEXITCODE -eq 0 -and $probeObject.ok -eq $true -and $probeObject.resourceLimits -eq $true) 'WSL isolation and cgroup resource limits'

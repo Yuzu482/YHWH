@@ -54,4 +54,4 @@ The released reviewer uses the native Pi `anthropic / claude-sonnet-5 / max` rou
 
 ## API key encryption (0.8)
 
-YHWH-managed Anthropic and aggregator API key files require api_key_dpapi envelopes using Windows DPAPI CurrentUser. Decrypt only in the fixed Windows helper, capture into private pipes, validate the route/config digest in WSL, and pass through kernel pipe FD3. API routes must never use plaintext credential files, argv, environment, prompt or log fallback. Legacy plaintext raises PI_AUTH_MIGRATION_REQUIRED; the operator upgrades the gateway and WSL files, then explicitly runs Migrate-API-Keys.cmd or install/Migrate-ApiCredentials.ps1. No plaintext backup is created. Migration does not erase old backups or freed disk blocks. Existing Pi OpenAI OAuth storage is outside this API-key change. Runtime memory and same-user/OS compromise remain outside the encryption guarantee.
+YHWH-managed API keys use Windows DPAPI CurrentUser; plaintext fallback is forbidden. The canonical encryption, migration and limitation policy is the `pi-auth` topic (`get_workflow({"topic":"pi-auth"})`), generated from `templates/agent-references/pi-auth.md`.

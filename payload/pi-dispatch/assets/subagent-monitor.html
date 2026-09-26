@@ -151,7 +151,10 @@
       const waiting = (task.waitReasons||[]).map(r=>waitLabels[r]||r).join('、');
       const failure = `<div class="meta"><span>排队 ${duration(task.queueWaitMs)} / 上限 ${task.queueTimeoutSeconds??120}s</span><span>执行 ${duration(task.executionMs)}${task.executionTimeoutSeconds?' / 上限 '+task.executionTimeoutSeconds+'s':''}</span>${waiting?'<span>'+escapeText(waiting)+'</span>':''}${outcome?.reviewDecision?'<span>审查：'+escapeText(outcome.reviewDecision)+'</span>':''}${outcome?.failureReason?'<span>'+escapeText(outcome.failureReason)+'</span>':''}</div>`;
       const cancel = task.cancellable ? `<div class="task-actions"><button type="button" data-cancel="${escapeText(task.requestId)}">取消任务</button></div>` : "";
-      return `<article class="task"><div class="task-head"><div><h2>${escapeText(task.role)} · ${escapeText(task.requestId)}</h2><div class="meta"><span>${escapeText(route)}</span><span>${escapeText(task.access)}</span>${dependencies}</div></div><span class="state ${escapeText(task.state)}">${stateLabels[task.state] || escapeText(task.state)}</span></div><div class="meta"><span>耗时 ${duration(task.elapsedMs)}</span><span>${escapeText(tools)}</span><span>${escapeText(tokens)}</span></div>${failure}${phaseText?'<div class="meta">'+escapeText(phaseText)+'</div>':''}${cancel}</article>`;
+      const role = escapeText(task.role || 'unknown');
+      const friendlyName = escapeText(task.displayNameZh || task.displayName || task.role || 'unknown');
+      const roleDetail = `<span>${escapeText(task.displayName || task.role || 'unknown')} · ${role}</span>`;
+      return `<article class="task"><div class="task-head"><div><h2>${friendlyName} · ${escapeText(task.requestId)}</h2><div class="meta">${roleDetail}<span>${escapeText(route)}</span><span>${escapeText(task.access)}</span>${dependencies}</div></div><span class="state ${escapeText(task.state)}">${stateLabels[task.state] || escapeText(task.state)}</span></div><div class="meta"><span>耗时 ${duration(task.elapsedMs)}</span><span>${escapeText(tools)}</span><span>${escapeText(tokens)}</span></div>${failure}${phaseText?'<div class="meta">'+escapeText(phaseText)+'</div>':''}${cancel}</article>`;
     }
     function render(data) {
       if (!data?.gateway) return;

@@ -146,7 +146,8 @@ function renderDetail(task) {
   detail.hidden = false;
   detail.replaceChildren();
   const fields = [
-    ['角色', task.role || '任务'], ['状态', task.state || '未知'],
+    ['友好名称', task.displayNameZh || task.displayName || task.role || '任务'],
+    ['英文名称', task.displayName || task.role || '任务'], ['角色 ID', task.role || 'unknown'], ['状态', task.state || '未知'],
     ['请求 ID', task.requestId || '无 ID'], ['路由', task.route || '路由未知'],
     ['已耗时', `${Math.max(0, Number(task.seconds) || 0)} 秒`]
   ];
@@ -175,7 +176,7 @@ function renderView() {
     const queued = state === 'queued';
     if (controls.active.checked && !active) return false;
     if (stateFilter === 'active' && !active || stateFilter === 'queued' && !queued) return false;
-    return !query || [task.role, task.state, task.requestId, task.route].some(value => String(value ?? '').toLocaleLowerCase().includes(query));
+    return !query || [task.role, task.displayName, task.displayNameZh, task.state, task.requestId, task.route].some(value => String(value ?? '').toLocaleLowerCase().includes(query));
   }) : [];
   const list = $('tasks'); list.replaceChildren();
   for (const task of tasks) {
@@ -183,13 +184,15 @@ function renderView() {
     const button = document.createElement('button'); button.type = 'button';
     button.className = 'task-card'; button.setAttribute('data-request-id', id); button.setAttribute('aria-pressed', String(Boolean(id && id === selectedRequestId)));
     const heading = document.createElement('span'); heading.className = 'task-heading';
-    const role = document.createElement('strong'); role.textContent = task.role || '任务';
+    const role = document.createElement('strong'); role.textContent = task.displayNameZh || task.displayName || task.role || '任务';
     const state = document.createElement('span'); state.className = 'task-state'; state.textContent = task.state || '未知';
     heading.append(role, state);
+    const roleDetail = document.createElement('span'); roleDetail.className = 'details';
+    roleDetail.textContent = `${task.displayName || task.role || '任务'} · ${task.role || 'unknown'}`;
     const route = document.createElement('span'); route.className = 'route'; route.textContent = task.route || '路由未知';
     const info = document.createElement('span'); info.className = 'details';
     info.textContent = `${id || '无 ID'} · ${Math.max(0, Number(task.seconds) || 0)} 秒`;
-    button.append(heading, route, info);
+    button.append(heading, roleDetail, route, info);
     button.addEventListener('click', () => { selectedRequestId = id || null; renderView(); });
     list.append(button);
   }

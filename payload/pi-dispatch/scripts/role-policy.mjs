@@ -5,6 +5,12 @@ export const ROLE_MODELS = Object.freeze({
   Geburah: 'claude-sonnet-5',
 });
 export const ROLE_ALIASES = Object.freeze({worker:'Chesed',researcher:'Malkuth',reviewer:'Geburah'});
+export const ROLE_DISPLAY_NAMES = Object.freeze({
+  Yesod: ['Task Intake', '任务整理'], Binah: ['Clarifier', '需求澄清'],
+  Hod: ['Risk Analyst', '风险评估'], Malkuth: ['Researcher', '资料调查'],
+  Chochmah: ['Planner', '方案规划'], Chesed: ['Implementer', '实现开发'],
+  Netzach: ['Verifier', '结果验证'], Geburah: ['Reviewer', '独立审查'],
+});
 export const ROLE_PROVIDERS = Object.freeze(Object.fromEntries(Object.keys(ROLE_MODELS).map(role => [role,role === 'Geburah' ? 'anthropic' : 'openai-codex'])));
 export function resolveRoleModel(role, requestedModel, requestedProvider) {
   const canonical = Object.hasOwn(ROLE_ALIASES,role) ? ROLE_ALIASES[role] : role;

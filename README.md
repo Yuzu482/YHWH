@@ -6,6 +6,8 @@ YHWH 是面向 Windows 11 + WSL2 的便携式 Kether 治理规则与 Pi 执行�
 
 **快速开始：** 查看[一键安装](#一键安装windows-11-x64)（需 Windows 11、WSL2 与硬件虚拟化），或先读[常见客户端接入](docs/common-clients.md)；项目结构见下方，安装细节与验证边界见[安装](#安装)和[验证与卸载](#验证与卸载)。
 
+角色友好名称与内部 Kether ID 的对应关系见[Pi 角色预设指南](docs/pi-role-presets.md) / [English](docs/pi-role-presets.en.md)。
+
 **可切换的 worker 硬限制。** 新源码默认在 YHWH 受管入口拒绝非 Luna worker，保留受控 reviewer/心跳例外；独立无头 CLI 模型执行在严格模式下停用。宿主可通过 `YHWH_WORKER_ENFORCEMENT=strict|off` 切换，任务不能覆盖。已有服务需要单独升级；不包含对宿主自身终端/编辑器的操作系统隔离。详见[开关与约束范围](docs/worker-enforcement.md)。
 
 **主代理只负责思考与调度：** Astra（或宿主选择的主模型）负责方案、调度、补丁整合与验收；代码、测试和实现修复由 Pi 子代理编写，原生 worker 默认 Luna/medium，并按任务复杂度显式选择 low、high 或 max。子代理失败不自动回退为主代理编码。该策略是宿主指令约束，不能禁用所有客户端的编辑工具；详见[职责与失败处理](docs/coordinator-only.md)与[思考档位和交付预算](docs/worker-budgets.md)。

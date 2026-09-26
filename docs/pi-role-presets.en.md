@@ -6,16 +6,18 @@ YHWH provides fixed Pi presets for eight Kether subagent roles. The gateway vali
 
 WSL read and workspace-write tasks submit one structured result through the controlled `yhwh_submit_result` tool; the gateway deterministically validates the canonical JSON. No-access tasks, including the reviewer, retain the single-line `KETHER_RESULT_JSON=` final envelope. Role-card instructions alone do not guarantee compliance; malformed results are rejected.
 
-| Role | Function | Permitted file access |
-| --- | --- | --- |
-| Yesod | Normalize the goal and task constraints | None |
-| Binah | Resolve material ambiguity | None |
-| Hod | Assess complexity and risk | None |
-| Malkuth | Inspect the workspace and record evidence | None or read-only |
-| Chochmah | Prepare a bounded execution plan | None or read-only |
-| Chesed | Code and modify files within authorization | None, read-only, or scoped write |
-| Netzach | Verify read-only evidence and record acceptance | None or read-only |
-| Geburah | Review supplied materials | None |
+| Friendly runtime name (中文 / English) | Internal ID | Function | Permitted file access |
+| --- | --- | --- | --- |
+| 任务整理 / Task Intake | Yesod | Normalize the goal and task constraints | None |
+| 需求澄清 / Clarifier | Binah | Resolve material ambiguity | None |
+| 风险评估 / Risk Analyst | Hod | Assess complexity and risk | None |
+| 资料调查 / Researcher | Malkuth | Inspect the workspace and record evidence | None or read-only |
+| 方案规划 / Planner | Chochmah | Prepare a bounded execution plan | None or read-only |
+| 实现开发 / Implementer | Chesed | Code and modify files within authorization | None, read-only, or scoped write |
+| 结果验证 / Verifier | Netzach | Verify read-only evidence and record acceptance | None or read-only |
+| 独立审查 / Reviewer | Geburah | Review supplied materials | None |
+
+Kether names are development/internal identifiers retained for protocol compatibility; user-facing agents use task names.
 
 The aliases `worker`, `researcher`, and `reviewer` resolve to Chesed, Malkuth, and Geburah respectively. Kether and Tifereth remain in the primary host; Da'at is not currently a dispatchable Pi preset. Existing model bindings remain: the seven non-review roles use Luna, and Geburah uses Claude Sonnet. Tasks with no access get no file tools; read-only tasks may use bounded reading and LSP tools according to their role. Chesed's read-only and scoped-write presets expose core file tools plus the `yhwh_submit_result` submission tool, leaving deterministic LSP probes to the primary host through `lsp_request`. Only Chesed may write when separately authorized with an explicit `writeScope` and an available OS sandbox.
 

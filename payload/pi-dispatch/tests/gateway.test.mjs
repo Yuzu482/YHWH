@@ -4,11 +4,13 @@ import {resultDigest} from '../extensions/role-contract.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, join, resolve } from 'node:path';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { request as httpRequest } from 'node:http';
 import { EventEmitter } from 'node:events';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { BoundedExecutor, createGatewayApp, createGatewayRuntime, registerMcpResponseCleanup, resolveAllowedCwd, resolveAllowedFile } from '../scripts/gateway.mjs';
@@ -18,6 +20,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const testsDir = resolve(root, 'tests');
 const token = 'test-token-0123456789-0123456789-abcdef';
 const verifiedSandbox = { ok: true, backend: 'wsl2-bwrap', hostMountVisible: false, windowsInterop: false, bubblewrap: true, pi: true, resourceLimits: true };
+const execFileAsync=promisify(execFile);
 
 test('MCP response cleanup is registered early and runs exactly once', async () => {
   const res = new EventEmitter();
@@ -61,6 +64,45 @@ function formattedTaskResult(task) { return 'KETHER_RESULT_JSON='+JSON.stringify
 function parsed(result) {
   return JSON.parse(result.content[0].text);
 }
+
+async function receiptFor(client,topic){
+  return parsed(await client.callTool({name:'get_workflow',arguments:{topic}})).receipt;
+}
+
+test('topic gate blocks omitted and mismatched receipts before write dispatch or submission',async()=>{
+  let calls=0;const records=[];
+  await withGateway(async({client})=>{
+    const task={role:'worker',objective:'Scoped fixture change',acceptance:['Return result'],readScope:['package.json'],writeScope:['package.json']};
+    const base={cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'workflow-write',task};
+    const omitted=parsed(await client.callTool({name:'dispatch_subagent',arguments:base}));
+    assert.equal(omitted.code,'WORKFLOW_TOPIC_REQUIRED');assert.match(omitted.error,/get_workflow.*coordinator-only/);
+    const wrong=await receiptFor(client,'pi-routing');
+    assert.equal(parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,workflowReceipt:wrong}})).code,'WORKFLOW_TOPIC_REQUIRED');
+    assert.equal(parsed(await client.callTool({name:'submit_subagent',arguments:{...base,workflowReceipt:wrong}})).code,'WORKFLOW_TOPIC_REQUIRED');
+    assert.equal(calls,0);
+    const correct=await receiptFor(client,'coordinator-only');
+    const accepted=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,workflowReceipt:correct}}));
+    assert.equal(accepted.ok,true);assert.equal(calls,1);
+    assert.ok(records.some(record=>record.operation==='workflow_topic_required'&&record.topic==='coordinator-only'));
+    assert.ok(records.some(record=>record.operation==='get_workflow'&&record.topic==='coordinator-only'));
+    assert.ok(records.some(record=>record.operation==='workflow_topic_admitted'&&record.topic==='coordinator-only'));
+    assert.equal(records.some(record=>JSON.stringify(record).includes(correct)),false);
+  },{dispatchFn:async(request,_signal,task)=>{calls++;return {ok:true,provider:request.provider,model:request.model,text:formattedTaskResult(task)};},auditLogger:{enabled:true,record:value=>records.push(value)}});
+});
+
+test('gateway CLI fetches the write topic before submitting a scoped request',async()=>{
+  const directory=mkdtempSync(join(tmpdir(),'yhwh-cli-write-'));
+  try{
+    await withGateway(async({port})=>{
+      const config=join(directory,'gateway.json'),tokenFile=join(directory,'token'),requestFile=join(directory,'request.json');
+      writeFileSync(tokenFile,token);
+      writeFileSync(config,JSON.stringify({host:'127.0.0.1',port,tokenFile}));
+      writeFileSync(requestFile,JSON.stringify({cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'cli-write-receipt',task:{role:'worker',objective:'Prepare scoped fixture change',acceptance:['Return result'],readScope:['package.json'],writeScope:['package.json']}}));
+      const {stdout}=await execFileAsync(process.execPath,[resolve(root,'scripts/gateway-client.mjs'),'dispatch',requestFile],{env:{...process.env,PI_GATEWAY_CONFIG:config},timeout:15000,windowsHide:true});
+      assert.equal(JSON.parse(stdout).ok,true);
+    });
+  }finally{rmSync(directory,{recursive:true,force:true});}
+});
 
 test('typed failed/unverified outputs and type errors cannot produce successful outcomes or contracts', async()=>{
   let mode='failed';
@@ -368,7 +410,8 @@ test('gateway preserves Tifereth trace ids and reports the enforced resource pro
     assert.equal(readResult.resourceLimits.timeoutSeconds, 5);
     assert.equal(readResult.formatValidation.ok, true);
     assert.equal(readResult.structuredResult.status, 'completed');
-    const writeResult = await client.callTool({ name: 'dispatch_subagent', arguments: { ...common, access: 'workspace-write', task: { ...task, writeScope: ['package.json'] } } });
+    const workflowReceipt=await receiptFor(client,'coordinator-only');
+    const writeResult = await client.callTool({ name: 'dispatch_subagent', arguments: { ...common, access: 'workspace-write', workflowReceipt, task: { ...task, writeScope: ['package.json'] } } });
     assert.equal(writeResult.isError, false);
     assert.equal(parsed(writeResult).writeScopeEnforced, true);
   });
@@ -383,7 +426,8 @@ test('workspace-write requires requestId and replays one durable result without 
   };
   await withGateway(async ({ client }) => {
     const task = { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Prepare one scoped change.', readScope: ['package.json'], writeScope: ['package.json'] };
-    const base = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', timeoutSeconds: 5, task };
+    const workflowReceipt=await receiptFor(client,'coordinator-only');
+    const base = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', timeoutSeconds: 5, workflowReceipt, task };
     const missing = await client.callTool({ name: 'dispatch_subagent', arguments: base });
     assert.equal(missing.isError, true);
     assert.match(parsed(missing).error, /stable requestId/);
@@ -398,8 +442,8 @@ test('workspace-write requires requestId and replays one durable result without 
     assert.equal(conflict.isError, true);
     assert.equal(parsed(conflict).idempotency.status, 'idempotency_key_reused');
     assert.equal(dispatchCount, 1);
-    assert.deepEqual(records.map(record => record.operation), ['dispatch_subagent', 'dispatch_subagent_replay', 'dispatch_subagent_idempotency']);
-    assert.equal(records[2].failureReason, 'idempotency_key_reused');
+    assert.deepEqual(records.filter(record=>!['get_workflow','workflow_topic_admitted'].includes(record.operation)).map(record => record.operation), ['dispatch_subagent', 'dispatch_subagent_replay', 'dispatch_subagent_idempotency']);
+    assert.equal(records.find(record=>record.operation==='dispatch_subagent_idempotency').failureReason, 'idempotency_key_reused');
   }, { dispatchFn, auditLogger: { enabled: true, record: value => records.push(value) } });
 });
 
@@ -433,7 +477,8 @@ test('overlapping write scopes are serialized across different requestIds', asyn
     return { ok: true, text: formattedTaskResult(task), provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0, patch: 'safe patch' };
   };
   await withGateway(async ({ client }) => {
-    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', resourceProfile: 'small', timeoutSeconds: 5 };
+    const workflowReceipt=await receiptFor(client,'coordinator-only');
+    const common = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', workflowReceipt, resourceProfile: 'small', timeoutSeconds: 5 };
     const first = client.callTool({ name: 'dispatch_subagent', arguments: { ...common, requestId: 'lock-one', task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'first write', readScope: ['package.json'], writeScope: ['package.json'] } } });
     while (!releaseFirst) await new Promise(resolvePromise => setTimeout(resolvePromise, 5));
     const second = client.callTool({ name: 'dispatch_subagent', arguments: { ...common, requestId: 'lock-two', task: { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'second write', readScope: ['package.json'], writeScope: ['package.json'] } } });

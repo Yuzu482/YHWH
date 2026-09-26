@@ -26,7 +26,7 @@ test('desktop launch uses a hidden direct process and no shell wrapper',()=>{
  assert.ok(spec.args.includes('-STA'));assert.ok(spec.args.includes('-Background'));assert.ok(!spec.args.includes('-Command'));
 });
 test('monitor projection excludes task prompts, outcomes and arbitrary fields',()=>{
- const data=projectSnapshot({ok:true,gateway:{instanceId:'fixture',active:1,queued:0},tasks:[{requestId:'x',role:'Malkuth',state:'running',requestedProvider:'openai-codex',requestedModel:'fixture',elapsedMs:2200,prompt:'secret',outcome:{sensitive:'value'},accessToken:'token'}]});
- assert.equal(data.tasks[0].seconds,2);assert.ok(!JSON.stringify(data).includes('secret'));assert.ok(!JSON.stringify(data).includes('token'));assert.ok(!JSON.stringify(data).includes('outcome'));
+ const data=projectSnapshot({ok:true,gateway:{instanceId:'fixture',active:1,queued:0},tasks:[{requestId:'x',role:'Malkuth',displayName:'Kingdom',displayNameZh:'王国',state:'running',requestedProvider:'openai-codex',requestedModel:'fixture',elapsedMs:2200,prompt:'secret',outcome:{sensitive:'value'},accessToken:'token'}]});
+ assert.equal(data.tasks[0].seconds,2);assert.equal(data.tasks[0].role,'Malkuth');assert.equal(data.tasks[0].displayName,'Kingdom');assert.equal(data.tasks[0].displayNameZh,'王国');assert.ok(!JSON.stringify(data).includes('secret'));assert.ok(!JSON.stringify(data).includes('token'));assert.ok(!JSON.stringify(data).includes('outcome'));
  assert.throws(()=>projectSnapshot({ok:false}),/Invalid/);
 });

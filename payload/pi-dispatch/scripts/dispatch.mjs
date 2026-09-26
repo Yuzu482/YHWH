@@ -23,6 +23,7 @@ const lspReadTools = ['lsp_diagnostics', 'lsp_hover', 'lsp_definition', 'lsp_ref
 const wslLspTools = ['diagnostics','hover','definition','references','symbols','completions','code_actions'].map(m => `yhwh_lsp_${m}`);
 const rolePresetExtension = '/opt/pi-kether/extensions/role-presets.js';
 const resultSubmitExtension = '/opt/pi-kether/extensions/result-submit.js';
+const sourceWindowExtension = '/opt/pi-kether/extensions/source-window.js';
 
 // Invoke Node entrypoints, never npm's .cmd shim or a shell containing user text.
 export function findPiEntry(env = process.env) {
@@ -174,6 +175,7 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false,
   }
   for (const extension of resolveControlledExtensions(request.provider, request.access, process.env, runtime)) args.push('--extension', extension);
   if (runtime === 'wsl2') args.push('--extension', '/opt/pi-kether/extensions/auth-scrub.js');
+  if (runtime === 'wsl2' && request.access !== 'none') args.push('--extension', sourceWindowExtension);
   if (structuredResultTool) {
     if (runtime !== 'wsl2' || request.access === 'none') throw new Error('Structured result tool requires WSL2 read or workspace-write access');
     args.push('--extension', resultSubmitExtension);
@@ -193,7 +195,7 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false,
     const tools = request.access === 'none' ? [] : request.access === 'read'
       ? [...readTools, ...(runtime === 'wsl2' ? [] : lspReadTools)]
       : [...readTools, ...(runtime === 'wsl2' ? [] : lspReadTools), 'edit', 'write', ...(runtime === 'wsl2' ? [] : ['code_rewrite'])];
-    if (runtime === 'wsl2' && request.access !== 'none') tools.push(...wslLspTools);
+    if (runtime === 'wsl2' && request.access !== 'none') tools.push(...wslLspTools, 'yhwh_source_window');
     if (structuredResultTool) tools.push('yhwh_submit_result');
     if (preset) {
       const ceiling = new Set(preset.toolCeilings[request.access]);

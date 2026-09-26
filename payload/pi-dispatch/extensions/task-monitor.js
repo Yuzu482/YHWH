@@ -1,4 +1,5 @@
 import {exportResult} from './result-export.js';
+import { resolveRolePreset } from '../scripts/role-presets.mjs';
 import { createTaskHeartbeat } from './task-heartbeat.js';
 import { createHash } from 'node:crypto';
 import { redactSensitiveText, summarizePatch, summarizeUsage } from './audit-log.js';
@@ -30,6 +31,8 @@ function publicRecord(record, now = Date.now()) {
     parentRunId: record.parentRunId,
     gatewayInstanceId: record.gatewayInstanceId,
     role: record.role,
+    displayName: record.displayName,
+    displayNameZh: record.displayNameZh,
     state: record.state,
     requestedProvider: record.provider,
     requestedModel: record.model,
@@ -92,11 +95,15 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
     const controller = new AbortController();
     const heartbeat = createHeartbeat();
     const now = new Date().toISOString();
+    const canonicalRole = (() => { try { return resolveRolePreset(input.task?.role || '').id; } catch { return null; } })();
+    const rolePreset = canonicalRole ? resolveRolePreset(canonicalRole) : null;
     const record = {
       requestId,
       parentRunId: input.parentRunId,
       gatewayInstanceId,
       role: /^[A-Za-z][A-Za-z0-9._ -]{0,63}$/.test(input.task?.role || '') ? input.task.role : 'unknown',
+      displayName: rolePreset?.displayName,
+      displayNameZh: rolePreset?.displayNameZh,
       provider: input.provider,
       model: input.model,
       access: input.access,

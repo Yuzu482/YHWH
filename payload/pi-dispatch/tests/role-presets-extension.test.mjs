@@ -6,7 +6,7 @@ import { ROLE_PRESETS as HOST_ROLE_PRESETS } from '../scripts/role-presets.mjs';
 test('extension registry matches the host registry exactly', () => {
   assert.deepEqual(Object.keys(EXTENSION_ROLE_PRESETS).sort(), Object.keys(HOST_ROLE_PRESETS).sort());
   for (const [id, preset] of Object.entries(HOST_ROLE_PRESETS)) {
-    assert.deepEqual(EXTENSION_ROLE_PRESETS[id], { id: preset.id, purpose: preset.purpose });
+    assert.deepEqual(EXTENSION_ROLE_PRESETS[id], { id: preset.id, displayName: preset.displayName, displayNameZh: preset.displayNameZh, purpose: preset.purpose });
   }
 });
 
@@ -31,16 +31,18 @@ test('extension registers flag, validates at startup, and appends only the selec
   assert.deepEqual(registered[1], { type: 'string', description: 'Select a canonical Kether role preset' });
   assert.throws(() => handlers.session_start(), /requires one of/);
   const original = 'Existing system prompt';
-  for (const id of Object.keys(EXTENSION_ROLE_PRESETS)) {
+  for (const [id, preset] of Object.entries(EXTENSION_ROLE_PRESETS)) {
     flag = id;
     assert.equal(handlers.session_start(), undefined);
     const result = handlers.before_agent_start({ systemPrompt: original });
     assert.ok(result.systemPrompt.startsWith(`${original}\n\n`));
-    assert.match(result.systemPrompt, new RegExp(`Kether role card \\(${id}\\):`));
+    assert.match(result.systemPrompt, new RegExp(`YHWH agent role \\(${preset.displayName}\\):`));
+    assert.match(result.systemPrompt, new RegExp(`canonical role ID: ${id}`));
+    assert.match(result.systemPrompt, new RegExp(`You are the ${preset.displayName}`));
     for (const other of Object.keys(EXTENSION_ROLE_PRESETS).filter(role => role !== id)) {
-      assert.doesNotMatch(result.systemPrompt, new RegExp(`Kether role card \\(${other}\\):`));
+      assert.doesNotMatch(result.systemPrompt, new RegExp(`YHWH agent role \\(${other}\\):`));
     }
-    const card = result.systemPrompt.slice(result.systemPrompt.indexOf('Kether role card'));
+    const card = result.systemPrompt.slice(result.systemPrompt.indexOf('YHWH agent role'));
     assert.ok(card.length < 600, `${id} card is not bounded`);
     assert.match(card, /host-authorized scope/);
     assert.match(result.systemPrompt, /one line starting KETHER_RESULT_JSON=/);

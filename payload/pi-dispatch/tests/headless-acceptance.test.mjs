@@ -26,7 +26,7 @@ function fixture(t,wait=true) {
  t.after(()=>{assert.equal(path.dirname(root),path.resolve(os.tmpdir()));fs.rmSync(root,{recursive:true,force:true})});
  const script=path.join(root,'cli.mjs');
  fs.writeFileSync(script,`const args=process.argv.slice(2);if(args.includes('--version'))console.log('fixture 1');else if(args.includes('--help'))console.log(${JSON.stringify(adapters.codex.requiredFlags.join(' '))});else{let s='';for await(const c of process.stdin)s+=c;if(${wait}&&s.includes('cancellation test'))await new Promise(()=>{setInterval(()=>{},1000)});const text=s.match(/YHWH_OK_[a-f0-9]{32}/)?.[0]??'missing';console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text}}));console.log(JSON.stringify({type:'turn.completed'}));}`);
- return {schemaVersion:1,workspaceRoots:[root],timeoutSeconds:10,maxOutputBytes:65536,clients:{codex:{enabled:true,executable:process.execPath,nodeScript:script,expectedVersion:'fixture 1',model:'fixture',policy:'read-only'}}};
+ return {schemaVersion:1,workspaceRoots:[root],timeoutSeconds:wait?30:10,maxOutputBytes:65536,clients:{codex:{enabled:true,executable:process.execPath,nodeScript:script,expectedVersion:'fixture 1',model:'fixture',policy:'read-only'}}};
 }
 test('live cancellation starts only after CLI launch and confirms the requested stop',async t=>{
  const result=await acceptHeadless(fixture(t),{live:true,cancel:true});
