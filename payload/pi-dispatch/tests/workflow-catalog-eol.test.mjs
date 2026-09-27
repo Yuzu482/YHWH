@@ -11,13 +11,13 @@ test('catalog check accepts CRLF without rewriting', {skip:process.platform!=='w
   try {
     mkdirSync(join(root,'install'),{recursive:true});
     mkdirSync(join(root,'templates','agent-references'),{recursive:true});
-    mkdirSync(join(root,'payload','workflow-skills','demo'),{recursive:true});
+    mkdirSync(join(root,'payload','workflow-skills','kether-governance'),{recursive:true});
     mkdirSync(join(root,'payload','pi-dispatch','workflow'),{recursive:true});
     const script=join(root,'install','Sync-HostWorkflow.ps1');
     copyFileSync(fileURLToPath(new URL('../../../install/Sync-HostWorkflow.ps1',import.meta.url)),script);
     writeFileSync(join(root,'templates','host-primary.md'),'primary text\n');
     writeFileSync(join(root,'templates','agent-references','example.md'),'reference text\n');
-    writeFileSync(join(root,'payload','workflow-skills','demo','SKILL.md'),'skill text\n');
+    writeFileSync(join(root,'payload','workflow-skills','kether-governance','SKILL.md'),'skill text\n');
     const run=(...args)=>spawnSync('pwsh.exe',['-NoProfile','-File',script,...args],{windowsHide:true,shell:false,timeout:10000,encoding:'utf8',maxBuffer:65536});
     assert.equal(run().status,0);
     const catalog=join(root,'payload','pi-dispatch','workflow','catalog.json');

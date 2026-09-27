@@ -1,6 +1,6 @@
 {
   "name": "pi-dispatch",
-  "version": "0.1.0+codex.20260904104257",
+  "version": "0.1.0+codex.20260927",
   "description": "Expose Pi as a Kether-governed model, probe, and LSP gateway for Tifereth.",
   "author": {
     "name": "Local developer"

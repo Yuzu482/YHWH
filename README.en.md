@@ -43,7 +43,7 @@ Every maintained README in this repository has complete Chinese and English vers
 **0.5 multi-host integration:** 18 host IDs now include Cursor, VS Code/Copilot, Windsurf Cascade, Cline, Roo Code, Gemini CLI, Kiro, Zed, Continue and LM Studio, alongside existing Codex, Cherry Studio, OpenCode, DeepSeek Harness, Claude and generic profiles. Select the primary model in the host. See the [common client guide](docs/common-clients.en.md) and [multi-host guide](docs/host-integration.en.md); configuration and protocol checks do not validate client UIs or the complete governance chain.
 
 - `payload/pi-dispatch/`: gateway source, plugin, editor bridges, tests and module lifecycle implementation.
-- `payload/workflow-skills/`: Kether role skills and primary-agent routing skills.
+- `payload/workflow-skills/`: installs the `kether-governance` primary governance skill; other role and routing skills are retained as historical material, while Pi injects the active worker roles.
 - `templates/AGENTS.kether.md`: compact global policy entry point.
 - `templates/agent-references/`: on-demand governance, routing, contract, authentication and evidence rules.
 - `install/`: installation, validation, host authentication configuration and WSL sandbox provisioning tools.

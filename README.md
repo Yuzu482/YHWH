@@ -43,7 +43,7 @@ v0.14.0 发布：Luna 支持可切换的严格/关闭执行模式及角色预设
 **0.5 多宿主接入：**共 18 个宿主 ID，新增 Cursor、VS Code/Copilot、Windsurf Cascade、Cline、Roo Code、Gemini CLI、Kiro、Zed、Continue 和 LM Studio，保留已有 Codex、Cherry Studio、OpenCode、DeepSeek Harness、Claude 与通用配置。主模型在宿主中选择。见[常见客户端指南](docs/common-clients.md)与[多宿主指南](docs/host-integration.md)；配置和协议测试不等于客户端界面与完整治理链已验证。
 
 - `payload/pi-dispatch/`：网关源码、插件、编辑器桥接、测试和模块生命周期实现。
-- `payload/workflow-skills/`：Kether 角色技能及主代理路由技能。
+- `payload/workflow-skills/`：当前安装 `kether-governance` 主代理治理技能；其余角色与路由技能仅保留为历史资料，实际 worker 角色由 Pi 网关注入。
 - `templates/AGENTS.kether.md`：精简的全局规则入口。
 - `templates/agent-references/`：按需加载的治理、路由、契约、认证和证据规则。
 - `install/`：安装、校验、宿主认证配置与 WSL 沙箱部署工具。

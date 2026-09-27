@@ -1,6 +1,6 @@
 # Source mapping and portability
 
-Inspected 2026-09-04. Primary source: ~/.dsh/.agent-presets/kether/preset.yml and agent.cordis.yml. Desktop comparison source: ~/AppData/Roaming/dsh-desktop/harness/.agent-presets/kether/. Role details: ~/.agents/skills/{yesod-prompt-compiler,binah-clarifier,hod-complexity-classifier,malkuth-scout,chochmah-planner,geburah-reviewer,chesed-implementer,netzach-verifier,daat-bridge,tifereth-coordinator}/SKILL.md. These are user profile assets, not Kether files in the upstream DSH source checkout.
+Inspected 2026-09-04. Historical DSH comparison sources were `~/.dsh/.agent-presets/kether/preset.yml`, `agent.cordis.yml`, and the Desktop Kether preset. YHWH's current worker role prompts are gateway-owned `payload/pi-dispatch/extensions/role-presets.js`; the former user-level role skills were retired from the active installation. These are local profile assets, not Kether files in the upstream DSH source checkout. Reinspect current DSH sources before relying on historical comparisons.
 
 ## Preserved concepts
 
@@ -8,7 +8,7 @@ Kether owns user intent, governance, ExecutionContract and escalation. Tifereth 
 
 ## Deliberate host adaptations
 
-- DSH strict coding mode forbids direct Kether/Tifereth implementation and requires specialist stages. Portable mode separates these responsibilities within the host's actual primary/worker model and preserves primary integration ownership. Simple tasks use the existing adaptive router. A local check is not independent agent evidence.
+- DSH strict coding mode forbids direct Kether/Tifereth implementation and requires specialist stages. YHWH separates these responsibilities within the host's actual primary/worker model: the primary owns integration and coding goes to a bounded Pi worker under the current coordinator-only rule. A local check is not independent agent evidence.
 - DSH's interactive Plan lifecycle requires an explicit approved plan before an execute contract. The portable adapter obeys the host's actual mode and existing user authorization; it does not add a universal plan-confirmation gate to already-authorized work.
 - DSH uses Cordis plugins, isolated workflowEngine, worker-thread execution and a Tifereth adapter. No equivalent plugins or hard guards are installed by a Markdown skill.
 - DSH's prescribed Safe Luna / Euclid Kimi K2.7 Code / Keter DeepSeek V4 Pro, Kimi K3 diagnosis, Claude Opus and GPT Sol ladder and Claude Sonnet evidence judge require those actual providers. Portable mode preserves the user's Codex delegated-model preference and reports unavailable capabilities instead of impersonating providers.
@@ -18,7 +18,7 @@ Kether owns user intent, governance, ExecutionContract and escalation. Tifereth 
 
 ## Installation boundaries
 
-Codex documents user-level instructions at ~/.codex/AGENTS.md and user-level skills at ~/.agents/skills. This import appends global guidance and adds kether-governance without replacing existing role skills or provider settings. Those local files do not establish cloud/account synchronization. ChatGPT Work custom instructions must be installed or verified separately where they are stored; CHATGPT-WORK-INSTRUCTIONS.md is self-contained when the skill is unavailable.
+Codex documents user-level instructions at ~/.codex/AGENTS.md and user-level skills at ~/.agents/skills. The current installer exposes only `kether-governance` as a primary-agent workflow skill. Older role, router, and coordinator skill texts remain historical repository material, outside the current on-demand catalog; Pi injects bounded role cards from `role-presets.js`. Upgrades back up older installed skills rather than leaving competing primary-agent entrypoints. These local files do not establish cloud/account synchronization. ChatGPT Work custom instructions must be installed or verified separately where they are stored; CHATGPT-WORK-INSTRUCTIONS.md is self-contained when the skill is unavailable.
 
 Official references, fetched 2026-09-04:
 - https://learn.chatgpt.com/docs/agent-configuration/agents-md

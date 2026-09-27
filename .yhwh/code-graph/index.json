@@ -76218,7 +76218,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/host-profiles.test.mjs",
-      "sha256": "63e71907d1b414ac07418feb1e83e208c6ef214403109c5557ec39b6d4f5ab4f",
+      "sha256": "fce358f2d8f49e767126ad9c486a0b504bd50b3121e39be940eac6c8ffab760f",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -77652,7 +77652,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/host-workflow.test.mjs",
-      "sha256": "6f63a18a4ddd3129ea48886f02ccf79defabb5b016179af0a93343efb25dff28",
+      "sha256": "15d2f837fe1499677adf245382c885e8d32f837cae6a72a66f43916b3de6cf1b",
       "facts": {
         "language": "javascript",
         "status": "parsed",
@@ -77663,8 +77663,8 @@
             "qualified": "registerTool",
             "kind": "method",
             "parent": null,
-            "line": 55,
-            "endLine": 55
+            "line": 59,
+            "endLine": 59
           }
         ],
         "imports": [
@@ -77770,56 +77770,38 @@
           {
             "from": null,
             "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 29
+          },
+          {
+            "from": null,
+            "kind": "call",
             "name": "workflowTopic",
             "line": 29
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
-            "line": 31
+            "name": "topic.startsWith",
+            "line": 29
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "test",
             "line": 32
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.equal",
+            "name": "workflowTopic",
             "line": 33
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 33
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "<dynamic>",
-            "line": 33
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "createHash",
-            "line": 33
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.deepEqual",
-            "line": 34
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "Object.keys",
-            "line": 34
           },
           {
             "from": null,
@@ -77830,79 +77812,109 @@
           {
             "from": null,
             "kind": "call",
-            "name": "test",
+            "name": "assert.equal",
+            "line": 36
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "<dynamic>",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "createHash",
+            "line": 37
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
             "line": 38
           },
           {
             "from": null,
             "kind": "call",
-            "name": "readFileSync",
+            "name": "Object.keys",
+            "line": 38
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
             "line": 39
-          },
-          {
-            "from": null,
-            "kind": "construct",
-            "name": "URL",
-            "line": 39
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.ok",
-            "line": 41
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "Buffer.byteLength",
-            "line": 41
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "Buffer.byteLength",
-            "line": 41
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
-            "line": 42
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
-            "line": 43
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.match",
-            "line": 44
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.doesNotMatch",
-            "line": 45
           },
           {
             "from": null,
             "kind": "call",
             "name": "test",
+            "line": 42
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "readFileSync",
+            "line": 43
+          },
+          {
+            "from": null,
+            "kind": "construct",
+            "name": "URL",
+            "line": 43
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.ok",
+            "line": 45
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "Buffer.byteLength",
+            "line": 45
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "Buffer.byteLength",
+            "line": 45
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 46
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
+            "line": 47
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.match",
             "line": 48
           },
           {
             "from": null,
             "kind": "call",
-            "name": "assert.throws",
-            "line": 49
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "workflowTopic",
+            "name": "assert.doesNotMatch",
             "line": 49
           },
           {
@@ -77914,50 +77926,68 @@
           {
             "from": null,
             "kind": "call",
-            "name": "registerHostWorkflow",
-            "line": 57
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 58
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "registration.handler",
-            "line": 59
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 60
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.equal",
-            "line": 61
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "assert.deepEqual",
-            "line": 62
-          },
-          {
-            "from": null,
-            "kind": "call",
-            "name": "JSON.parse",
-            "line": 62
+            "name": "assert.throws",
+            "line": 53
           },
           {
             "from": null,
             "kind": "call",
             "name": "workflowTopic",
+            "line": 53
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "test",
+            "line": 56
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "registerHostWorkflow",
+            "line": 61
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
             "line": 62
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "registration.handler",
+            "line": 63
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 64
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.equal",
+            "line": 65
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "assert.deepEqual",
+            "line": 66
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "JSON.parse",
+            "line": 66
+          },
+          {
+            "from": null,
+            "kind": "call",
+            "name": "workflowTopic",
+            "line": 66
           }
         ]
       }
@@ -105157,7 +105187,7 @@
     },
     {
       "path": "payload/pi-dispatch/tests/workflow-catalog-eol.test.mjs",
-      "sha256": "127af6aaa9b202140c3eaa4985cc67611f199ffb4929eb9a2a41d6649a855195",
+      "sha256": "153b0229d492ff51e5692d0166f1685cef2c8eaa02eb9d44388de4500b34ae2d",
       "facts": {
         "language": "javascript",
         "status": "parsed",

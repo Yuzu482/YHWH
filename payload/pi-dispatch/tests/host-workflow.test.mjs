@@ -25,6 +25,10 @@ test('returns the frozen coordinator-only primary policy',()=>{
   assert.match(workflowInstructions,/block instead/i);
 });
 
+test('exposes only the governance skill as a skill topic',()=>{
+  assert.deepEqual(workflowTopic('primary').availableTopics.filter(topic=>topic.startsWith('skill:')),['skill:kether-governance']);
+});
+
 test('preserves catalog content and hash fields',()=>{
   const response=workflowTopic('primary');
   const content=catalog.topics.primary;

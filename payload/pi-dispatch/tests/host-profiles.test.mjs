@@ -46,7 +46,7 @@ test('export rejects junction ancestors and bad scope before writing',()=>{
  finally{rmSync(dir,{recursive:true,force:true});}
 });
 test('workflow catalog rejects arbitrary paths and reports stable content digests',()=>{
- const doc=workflowTopic('pi-routing');assert.match(doc.content,/claude-sonnet-5/);assert.equal(doc.sha256,createHash('sha256').update(doc.content).digest('hex'));for(const topic of ['../../auth.json','__proto__','toString','/etc/passwd'])assert.throws(()=>workflowTopic(topic),/Unknown/);assert.match(workflowTopic('skill:kether-governance').content,/Typed role contracts/);
+ const doc=workflowTopic('pi-routing');assert.match(doc.content,/claude-sonnet-5/);assert.equal(doc.sha256,createHash('sha256').update(doc.content).digest('hex'));for(const topic of ['../../auth.json','__proto__','toString','/etc/passwd'])assert.throws(()=>workflowTopic(topic),/Unknown/);assert.match(workflowTopic('skill:kether-governance').content,/load the host's `pi-contracts` topic/);
 });
 test('actual MCP session discovers and reads governance without model execution',async()=>{
  let modelCalls=0;

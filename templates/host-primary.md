@@ -32,7 +32,7 @@ For `project_memory`, `code_graph` and workspace-write Pi tasks, pass that topic
 | Trigger | Topic |
 | --- | --- |
 | Any implementation, worker failure, code/test repair or patch integration | `coordinator-only` |
-| Non-trivial planning, stage selection, scope or acceptance | `governance`, `skill:kether-governance` |
+| Non-trivial planning, stage selection, scope or acceptance | `skill:kether-governance` |
 | Considering model-backed delegation | `delegation` |
 | Before selecting model/role or controlled API transport | `pi-routing` |
 | Before model task or linked handoff | `pi-contracts` |

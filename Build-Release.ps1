@@ -10,6 +10,8 @@ New-Item -ItemType Directory -Force -Path $release | Out-Null
 
 & (Join-Path $root 'install\Test-PiKether.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Portable self-test failed.' }
+& (Join-Path $root 'install\Test-HostWorkflowSync.ps1') | Out-Null
+& (Join-Path $root 'install\Test-HindsightWrapper.ps1') | Out-Null
 & (Join-Path $root 'install\Test-WorkflowConfig.ps1')
 & (Join-Path $root 'install\Test-Headless.ps1')
 & (Join-Path $root 'install\Sync-HostWorkflow.ps1') -Check

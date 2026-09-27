@@ -1,6 +1,10 @@
 # 工作流渐进加载验收
 
-主代理常驻文本为 `templates/host-primary.md` 与 `payload/pi-dispatch/skills/pi-dispatch/SKILL.md`；测试要求二者 UTF-8 总量不超过 8 KB（8000 字节）。策略正文以 `templates/agent-references/*.md` 和 `payload/workflow-skills/*/SKILL.md` 为源，由 `install/Sync-HostWorkflow.ps1` 生成目录；CI 用 `-Check` 拒绝过期目录。
+主代理常驻文本为 `templates/host-primary.md` 与 `payload/pi-dispatch/skills/pi-dispatch/SKILL.md`；测试要求二者 UTF-8 总量不超过 8 KB（8000 字节）。按需目录只收录 `templates/agent-references/*.md` 和 `payload/workflow-skills/kether-governance/SKILL.md`；`install/Sync-HostWorkflow.ps1` 负责生成，CI 用 `-Check` 拒绝过期目录。
+
+Codex 的常驻治理索引是 `~/.codex/AGENTS.md`，它直接链接 `kether-governance` skill；已删除中转用的 `governance.md`。旧角色、路由和协调器 skill 保留为仓库历史来源，不再进入主代理技能列表或按需目录；Pi 的 `role-presets.js` 按实际角色注入简短角色卡。`-InstallHost` 同步宿主引用、托管索引块、治理 skill、Pi dispatch skill、插件清单和生成目录，并备份被替换或迁出的文件；`install/Test-PiKether.ps1 -Installed` 检查托管文件哈希及已退役引用是否缺席。宿主同步不会重启 Pi、更新 WSL 或刷新 Codex 插件缓存，缓存须另行通过 Codex 插件管理更新，新会话才会重新读取 skill。
+
+若宿主已安装 Hindsight，安装器会将它原有的大型 skill 拆为短入口与七份本地引用，并备份未改动的原文。仓库只存包装模板与拆分脚本，不捆绑第三方正文。以后单独重装 Hindsight，可运行 `install/Apply-HindsightWrapper.ps1` 重新应用；`-Check` 用于检查本机包装是否完整。
 
 `get_workflow` 返回短期 `receipt`。调用 `project_memory`、`code_graph` 或可写 Pi 任务时，把对应主题的 `receipt` 作为 `workflowReceipt` 传入。网关按当前主题摘要、有效期和进程内记录校验；漏读返回 `WORKFLOW_TOPIC_REQUIRED`，并指明要读取的主题。凭据仅证明从该网关取回了主题，不证明模型理解、遵守规则或属于某个独立主机会话。网关重启后须重新读取。
 

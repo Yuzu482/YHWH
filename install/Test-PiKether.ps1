@@ -15,6 +15,8 @@ function Check([bool]$Ok, [string]$Name) {
 }
 try { $manifest = Get-Content -LiteralPath (Join-Path $packageRoot 'portable.manifest.json') -Raw | ConvertFrom-Json; Check ($manifest.containsCredentials -eq $false) 'portable manifest' } catch { Check $false 'portable manifest' }
 $payloadPlugin = Join-Path $packageRoot 'payload\pi-dispatch'
+Check (Test-Path -LiteralPath (Join-Path $packageRoot 'install\Apply-HindsightWrapper.ps1') -PathType Leaf) 'Hindsight wrapper installer included'
+Check (Test-Path -LiteralPath (Join-Path $packageRoot 'templates\hindsight-coding-agent\SKILL.md') -PathType Leaf) 'Hindsight wrapper template included'
 foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','workflow/headless.example.json','workflow/catalog.json')) {
   Check (Test-Path -LiteralPath (Join-Path $payloadPlugin $headlessFile) -PathType Leaf) ('headless CLI payload: '+$headlessFile)
   if($Installed) {
@@ -22,12 +24,14 @@ foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapter
     Check ((Test-Path -LiteralPath $installedFile -PathType Leaf) -and ((Get-FileHash -LiteralPath $installedFile).Hash -eq (Get-FileHash -LiteralPath (Join-Path $payloadPlugin $headlessFile)).Hash)) ('headless CLI installed parity: '+$headlessFile)
   }
 }
-try { $pluginManifest = Get-Content -LiteralPath (Join-Path $payloadPlugin '.codex-plugin\plugin.json') -Raw | ConvertFrom-Json; Check ($pluginManifest.name -eq 'pi-dispatch') 'Codex plugin manifest' } catch { Check $false 'Codex plugin manifest' }
+try { $pluginManifestPath = Join-Path $payloadPlugin '.codex-plugin\plugin.json'; $pluginManifest = Get-Content -LiteralPath $pluginManifestPath -Raw | ConvertFrom-Json; Check ($pluginManifest.name -eq 'pi-dispatch' -and $pluginManifest.version -eq $manifest.components.piDispatch) 'Codex plugin manifest and portable version parity' } catch { Check $false 'Codex plugin manifest and portable version parity' }
 
 $policy = Get-Content -LiteralPath (Join-Path $packageRoot 'templates\AGENTS.kether.md') -Raw
 foreach ($link in [regex]::Matches($policy, '\]\((agent-references/[^)]+)\)')) {
   Check (Test-Path -LiteralPath (Join-Path $packageRoot ('templates/' + $link.Groups[1].Value)) -PathType Leaf) ('policy reference: ' + $link.Groups[1].Value)
 }
+Check ($policy.Contains('../.agents/skills/kether-governance/SKILL.md') -and -not $policy.Contains('agent-references/governance.md')) 'direct governance skill entrypoint'
+Check ($policy.Contains('agent-references/headless-cli.md')) 'headless CLI trigger in Codex index'
 function Get-DistributableFiles([string]$Directory) {
   foreach ($item in Get-ChildItem -LiteralPath $Directory -Force) {
     if ($item.PSIsContainer) {
@@ -55,11 +59,58 @@ if ($Installed) {
   Check (Test-Path -LiteralPath $piEntry -PathType Leaf) 'host Pi entry installed'
   Check (Test-Path -LiteralPath (Join-Path $plugin 'workflow\catalog.json')) 'host-neutral workflow catalog installed'
   if($Hosts -contains 'codex'){
-  Check (Test-Path -LiteralPath (Join-Path $TargetHome '.codex\AGENTS.md')) 'Kether policy installed'
-  foreach ($link in [regex]::Matches($policy, '\]\((agent-references/[^)]+)\)')) {
-    Check (Test-Path -LiteralPath (Join-Path $TargetHome ('.codex/' + $link.Groups[1].Value)) -PathType Leaf) ('installed policy reference: ' + $link.Groups[1].Value)
+  $installedPluginManifest = Join-Path $TargetHome 'plugins\pi-dispatch\.codex-plugin\plugin.json'
+  $pluginManifestParity = (Test-Path -LiteralPath $installedPluginManifest -PathType Leaf) -and ((Get-FileHash -LiteralPath $pluginManifestPath -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedPluginManifest -Algorithm SHA256).Hash)
+  Check $pluginManifestParity 'installed plugin manifest parity'
+  $agentsInstalled = Join-Path $TargetHome '.codex\AGENTS.md'
+  Check (Test-Path -LiteralPath $agentsInstalled -PathType Leaf) 'Kether policy installed'
+  if (Test-Path -LiteralPath $agentsInstalled -PathType Leaf) {
+    $agentsText = [IO.File]::ReadAllText($agentsInstalled)
+    $markers = [regex]::Match($agentsText, '(?s)<!-- PI-KETHER:BEGIN -->\s*(.*?)\s*<!-- PI-KETHER:END -->')
+    $normalize = { param($text) ([string]$text -replace "`r`n|`r|`n", "`n").Trim() }
+    $expectedBlock = & $normalize $policy
+    $actualBlock = if ($markers.Success) { & $normalize $markers.Groups[1].Value } else { '' }
+    Check ($markers.Success -and $actualBlock -ceq $expectedBlock) 'managed Codex policy block parity'
   }
-  Check (Test-Path -LiteralPath (Join-Path $TargetHome '.agents\skills\kether-governance\SKILL.md')) 'Kether skills installed'
+  $referenceSource = Join-Path $packageRoot 'templates\agent-references'
+  if (Test-Path -LiteralPath $referenceSource -PathType Container) {
+    foreach ($reference in Get-ChildItem -LiteralPath $referenceSource -File -Filter '*.md') {
+      $installedReference = Join-Path $TargetHome ('.codex\agent-references\' + $reference.Name)
+      $matches = (Test-Path -LiteralPath $installedReference -PathType Leaf) -and ((Get-FileHash -LiteralPath $reference.FullName -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedReference -Algorithm SHA256).Hash)
+      Check $matches ('installed policy reference parity: ' + $reference.Name)
+    }
+    $retiredGovernanceReference = Join-Path $TargetHome '.codex\agent-references\governance.md'
+    $sourceGovernanceReference = Join-Path $referenceSource 'governance.md'
+    Check ((-not (Test-Path -LiteralPath $sourceGovernanceReference -PathType Leaf)) -and (-not (Test-Path -LiteralPath $retiredGovernanceReference))) 'retired governance reference absent from installed references'
+  } else { Check $false 'installed policy references source directory' }
+  $workflowSource = Join-Path $packageRoot 'payload\workflow-skills'
+  if (Test-Path -LiteralPath $workflowSource -PathType Container) {
+    $workflowSkills = Get-ChildItem -LiteralPath $workflowSource -Directory
+    $governanceSkill = $workflowSkills | Where-Object { $_.Name -eq 'kether-governance' } | Select-Object -First 1
+    if ($governanceSkill) {
+      $sourceFiles = @(Get-ChildItem -LiteralPath $governanceSkill.FullName -File -Recurse)
+      foreach ($sourceFile in $sourceFiles) {
+        $relative = [IO.Path]::GetRelativePath($governanceSkill.FullName, $sourceFile.FullName)
+        $installedFile = Join-Path (Join-Path $TargetHome '.agents\skills\kether-governance') $relative
+        $matches = (Test-Path -LiteralPath $installedFile -PathType Leaf) -and ((Get-FileHash -LiteralPath $sourceFile.FullName -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedFile -Algorithm SHA256).Hash)
+        Check $matches ('installed managed skill parity: kether-governance/' + $relative)
+      }
+    } else { Check $false 'kether-governance source skill exists' }
+    foreach ($retiredSkill in @($workflowSkills | Where-Object { $_.Name -ne 'kether-governance' })) {
+      $installedRetiredSkill = Join-Path (Join-Path $TargetHome '.agents\skills') $retiredSkill.Name
+      Check (-not (Test-Path -LiteralPath $installedRetiredSkill)) ('retired YHWH skill absent from installed skills: ' + $retiredSkill.Name)
+    }
+  } else { Check $false 'installed managed workflow skills source directory' }
+  }
+  $activePiSkill = Join-Path $TargetHome 'plugins\pi-dispatch\skills\pi-dispatch\SKILL.md'
+  $sourcePiSkill = Join-Path $payloadPlugin 'skills\pi-dispatch\SKILL.md'
+  $piSkillMatches = (Test-Path -LiteralPath $sourcePiSkill -PathType Leaf) -and (Test-Path -LiteralPath $activePiSkill -PathType Leaf) -and ((Get-FileHash -LiteralPath $sourcePiSkill -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $activePiSkill -Algorithm SHA256).Hash)
+  Check $piSkillMatches 'active Pi pi-dispatch skill parity'
+  if ($Hosts -contains 'codex' -and (Test-Path -LiteralPath (Join-Path $TargetHome '.agents\skills\hindsight-coding-agent\SKILL.md') -PathType Leaf)) {
+    try {
+      & (Join-Path $packageRoot 'install\Apply-HindsightWrapper.ps1') -TargetHome $TargetHome -Check | Out-Null
+      Check $true 'optional Hindsight wrapper parity'
+    } catch { Check $false 'optional Hindsight wrapper parity' }
   }
   $hostState=Get-Content -LiteralPath (Join-Path $TargetHome '.local\state\pi-kether\installation-hosts.json') -Raw|ConvertFrom-Json
   foreach($hostId in $Hosts){Check (Test-Path -LiteralPath (Join-Path $hostState.profiles "$hostId/connection.json")) ("host profile: $hostId")}
