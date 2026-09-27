@@ -38,7 +38,7 @@ test('preserves catalog content and hash fields',()=>{
 test('always-visible primary index and Pi dispatch skill stay within the context budget',()=>{
   const skill=readFileSync(new URL('../skills/pi-dispatch/SKILL.md',import.meta.url),'utf8');
   const primary=catalog.topics.primary;
-  assert.ok(Buffer.byteLength(primary,'utf8')+Buffer.byteLength(skill,'utf8')<=10_000);
+  assert.ok(Buffer.byteLength(primary,'utf8')+Buffer.byteLength(skill,'utf8')<=8000);
   assert.match(primary,/\| Trigger \| Topic \|/);
   assert.match(primary,/host has not injected it/);
   assert.match(primary,/Before Pi routing or execution, call `list_capabilities`/);

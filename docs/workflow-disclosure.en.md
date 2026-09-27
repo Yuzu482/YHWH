@@ -1,6 +1,6 @@
 # Progressive workflow loading acceptance
 
-The always-visible primary text is `templates/host-primary.md` plus `payload/pi-dispatch/skills/pi-dispatch/SKILL.md`; a test limits their combined UTF-8 size to 10 KB. Policy topics come from `templates/agent-references/*.md` and `payload/workflow-skills/*/SKILL.md`. `install/Sync-HostWorkflow.ps1` generates the catalog, and CI rejects a stale catalog with `-Check`.
+The always-visible primary text is `templates/host-primary.md` plus `payload/pi-dispatch/skills/pi-dispatch/SKILL.md`; a test limits their combined UTF-8 size to 8 KB (8000 bytes). Policy topics come from `templates/agent-references/*.md` and `payload/workflow-skills/*/SKILL.md`. `install/Sync-HostWorkflow.ps1` generates the catalog, and CI rejects a stale catalog with `-Check`.
 
 `get_workflow` returns a short-lived `receipt`. Pass the matching topic's receipt as `workflowReceipt` when calling `project_memory`, `code_graph`, or a workspace-write Pi task. The gateway checks the current topic digest, expiry, and its in-process record. A missing read returns `WORKFLOW_TOPIC_REQUIRED` with the topic to fetch. A receipt proves retrieval from that gateway, not comprehension, compliance, or independent host-session identity. Fetch again after a gateway restart.
 

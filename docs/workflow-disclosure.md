@@ -1,6 +1,6 @@
 # 工作流渐进加载验收
 
-主代理常驻文本为 `templates/host-primary.md` 与 `payload/pi-dispatch/skills/pi-dispatch/SKILL.md`；测试要求二者 UTF-8 总量不超过 10 KB。策略正文以 `templates/agent-references/*.md` 和 `payload/workflow-skills/*/SKILL.md` 为源，由 `install/Sync-HostWorkflow.ps1` 生成目录；CI 用 `-Check` 拒绝过期目录。
+主代理常驻文本为 `templates/host-primary.md` 与 `payload/pi-dispatch/skills/pi-dispatch/SKILL.md`；测试要求二者 UTF-8 总量不超过 8 KB（8000 字节）。策略正文以 `templates/agent-references/*.md` 和 `payload/workflow-skills/*/SKILL.md` 为源，由 `install/Sync-HostWorkflow.ps1` 生成目录；CI 用 `-Check` 拒绝过期目录。
 
 `get_workflow` 返回短期 `receipt`。调用 `project_memory`、`code_graph` 或可写 Pi 任务时，把对应主题的 `receipt` 作为 `workflowReceipt` 传入。网关按当前主题摘要、有效期和进程内记录校验；漏读返回 `WORKFLOW_TOPIC_REQUIRED`，并指明要读取的主题。凭据仅证明从该网关取回了主题，不证明模型理解、遵守规则或属于某个独立主机会话。网关重启后须重新读取。
 
