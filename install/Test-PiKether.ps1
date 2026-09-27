@@ -7,6 +7,7 @@ param(
   [switch]$SkipWsl
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'HostWorkflowDrift.ps1')
 $packageRoot = Split-Path -Parent $PSScriptRoot
 $failures = [Collections.Generic.List[string]]::new()
 function Check([bool]$Ok, [string]$Name) {
@@ -53,15 +54,57 @@ $backups = $scanFiles | Where-Object { $_.Name -match '\.bak$|\.backup$' }
 Check (-not $backups) 'no backup files in payload'
 
 if ($Installed) {
+  $baselineHashes = @{}
+  $baselineValid = $false
+  try {
+    $baselinePath = Join-Path $TargetHome '.codex/yhwh-managed-hashes.json'
+    $baseline = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json -ErrorAction Stop
+    if ($baseline.schemaVersion -eq 1 -and $baseline.files -is [pscustomobject]) {
+      $baselineValid = $true
+      foreach ($property in $baseline.files.PSObject.Properties) {
+        if ([string]$property.Value -notmatch '\A[0-9a-fA-F]{64}\z') { $baselineValid = $false; break }
+        $baselineHashes[$property.Name] = [string]$property.Value
+      }
+    }
+  } catch { $baselineValid = $false }
+  if (-not $baselineValid) { $baselineHashes = @{} }
+  function Get-ArtifactHash([string]$Path, [switch]$ManagedBlock) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    if ($ManagedBlock) {
+      $text = [IO.File]::ReadAllText($Path)
+      $match = [regex]::Match($text, '(?s)<!-- PI-KETHER:BEGIN -->.*?<!-- PI-KETHER:END -->')
+      if (-not $match.Success) {
+        $template = [IO.File]::ReadAllText($Path)
+        $block = "<!-- PI-KETHER:BEGIN -->`r`n$($template.TrimEnd())`r`n<!-- PI-KETHER:END -->"
+        $bytes = [Text.UTF8Encoding]::new($false).GetBytes($block)
+        return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+      }
+      $bytes = [Text.UTF8Encoding]::new($false).GetBytes($match.Value)
+      return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+    }
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  function Report-ArtifactDrift([string]$Key, [string]$SourcePath, [string]$InstalledPath, [switch]$ManagedBlock) {
+    $sourceHash = Get-ArtifactHash $SourcePath -ManagedBlock:$ManagedBlock
+    $installedHash = Get-ArtifactHash $InstalledPath -ManagedBlock:$ManagedBlock
+    $baselineHash = if ($baselineValid -and $baselineHashes.ContainsKey($Key)) { $baselineHashes[$Key] } else { $null }
+    $kind = Get-HostWorkflowDriftKind -SourceHash $sourceHash -InstalledHash $installedHash -BaselineHash $baselineHash
+    Write-Host "[DRIFT] $kind $Key" -ForegroundColor Yellow
+  }
   $plugin = Join-Path $TargetHome 'plugins\pi-dispatch'
   Check (Test-Path -LiteralPath (Join-Path $plugin 'node_modules\@modelcontextprotocol\sdk')) 'plugin dependencies installed'
   $piEntry = Join-Path $TargetHome '.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js'
   Check (Test-Path -LiteralPath $piEntry -PathType Leaf) 'host Pi entry installed'
-  Check (Test-Path -LiteralPath (Join-Path $plugin 'workflow\catalog.json')) 'host-neutral workflow catalog installed'
+  $installedCatalog = Join-Path $plugin 'workflow\catalog.json'
+  $sourceCatalog = Join-Path $payloadPlugin 'workflow\catalog.json'
+  $catalogParity = (Test-Path -LiteralPath $installedCatalog -PathType Leaf) -and ((Get-FileHash -LiteralPath $sourceCatalog -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedCatalog -Algorithm SHA256).Hash)
+  Check $catalogParity 'host-neutral workflow catalog installed'
+  if (-not $catalogParity) { Report-ArtifactDrift 'plugins/pi-dispatch/workflow/catalog.json' $sourceCatalog $installedCatalog }
   if($Hosts -contains 'codex'){
   $installedPluginManifest = Join-Path $TargetHome 'plugins\pi-dispatch\.codex-plugin\plugin.json'
   $pluginManifestParity = (Test-Path -LiteralPath $installedPluginManifest -PathType Leaf) -and ((Get-FileHash -LiteralPath $pluginManifestPath -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedPluginManifest -Algorithm SHA256).Hash)
   Check $pluginManifestParity 'installed plugin manifest parity'
+  if (-not $pluginManifestParity) { Report-ArtifactDrift 'plugins/pi-dispatch/.codex-plugin/plugin.json' $pluginManifestPath $installedPluginManifest }
   $agentsInstalled = Join-Path $TargetHome '.codex\AGENTS.md'
   Check (Test-Path -LiteralPath $agentsInstalled -PathType Leaf) 'Kether policy installed'
   if (Test-Path -LiteralPath $agentsInstalled -PathType Leaf) {
@@ -70,7 +113,9 @@ if ($Installed) {
     $normalize = { param($text) ([string]$text -replace "`r`n|`r|`n", "`n").Trim() }
     $expectedBlock = & $normalize $policy
     $actualBlock = if ($markers.Success) { & $normalize $markers.Groups[1].Value } else { '' }
-    Check ($markers.Success -and $actualBlock -ceq $expectedBlock) 'managed Codex policy block parity'
+    $agentsParity = $markers.Success -and $actualBlock -ceq $expectedBlock
+    Check $agentsParity 'managed Codex policy block parity'
+    if (-not $agentsParity) { Report-ArtifactDrift '.codex/AGENTS.md#PI-KETHER' (Join-Path $packageRoot 'templates/AGENTS.kether.md') $agentsInstalled -ManagedBlock }
   }
   $referenceSource = Join-Path $packageRoot 'templates\agent-references'
   if (Test-Path -LiteralPath $referenceSource -PathType Container) {
@@ -78,6 +123,7 @@ if ($Installed) {
       $installedReference = Join-Path $TargetHome ('.codex\agent-references\' + $reference.Name)
       $matches = (Test-Path -LiteralPath $installedReference -PathType Leaf) -and ((Get-FileHash -LiteralPath $reference.FullName -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedReference -Algorithm SHA256).Hash)
       Check $matches ('installed policy reference parity: ' + $reference.Name)
+      if (-not $matches) { Report-ArtifactDrift ('.codex/agent-references/' + $reference.Name) $reference.FullName $installedReference }
     }
     $retiredGovernanceReference = Join-Path $TargetHome '.codex\agent-references\governance.md'
     $sourceGovernanceReference = Join-Path $referenceSource 'governance.md'
@@ -94,6 +140,7 @@ if ($Installed) {
         $installedFile = Join-Path (Join-Path $TargetHome '.agents\skills\kether-governance') $relative
         $matches = (Test-Path -LiteralPath $installedFile -PathType Leaf) -and ((Get-FileHash -LiteralPath $sourceFile.FullName -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedFile -Algorithm SHA256).Hash)
         Check $matches ('installed managed skill parity: kether-governance/' + $relative)
+        if (-not $matches) { Report-ArtifactDrift ('.agents/skills/kether-governance/' + $relative.Replace('\\','/')) $sourceFile.FullName $installedFile }
       }
     } else { Check $false 'kether-governance source skill exists' }
     foreach ($retiredSkill in @($workflowSkills | Where-Object { $_.Name -ne 'kether-governance' })) {
@@ -106,6 +153,7 @@ if ($Installed) {
   $sourcePiSkill = Join-Path $payloadPlugin 'skills\pi-dispatch\SKILL.md'
   $piSkillMatches = (Test-Path -LiteralPath $sourcePiSkill -PathType Leaf) -and (Test-Path -LiteralPath $activePiSkill -PathType Leaf) -and ((Get-FileHash -LiteralPath $sourcePiSkill -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $activePiSkill -Algorithm SHA256).Hash)
   Check $piSkillMatches 'active Pi pi-dispatch skill parity'
+  if (-not $piSkillMatches) { Report-ArtifactDrift 'plugins/pi-dispatch/skills/pi-dispatch/SKILL.md' $sourcePiSkill $activePiSkill }
   if ($Hosts -contains 'codex' -and (Test-Path -LiteralPath (Join-Path $TargetHome '.agents\skills\hindsight-coding-agent\SKILL.md') -PathType Leaf)) {
     try {
       & (Join-Path $packageRoot 'install\Apply-HindsightWrapper.ps1') -TargetHome $TargetHome -Check | Out-Null

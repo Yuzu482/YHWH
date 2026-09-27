@@ -91,12 +91,13 @@ if ($InstallHost) {
   $piSkillTarget = Join-Path $homePath 'plugins/pi-dispatch/skills/pi-dispatch/SKILL.md'
   $catalogTarget = Join-Path $homePath 'plugins/pi-dispatch/workflow/catalog.json'
   $pluginManifestTarget = Join-Path $homePath 'plugins/pi-dispatch/.codex-plugin/plugin.json'
+  $hashManifestTarget = Join-Path $homePath '.codex/yhwh-managed-hashes.json'
   $retiredReferenceTarget = Join-Path $referencesTarget 'governance.md'
   $retireGovernanceReference = -not (Test-Path -LiteralPath (Join-Path $referencesSource 'governance.md') -PathType Leaf)
   $skillsRoot = Join-Path $homePath '.agents/skills'
   $retired = @(Get-ChildItem -LiteralPath $workflowRoot -Directory | Where-Object Name -ne 'kether-governance' | Sort-Object Name)
   $targets = [Collections.Generic.List[string]]::new()
-  $targets.Add($governanceTarget); $targets.Add($agentsTarget); $targets.Add($piSkillTarget); $targets.Add($catalogTarget); $targets.Add($pluginManifestTarget)
+  $targets.Add($governanceTarget); $targets.Add($agentsTarget); $targets.Add($piSkillTarget); $targets.Add($catalogTarget); $targets.Add($pluginManifestTarget); $targets.Add($hashManifestTarget)
   if ($retireGovernanceReference) { $targets.Add($retiredReferenceTarget) }
   foreach ($reference in Get-ChildItem -LiteralPath $referencesSource -File -Filter '*.md') { $targets.Add((Join-Path $referencesTarget $reference.Name)) }
   foreach ($skill in $retired) { $targets.Add((Join-Path $skillsRoot $skill.Name)) }
@@ -151,6 +152,24 @@ if ($InstallHost) {
     if (-not $?) { throw 'Hindsight wrapper update failed.' }
     $changed.Add($hindsightSkill)
   }
+  $hashes = [ordered]@{}
+  foreach ($reference in Get-ChildItem -LiteralPath $referencesSource -File -Filter '*.md' | Sort-Object Name) {
+    $key = '.codex/agent-references/' + $reference.Name
+    $hashes[$key] = (Get-FileHash -LiteralPath $reference.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  foreach ($file in Get-ChildItem -LiteralPath $governanceSource -File -Recurse | Sort-Object FullName) {
+    $relative = [IO.Path]::GetRelativePath($governanceSource, $file.FullName).Replace([IO.Path]::DirectorySeparatorChar.ToString(), '/')
+    $hashes['.agents/skills/kether-governance/' + $relative] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  $hashes['plugins/pi-dispatch/skills/pi-dispatch/SKILL.md'] = (Get-FileHash -LiteralPath $piSkillSource -Algorithm SHA256).Hash.ToLowerInvariant()
+  $hashes['plugins/pi-dispatch/workflow/catalog.json'] = (Get-FileHash -LiteralPath $catalogSource -Algorithm SHA256).Hash.ToLowerInvariant()
+  $hashes['plugins/pi-dispatch/.codex-plugin/plugin.json'] = (Get-FileHash -LiteralPath $pluginManifestSource -Algorithm SHA256).Hash.ToLowerInvariant()
+  $managedBlock = "<!-- PI-KETHER:BEGIN -->`r`n$([IO.File]::ReadAllText($agentsSource).TrimEnd())`r`n<!-- PI-KETHER:END -->"
+  $blockBytes = [Text.UTF8Encoding]::new($false).GetBytes($managedBlock)
+  $hashes['.codex/AGENTS.md#PI-KETHER'] = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($blockBytes)).ToLowerInvariant()
+  $manifest = [ordered]@{ schemaVersion = 1; files = $hashes } | ConvertTo-Json -Depth 8
+  [IO.File]::WriteAllText($hashManifestTarget, $manifest + "`n", [Text.UTF8Encoding]::new($false))
+  $changed.Add($hashManifestTarget)
   Write-Host "Backup: $backupRoot"
   Write-Host 'Changed targets:'
   foreach ($item in $changed) { Write-Host "  $item" }

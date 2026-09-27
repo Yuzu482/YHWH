@@ -51,7 +51,10 @@ else { for await(const chunk of process.stdin){} console.log(JSON.stringify({typ
   Write-Host '[PASS] Headless wrappers, model-free batch streams, inert defaults, isolated packaged runtime and installed drift detection.'
 } finally {
   if($hadEnforcement){[Environment]::SetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT',$previousEnforcement,'Process')}
-  else {[Environment]::SetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT',$null,'Process')}
+  else {[Environment]::SetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT',$null,'Process'); Remove-Item Env:YHWH_WORKER_ENFORCEMENT -ErrorAction SilentlyContinue}
+  $restoredEnforcement=[Environment]::GetEnvironmentVariable('YHWH_WORKER_ENFORCEMENT','Process')
+  if($hadEnforcement){if($restoredEnforcement -cne $previousEnforcement){throw 'Worker enforcement environment value was not restored exactly.'}}
+  elseif($null -ne $restoredEnforcement -or (Test-Path Env:YHWH_WORKER_ENFORCEMENT)){throw 'Worker enforcement environment variable was not removed.'}
   $resolved=[IO.Path]::GetFullPath($scratch)
   $expected=[IO.Path]::GetFullPath((Join-Path $root '.test'))+[IO.Path]::DirectorySeparatorChar
   if(-not $resolved.StartsWith($expected,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe fixture cleanup path.'}

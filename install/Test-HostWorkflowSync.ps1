@@ -22,12 +22,27 @@ try {
   if ([IO.File]::ReadAllText((Join-Path $references 'local-only.md')) -cne 'preserve-this') { throw 'Unmanaged reference was modified.' }
   $sourceManifest = Join-Path $repo 'payload/pi-dispatch/.codex-plugin/plugin.json'
   if ((Get-FileHash -LiteralPath $pluginManifest).Hash -ne (Get-FileHash -LiteralPath $sourceManifest).Hash) { throw 'Installed plugin manifest differs from source.' }
+  $hashManifestPath = Join-Path $codexRoot 'yhwh-managed-hashes.json'
+  if (-not (Test-Path -LiteralPath $hashManifestPath -PathType Leaf)) { throw 'Managed hash manifest was not created.' }
+  $hashManifest = Get-Content -LiteralPath $hashManifestPath -Raw | ConvertFrom-Json
+  if ($hashManifest.schemaVersion -ne 1) { throw 'Managed hash manifest schema version is incorrect.' }
+  $managedBlock = [regex]::Match($agents, '(?s)<!-- PI-KETHER:BEGIN -->.*?<!-- PI-KETHER:END -->').Value
+  $blockHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($managedBlock))).ToLowerInvariant()
+  if ($hashManifest.files.'.codex/AGENTS.md#PI-KETHER' -cne $blockHash) { throw 'Managed AGENTS block hash is incorrect.' }
+  $referenceKey = '.codex/agent-references/headless-cli.md'
+  if ($hashManifest.files.$referenceKey -cne (Get-FileHash -LiteralPath (Join-Path $references 'headless-cli.md')).Hash.ToLowerInvariant()) { throw 'Managed reference hash is incorrect.' }
+  $piKey = 'plugins/pi-dispatch/skills/pi-dispatch/SKILL.md'
+  if ($hashManifest.files.$piKey -cne (Get-FileHash -LiteralPath (Join-Path $fullFixture $piKey)).Hash.ToLowerInvariant()) { throw 'Pi dispatch skill hash is incorrect.' }
+  $manifestBeforeSecondSync = [IO.File]::ReadAllText($hashManifestPath)
   $backupBase = Join-Path $codexRoot 'backups/yhwh-host-workflow'
   $retiredBackups = @(Get-ChildItem -LiteralPath $backupBase -File -Recurse -Filter 'governance.md')
   if ($retiredBackups.Count -ne 1 -or [IO.File]::ReadAllText($retiredBackups[0].FullName) -cne 'retired-rule') { throw 'Retired governance reference was not backed up.' }
   & (Join-Path $PSScriptRoot 'Sync-HostWorkflow.ps1') -InstallHost -TargetHome $fullFixture | Out-Null
   $agents = [IO.File]::ReadAllText((Join-Path $codexRoot 'AGENTS.md'))
   if ([regex]::Matches($agents, [regex]::Escape('<!-- PI-KETHER:BEGIN -->')).Count -ne 1) { throw 'Second sync duplicated the managed policy block.' }
+  if ([IO.File]::ReadAllText($hashManifestPath) -cne $manifestBeforeSecondSync) { throw 'Managed hash manifest changed across repeated sync.' }
+  $manifestBackups = @(Get-ChildItem -LiteralPath $backupBase -File -Recurse -Filter 'yhwh-managed-hashes.json')
+  if ($manifestBackups.Count -ne 1) { throw 'Previous managed hash manifest was not archived.' }
   Write-Host '[PASS] Host workflow sync preserves local text, retires stale policy, and copies source manifest'
 } finally {
   if (Test-Path -LiteralPath $fullFixture) { Remove-Item -LiteralPath $fullFixture -Recurse -Force }

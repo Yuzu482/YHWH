@@ -47,9 +47,7 @@ or survival of every power-loss/storage failure; rejected sessions still need lo
 
 ## Host Claude API credentials
 
-The released reviewer uses the native Pi `anthropic / claude-sonnet-5 / max` route with user-owned API billing. Configure the key through `Configure-Claude-API.cmd`, or run `install/Set-ClaudeApiKey.ps1 -TargetHome <Windows user home>`. Only `.local/state/pi-kether/anthropic-api-key.json` is used. Never read, renew or forward Claude subscription credentials; environment keys, custom endpoints and CLI-token fallbacks are not accepted.
-
-`check_claude_auth` validates local configuration only and makes no network/model call. It does not establish key validity, quota or model availability and does not clear an open circuit. After the user repairs configuration, Tifereth must explicitly authorize `probe_model` with `recovery:true` for the pinned route. Only a successful probe permits resuming ordinary work. Keys enter trusted Pi memory through FD3, never prompts, logs, CLI arguments, environment variables or portable packages. The reviewer retains `access:none` and no tools.
+The canonical reviewer route, credential handling and recovery policy is the `pi-auth` topic (`get_workflow({"topic":"pi-auth"})`), generated from `templates/agent-references/pi-auth.md`.
 
 
 ## API key encryption (0.8)
