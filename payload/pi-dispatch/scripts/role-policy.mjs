@@ -1,4 +1,5 @@
 import { API_PROVIDERS, configuredRoute } from './controlled-provider.mjs';
+import { effectiveReviewerTransport } from './reviewer-route-config.mjs';
 export const ROLE_MODELS = Object.freeze({
   Yesod: 'gpt-6-luna', Binah: 'gpt-6-luna', Malkuth: 'gpt-6-luna',
   Hod: 'gpt-6-luna', Chochmah: 'gpt-6-luna', Chesed: 'gpt-6-luna', Netzach: 'gpt-6-luna',
@@ -11,8 +12,11 @@ export const ROLE_DISPLAY_NAMES = Object.freeze({
   Chochmah: ['Planner', '方案规划'], Chesed: ['Implementer', '实现开发'],
   Netzach: ['Verifier', '结果验证'], Geburah: ['Reviewer', '独立审查'],
 });
-export const ROLE_PROVIDERS = Object.freeze(Object.fromEntries(Object.keys(ROLE_MODELS).map(role => [role,role === 'Geburah' ? 'anthropic' : 'openai-codex'])));
-export function resolveRoleModel(role, requestedModel, requestedProvider) {
+export const ROLE_PROVIDERS = Object.freeze(Object.fromEntries(Object.keys(ROLE_MODELS).map(role => [role,role === 'Geburah' ? 'claude-code-cli' : 'openai-codex'])));
+export function effectiveRoleProviders(home) {
+  return Object.freeze({...ROLE_PROVIDERS, Geburah: effectiveReviewerTransport(home)});
+}
+export function resolveRoleModel(role, requestedModel, requestedProvider, home) {
   const canonical = Object.hasOwn(ROLE_ALIASES,role) ? ROLE_ALIASES[role] : role;
   if (!Object.hasOwn(ROLE_MODELS,canonical)) throw new Error(`Role is not admitted for Pi execution: ${role}`);
   if (API_PROVIDERS.includes(requestedProvider)) {
@@ -23,8 +27,10 @@ export function resolveRoleModel(role, requestedModel, requestedProvider) {
     return {role:canonical,provider:requestedProvider,model:route.model};
   }
   const model=ROLE_MODELS[canonical];
-  const provider=ROLE_PROVIDERS[canonical];
-  if (requestedProvider !== undefined && requestedProvider !== provider) throw new Error(`Role ${canonical} requires provider ${provider}`);
+  const configuredProviders=canonical === 'Geburah' ? effectiveRoleProviders(home) : ROLE_PROVIDERS;
+  const provider=configuredProviders[canonical];
+  if (canonical === 'Geburah' && requestedProvider !== undefined && !['claude-code-cli', 'anthropic'].includes(requestedProvider)) throw new Error('Role Geburah requires provider claude-code-cli or anthropic');
+  if (requestedProvider !== undefined && requestedProvider !== provider && !(canonical === 'Geburah' && ['claude-code-cli', 'anthropic'].includes(requestedProvider))) throw new Error(`Role ${canonical} requires provider ${provider}`);
   if (requestedModel !== undefined && requestedModel !== model) throw new Error(`Role ${canonical} requires model ${model}`);
-  return {role:canonical,model,provider};
+  return {role:canonical,model,provider:requestedProvider ?? provider};
 }

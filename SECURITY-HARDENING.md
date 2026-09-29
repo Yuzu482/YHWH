@@ -1,6 +1,6 @@
 # Security hardening verification — 2026-09-05
 
-Current 0.6.0 note: the Claude reviewer uses native Anthropic API credentials via an isolated host key file and FD3 in-memory storage, with no subscription bridge or CLI. OpenAI refresh remains host-owned. All model sandboxes now have an empty /proc. The dated evidence below is historical and does not validate the new API route; see VERIFICATION.md for current checks.
+The dated evidence below describes the 0.6.0 API-key reviewer route. The current default reviewer route uses the official Claude Code CLI on the Windows host with `access:none`, an empty temporary directory, no-tools arguments, a sanitized child environment and a bounded Job Object. This route is **not inside the WSL sandbox**. The gateway does not inspect or renew Claude Code login state, and it never switches automatically to the retained native Anthropic API-key route. OpenAI refresh remains host-owned. See VERIFICATION.md for current checks.
 
 
 Implemented in the source plugin, installed Gateway, WSL runtime and portable payload:
