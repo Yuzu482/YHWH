@@ -41,7 +41,7 @@ switch($Action) {
     New-Item -ItemType Directory -Path $testOutputRoot -Force | Out-Null
     Push-Location $gatewayRoot
     try {
-      & npm test *> $testLog
+      & npm test 2>&1 | Out-File -FilePath $testLog -Encoding utf8NoBOM
       $npmTestExit=$LASTEXITCODE
       & node scripts/test-baseline.mjs --compare $testLog
       $baselineExit=$LASTEXITCODE
