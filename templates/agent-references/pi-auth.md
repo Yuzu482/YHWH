@@ -1,8 +1,10 @@
-## Host Claude API credentials
+## Claude Code CLI reviewer and optional API credentials
 
-The released reviewer uses the native Pi `anthropic / claude-sonnet-5 / max` route with user-owned API billing. Configure the key through `Configure-Claude-API.cmd`, or run `install/Set-ClaudeApiKey.ps1 -TargetHome <Windows user home>`. Only `.local/state/pi-kether/anthropic-api-key.json` is used. Never read, renew or forward Claude subscription credentials; environment keys, custom endpoints and CLI-token fallbacks are not accepted.
+The default reviewer route is `claude-code-cli / claude-sonnet-5 / max`. The gateway invokes the official Claude Code CLI in no-tools mode on the Windows host, outside WSL. The CLI owns its subscription login; the gateway does not read, forward, renew or store its credentials. Login and recovery are manual. Before use, clear `ANTHROPIC_API_KEY` in PowerShell and confirm `claude -p "reply OK" --output-format json --model sonnet` works; if login has expired, run `claude` and `/login` yourself. The gateway strips Anthropic credential environment variables and `CLAUDE_CODE_*` overrides from the child process.
 
-`check_claude_auth` validates local configuration only and makes no network/model call. It does not establish key validity, quota or model availability and does not clear an open circuit. After the user repairs configuration, Tifereth must explicitly authorize `probe_model` with `recovery:true` for the pinned route. Only a successful probe permits resuming ordinary work. Keys enter trusted Pi memory through FD3, never prompts, logs, CLI arguments, environment variables or portable packages. The reviewer retains `access:none` and no tools.
+The separate native Pi `anthropic / claude-sonnet-5 / max` API route remains available by explicit selection or host-owned reviewer-transport preference. It uses user-owned API billing. Configure its key through `Configure-Claude-API.cmd`, or run `install/Set-ClaudeApiKey.ps1 -TargetHome <Windows user home>`. Only `.local/state/pi-kether/anthropic-api-key.json` is used for this API route. API keys are never borrowed from the CLI, and the CLI route never falls back to this route.
+
+`check_claude_auth` validates only the API-key route's local configuration. It makes no network/model call, does not validate CLI login, quota or model availability, and does not clear an open circuit. After repairing either route, Tifereth explicitly runs `probe_model` with `recovery:true` for that exact tuple. Only a successful probe permits resuming ordinary work. API keys enter trusted Pi memory through FD3, never prompts, logs, CLI arguments, environment variables or portable packages. Both reviewer routes retain `access:none` and no tools.
 
 
 ## Optional controlled API transports (0.7)

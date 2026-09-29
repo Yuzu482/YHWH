@@ -1,6 +1,6 @@
 ---
 name: kether-governance
-description: Apply the user's Kether governance workflow to substantive ChatGPT Work and Codex tasks, including scope contracts, specialist routing, review gates, and evidence-based acceptance. Use when global instructions request Kether governance or the user invokes it; keep simple tasks on the compact path.
+description: Apply the user's Kether governance workflow to T2 or disputed ChatGPT Work and Codex tasks, including scope contracts, specialist routing, review gates, and evidence-based acceptance. Use when global instructions request Kether governance or the user invokes it; use task-tiers for compact T0/T1 writes.
 ---
 
 # Kether governance
@@ -11,7 +11,7 @@ This skill is the detailed governance reference for the user's Kether workflow. 
 
 1. Identify the actual host capabilities and active authorization. Higher-priority instructions and explicit user intent govern. Loading this skill does not switch the host into Plan mode or grant permissions.
 2. Use compact primary mode for non-coding work. All coding, including small fixes, tests and implementation scripts, is authored by bounded Pi workers under the coordinator-only policy. The primary plans, inspects, mechanically integrates accepted patches and verifies; it does not take over failed implementation.
-3. For substantive work, use the staged path below with bounded specialists wherever they provide real value and the host permits delegation. Dispatch model-backed specialists through Pi with provider `openai-codex`; built-in subagents require an explicit user request for the current task. Workers are real calls, not simulated personas. The primary owns decomposition, integration, acceptance, and user communication.
+3. Classify workspace writes under the host's `task-tiers` reference. T0 uses Chesed and Netzach; T1 adds Geburah post-review; T2 uses the full staged path below with approved pre-review before mutation. Dispatch model-backed specialists through Pi with provider `openai-codex`; built-in subagents require an explicit user request for the current task. Workers are real calls, not simulated personas. The primary owns decomposition, integration, acceptance, and user communication.
 4. If mandatory worker capacity is unavailable, coding stays blocked; continue only primary reasoning/diagnosis. Distinguish local review from independent verification. A prompt or role name alone never establishes independent execution; require actual Pi dispatch and accepted worker artifacts. Primary-authored coding needs an explicit subsequent user exception.
 
 ## Derive a task agreement
@@ -36,7 +36,7 @@ In explicit Plan mode, produce the concrete plan without mutation and wait for a
 | post-review | Geburah | Compare actual artifacts/diff and verification with the agreement; approve or return concrete findings. |
 | final synthesis | Kether / primary | Evidence-backed result and remaining limits, without claiming skipped or failed stages passed. |
 
-The staged order is part of the current Kether contract. Conditional work can be not-needed in the compact path, with a reason. Read-only tasks do not gain implementation authority. For substantive mutations, pre-review precedes writes and post-review follows verification. Independent calls add real review evidence; internal self-checks must be labeled accurately when independence matters.
+The staged order is part of the current Kether contract. Apply the canonical `task-tiers` trigger table rather than interpreting "substantive" or "non-trivial" ad hoc. Conditional stages can be not-needed in T0/T1 with a reason. Read-only tasks do not gain implementation authority. T2 pre-review precedes writes; T1/T2 post-review follows verification. Independent calls add real review evidence; internal self-checks must be labeled accurately when independence matters.
 
 ## Bounded delegation
 

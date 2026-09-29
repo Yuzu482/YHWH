@@ -1,0 +1,13 @@
+# Workspace-write task tiers
+
+Classify the whole requested change before the first write. Use the highest matching tier; related changes cannot be split into smaller packets to lower the tier. Count planned **added plus deleted** source lines. Reassess an estimate overrun and raise the tier when the observed patch crosses a trigger or scope. Unknown risk or file scope is T2. This is the canonical stage-selection rule for Codex and other primary hosts.
+
+| Tier | Observable trigger | Required stages |
+| --- | --- | --- |
+| T0 | Exactly one named file, at most 20 changed lines, easy rollback, no test/config or T2 trigger | Chesed implementation → Netzach verification; no Geburah call |
+| T1 | Multiple named files, more than 20 changed lines, or a test/config change; no T2 trigger | Chesed implementation → Netzach verification → independent Geburah post-review |
+| T2 | Public API/protocol/schema, dependency or lockfile, security/auth/credentials, migration, irreversible or uncertain change; also unknown file scope | Full linked chain, including approved Geburah pre-review before Chesed and independent Geburah post-review after Netzach |
+
+For each workspace-write request, send `tier` (`T0`, `T1`, or `T2`) and a strict `tierDeclaration`: `files` (exact relative paths), `estimatedLines` (added plus deleted), `isTestOrConfigChange`, `publicApiOrProtocol`, `dependencyOrLockfile`, `securityAuthOrCredentials`, `migration`, `irreversibleOrNoRollback`, and `uncertainFileScope` (the last seven are booleans). Match declaration files to `task.writeScope`. Resolve uncertain scope to an exact file list before dispatch while retaining T2 classification. T0/T1 may be standalone only when the gateway records the tier; they cannot claim a linked stage chain. T2 requires an attested approved pre-review predecessor in a linked handoff. A tier declaration is an audit claim, not proof of semantic safety. The gateway can check paths, line counts, ledger records and handoff evidence; the primary still checks actual API/security meaning and raises the tier when needed.
+
+T0 may use a synchronous Pi dispatch so no asynchronous-result policy is needed solely for that small task. For T1/T2 use the normal asynchronous path. A T1 result is pending acceptance until post-review approves; reviewer unavailability leaves it unverified, not silently downgraded. If any T0 condition fails in the returned patch, reject the T0 result and replan at the higher tier before further work. Reviewers do not edit; verifiers do not repair silently. Report stages skipped by policy as not needed, never as passed.

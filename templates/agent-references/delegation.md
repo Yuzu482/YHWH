@@ -4,7 +4,7 @@ Apply this policy to every task and every agent operating under this Codex home.
 
 ### Routing
 
-- For every non-trivial task, first assess scope, uncertainty, dependencies, and whether delegation creates real parallel or specialist value.
+- For T1/T2 or a proposed multi-worker task, first assess scope, uncertainty, dependencies, and whether delegation creates real parallel or specialist value. Use `task-tiers` for the write-path decision; do not reinterpret an undefined "non-trivial" threshold.
 - Keep simple non-coding work with the primary. Coding always goes to a bounded Pi worker; tightly coupled edits go to one worker. The primary owns integration and acceptance.
 - Delegate only bounded, independently reviewable subtasks. Never delegate merely to add ceremony.
 - Route model-backed lower-agent work through the installed Pi gateway using the current role binding. Do not use the built-in multi-agent runtime unless explicitly requested. If Pi is unavailable, keep coding blocked and continue only primary reasoning/diagnosis; do not silently fall back to primary coding or built-in subagents.
