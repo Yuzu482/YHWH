@@ -7,7 +7,7 @@ export const SCHEDULER_POLICY = Object.freeze({
   memoryCapacityBytes: 6 * GIB,
   cpuCapacity: 2,
   hostReserveBytes: Math.max(2 * GIB, Math.ceil(totalmem() * 0.10)),
-  providerCapacity: Object.freeze({ 'openai-codex': 2, 'anthropic': 1, 'opencode-go': 2, 'yhwh-worker-api': 2, 'yhwh-reviewer-api': 1 }),
+  providerCapacity: Object.freeze({ 'openai-codex': 2, 'anthropic': 1, 'opencode-go': 2, 'yhwh-worker-api': 2, 'yhwh-reviewer-api': 1, 'claude-code-cli': 1 }),
   pollIntervalMs: 500,
   agingIntervalMs: 30_000,
   queueTimeoutMs: 120_000,
@@ -22,7 +22,7 @@ export class ResourceAwareExecutor {
     this.memoryCapacityBytes = options.memoryCapacityBytes ?? SCHEDULER_POLICY.memoryCapacityBytes;
     this.cpuCapacity = options.cpuCapacity ?? SCHEDULER_POLICY.cpuCapacity;
     this.hostReserveBytes = options.hostReserveBytes ?? SCHEDULER_POLICY.hostReserveBytes;
-    this.providerCapacity = { ...SCHEDULER_POLICY.providerCapacity, ...(options.providerCapacity || {}) };
+    this.providerCapacity = { ...SCHEDULER_POLICY.providerCapacity, ...(options.providerCapacity || {}), 'claude-code-cli': 1 };
     this.availableMemoryBytes = options.availableMemoryBytes ?? freemem;
     this.pollIntervalMs = options.pollIntervalMs ?? SCHEDULER_POLICY.pollIntervalMs;
     this.agingIntervalMs = options.agingIntervalMs ?? SCHEDULER_POLICY.agingIntervalMs;

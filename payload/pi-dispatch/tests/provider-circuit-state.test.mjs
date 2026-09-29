@@ -42,6 +42,34 @@ test('a completed model response overrides a nonfatal custom-model warning', () 
   assert.equal(circuit.state(provider, model).state, 'closed');
 });
 
+test('the exact benign diagnostics warning cannot hide timeouts or real failures', () => {
+  const warning = 'Warning: Model "gpt-6-luna" not found for provider "openai-codex". Using custom model id.';
+  const timeout = { exitCode: 124, failure: 'Missing complete assistant response', diagnostics: warning };
+  assert.deepEqual(classifyProviderResult(timeout), { healthy: false, category: 'timeout', impact: true });
+  const matched = { provider, model, requestedProvider: provider, requestedModel: model };
+  for (const toolErrors of [undefined, 2]) {
+    assert.deepEqual(classifyProviderResult({ ...matched, exitCode: 124, failure: null, toolErrors, diagnostics: warning }), { healthy: false, category: 'timeout', impact: true });
+  }
+  const cases = [
+    ['The model was not found', 'model_unavailable'],
+    ['unsupported model for account', 'model_unavailable'],
+    ['401 unauthorized', 'authentication'],
+    ['SIGABRT', 'runtime_crash'],
+    ['ECONNRESET', 'network'],
+    ['quota 429', 'rate_limit'],
+  ];
+  for (const [failure, category] of cases) {
+    assert.equal(classifyProviderResult({ failure, diagnostics: warning }).category, category);
+  }
+  assert.equal(classifyProviderResult({ failure: 'Model not found', diagnostics: warning.replace('gpt-6-luna', 'gpt-6-lunx') }).category, 'model_unavailable');
+  assert.equal(classifyProviderResult({ failure: warning }).category, 'model_unavailable');
+  assert.equal(classifyProviderResult(null, new Error(warning)).category, 'model_unavailable');
+  assert.deepEqual(classifyProviderResult({ ...matched, exitCode: 0, failure: null, diagnostics: warning }), { healthy: true, category: 'provider_reachable', impact: true });
+  const circuit = createMemoryProviderCircuitState();
+  circuit.record({ provider, model, ...classifyProviderResult(timeout) });
+  assert.equal(circuit.state(provider, model).reason, null);
+});
+
 test('authentication opens indefinitely and needs an explicit recovery probe', () => {
   let now = 1_700_000_000_000;
   const circuit = createMemoryProviderCircuitState({ clock: () => now });

@@ -107,7 +107,8 @@ function summarizeTools(result) {
   for (const name of Array.isArray(result?.toolsUsed) ? result.toolsUsed : []) {
     if (typeof name === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(name)) counts[name] = (counts[name] || 0) + 1;
   }
-  return { counts, total: Object.values(counts).reduce((sum, count) => sum + count, 0), errors: finiteNumber(result?.toolErrors) || 0 };
+  return { counts, total: Object.values(counts).reduce((sum, count) => sum + count, 0), errors: finiteNumber(result?.toolErrors) || 0,
+    recoveredErrors: finiteNumber(result?.recoveredErrors) || 0, unrecoveredErrors: finiteNumber(result?.unrecoveredErrors) ?? finiteNumber(result?.toolErrors) ?? 0 };
 }
 
 function summarizeFormatDiagnostic(validation) {
@@ -129,9 +130,24 @@ function summarizeFormatDiagnostic(validation) {
   return summary;
 }
 
+function summarizeHostVerification(value) {
+  if (!value || typeof value !== 'object') return undefined;
+  const artifactSha256 = /^[a-f0-9]{64}$/.test(value.artifactSha256 ?? '') ? value.artifactSha256 : undefined;
+  const recordSha256 = /^[a-f0-9]{64}$/.test(value.recordSha256 ?? '') ? value.recordSha256 : undefined;
+  const checks = Array.isArray(value.checks) ? value.checks : Array.isArray(value.requiredCheckNames) ? value.requiredCheckNames : null;
+  return {
+    ...(typeof value.state === 'string' ? {state:value.state} : {}),
+    ...(typeof value.outcome === 'string' ? {outcome:value.outcome} : {}),
+    ...(artifactSha256 ? {artifactSha256} : {}),
+    ...(recordSha256 ? {recordSha256} : {}),
+    ...(checks ? {checkCount:checks.length, ...(Array.isArray(value.checks) ? {passedChecks:checks.filter(item=>item?.exitCode===0).length,failedChecks:checks.filter(item=>item?.exitCode!==0).length} : {})} : {}),
+  };
+}
+
 export function buildAuditRecord({ timestamp = new Date().toISOString(), requestId, operation, input, task, result, durationMs, failure }) {
   const reason = failure ?? result?.failure ?? (result?.ok === false ? 'execution failed' : null);
   const formatDiagnostic = summarizeFormatDiagnostic(result?.formatValidation);
+  const hostVerification = summarizeHostVerification(result?.hostVerification ?? (operation==='record_host_verification' ? result : null));
   return {
     auditVersion: AUDIT_VERSION,
     timestamp,
@@ -147,6 +163,8 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     },
     phaseTimings: result?.phaseTimings,
     executionMode: result?.executionMode,
+    runtime: result?.runtime,
+    status: result?.status,
     lspStatus: operation==='lsp_request'?result?.status:undefined,
     failureCode: result?.failureCode,
     modelCalls: finiteNumber(result?.modelCalls),
@@ -157,9 +175,10 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     roleValidation:result?.roleValidation,
     ...(formatDiagnostic ? { formatDiagnostic } : {}),
     reviewDecision:result?.reviewValidation?.decision??result?.reviewDecision,
+    ...(hostVerification ? {hostVerification} : {}),
     tokens: summarizeUsage(result?.usage),
     patch: summarizePatch(result?.patch),
-    outcome: result?.ok === true && !reason ? 'completed' : 'failed',
+    outcome: result?.status === 'awaiting-host-verification' ? 'awaiting-host-verification' : result?.ok === true && !reason ? 'completed' : 'failed',
     failureReason: reason ? redactSensitiveText(reason) : null,
   };
 }

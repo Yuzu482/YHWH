@@ -1,6 +1,7 @@
 import {createExecutionTimeline} from '../extensions/execution-timeline.js';
 import {createEditorRpc} from './editor-rpc.mjs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { validateUnifiedPatch, compileWriteScope } from '../extensions/write-scope-guard.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { basename, parse, relative } from 'node:path/win32';
 
@@ -76,6 +77,17 @@ function workspaceLocation(cwd) {
   return { drive, rel };
 }
 
+export function validateSandboxPatch(patch, { job, requestId, writeScope = [], access } = {}) {
+  if (!patch || access !== 'workspace-write' || !requestId) return { patchValidation: undefined, failure: undefined };
+  try {
+    const baselinePrefix = `/var/lib/pi-kether/jobs/${job}/baseline`;
+    const workspacePrefix = `/var/lib/pi-kether/jobs/${job}/workspace`;
+    const changedFiles = validateUnifiedPatch(patch, writeScope, baselinePrefix, workspacePrefix).sort();
+    const canonicalScope = compileWriteScope(writeScope).map(item => `${item.tree ? 'tree' : 'file'}:${item.path}`).sort().join('\\n');
+    return { patchValidation: { ok: true, requestId, jobId: job, changedFiles, patchSha256: createHash('sha256').update(patch, 'utf8').digest('hex'), scopeSha256: createHash('sha256').update(canonicalScope, 'utf8').digest('hex') }, failure: undefined };
+  } catch { return { patchValidation: { ok: false, requestId, jobId: job }, failure: 'sandbox-patch-validation-failed' }; }
+}
+
 function stripPatch(stdout) {
   const index = stdout.lastIndexOf(PATCH_MARKER);
   if (index < 0) return { stdout, patch: undefined };
@@ -84,7 +96,7 @@ function stripPatch(stdout) {
   return { stdout: stdout.slice(0, index), patch: Buffer.from(encoded, 'base64').toString('utf8') };
 }
 
-export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, env = process.env, signal, onProgress, editorBroker, apiPacket } = {}) {
+export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket } = {}) {
   return new Promise((done) => {
     if (!resourceLimits?.profile || !Number.isInteger(resourceLimits.timeoutSeconds) || !Number.isInteger(resourceLimits.outputBytes)) {
       done({ exitCode: null, failure: 'invalid-resource-limits', stdout: '', stderr: '', sandbox: 'wsl2-bwrap' });
@@ -131,7 +143,10 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
       }
       try {
         const separated = stripPatch(stdout);
-        done({ exitCode: code, failure, stdout: separated.stdout, stderr, patch: separated.patch, sandbox: 'wsl2-bwrap', cleanup,phaseTimings:timeline.snapshot() });
+        const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access });
+        const patchValidation = proof.patchValidation;
+        if (proof.failure) failure ||= proof.failure;
+        done({ exitCode: code, failure, stdout: separated.stdout, stderr, patch: separated.patch, patchValidation, sandbox: 'wsl2-bwrap', cleanup,phaseTimings:timeline.snapshot() });
       } catch (error) {
         done({ exitCode: code, failure: error.message, stdout: '', stderr, sandbox: 'wsl2-bwrap', cleanup,phaseTimings:timeline.snapshot() });
       }

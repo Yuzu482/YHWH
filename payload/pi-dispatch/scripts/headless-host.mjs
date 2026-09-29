@@ -51,18 +51,23 @@ export function resolveWorkspace(config, cwd) {
 }
 
 // No shell, prompt argv, raw child logs, or arbitrary caller-supplied flags.
-export function runProcess(executable, args, { cwd, input = '', timeoutMs, maxOutputBytes, signal, onStdout, onStarted, processTreeMode = 'native' } = {}) {
+export function runProcess(executable, args, { cwd, input = '', timeoutMs, maxOutputBytes, signal, onStdout, onStarted, processTreeMode = 'native', jobMemoryBytes, env } = {}) {
   return new Promise(resolve => {
+    if (jobMemoryBytes !== undefined && (!Number.isSafeInteger(jobMemoryBytes) || jobMemoryBytes < 128 * 1024 * 1024 || jobMemoryBytes > 4 * 1024 * 1024 * 1024))
+      return resolve({ failure: 'invalid_job_memory_limit', exitCode: null, stdout: '', stderr: '' });
+    if (jobMemoryBytes !== undefined && processTreeMode !== 'job-object')
+      return resolve({ failure: 'job_memory_requires_job_object', exitCode: null, stdout: '', stderr: '' });
     if (signal?.aborted) return resolve({ failure: 'cancelled', exitCode: null, stdout: '', stderr: '' });
     let bytes = 0, failure = null, stdout = [], stderr = [], settled = false, killTimer;
     if (processTreeMode === 'job-object') {
       if (process.platform !== 'win32') return resolve({ failure: 'job_object_requires_windows', exitCode: null, stdout: '', stderr: '' });
       args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(ownRoot, 'scripts/headless-job.ps1'), '-Executable', executable,
-        '-ArgumentsBase64', Buffer.from(JSON.stringify(args)).toString('base64'), '-WorkingDirectory', cwd, '-ParentPid', String(process.pid)];
+        '-ArgumentsBase64', Buffer.from(JSON.stringify(args)).toString('base64'), '-WorkingDirectory', cwd, '-ParentPid', String(process.pid),
+        ...(jobMemoryBytes === undefined ? [] : ['-JobMemoryBytes', String(jobMemoryBytes)])];
       executable = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
     }
     const child = spawn(executable, args, { cwd, shell: false, windowsHide: true,
-      detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] });
+      detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'], ...(env === undefined ? {} : { env }) });
     const finish = code => {
       if (settled) return;
       settled = true; clearTimeout(timer); clearTimeout(killTimer);

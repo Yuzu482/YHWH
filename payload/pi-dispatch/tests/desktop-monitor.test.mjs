@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import extension from '../pi-extensions/desktop-monitor/index.mjs';
 import {launchSpec} from '../pi-extensions/desktop-monitor/launcher.mjs';
 import {projectSnapshot,describePet} from '../pi-extensions/desktop-monitor/feed.mjs';
@@ -19,6 +20,16 @@ test('pet states distinguish current work, historical failures and disconnection
  const spec=launchSpec({mode:'pet'});
  assert.equal(spec.args[spec.args.indexOf('-Mode')+1],'pet');
  assert.throws(()=>launchSpec({mode:'invalid'}),/Invalid/);
+});
+test('pet state makes host verification distinct from failed and idle work',()=>{
+ const base={ok:true,active:0,queued:0,tasks:[{state:'awaiting-host-verification'}]};
+ const pending=describePet(base);assert.equal(pending.state,'host-verification');assert.equal(pending.label,'待主机验收 1');
+ const active=describePet({...base,active:1});
+ assert.equal(active.state,'running');assert.match(active.detail,/待主机验收 1/);
+});
+test('embedded gateway monitor labels host verification separately from failure',()=>{
+ const html=readFileSync(new URL('../assets/subagent-monitor.html',import.meta.url),'utf8');
+ assert.match(html,/awaiting-host-verification/);assert.match(html,/待主机验收/);
 });
 test('desktop launch uses a hidden direct process and no shell wrapper',()=>{
  const spec=launchSpec({configPath:process.cwd(),readyFile:'ready.json'});

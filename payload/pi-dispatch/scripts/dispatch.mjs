@@ -8,9 +8,11 @@ import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'no
 import { pathToFileURL } from 'node:url';
 import { compileKetherTask, validateKetherTask } from '../extensions/kether-envelope.js';
 import { compileWriteScope } from '../extensions/write-scope-guard.js';
+import { accountToolErrors } from '../extensions/tool-error-recovery.js';
 import { DEFAULT_RESOURCE_PROFILE, resolveResourceLimits } from '../extensions/resource-limits.js';
 import { PROVIDER_POLICY, resolveControlledExtensions, validateRoute } from './provider-policy.mjs';
 import { runWslSandbox, sandboxRequested } from './wsl-sandbox.mjs';
+import { runClaudeReviewerCli } from './claude-reviewer-cli.mjs';
 import { resolveRoleModel } from './role-policy.mjs';
 import { validateRoleAccess } from './role-presets.mjs';
 import { requireReviewMaterials } from '../extensions/review-contract.js';
@@ -67,6 +69,11 @@ export function validateRequest(value, allowWrite = false, launchRoot = process.
   for (const key of ['provider', 'model']) if (request[key] !== undefined && (typeof request[key] !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._/:+@-]{0,199}$/.test(request[key]))) throw new Error(`Invalid ${key}`);
   if (!request.provider || !request.model) throw new Error('Model tasks require explicit provider and model from models output');
   const policy = validateRoute(request.provider, request.model);
+  if (request.provider === 'claude-code-cli' && (
+    request.access !== 'none' || !(probe && probeApproved && probeToken && task?.role === 'Netzach') && (!reviewerValidated || task?.role !== 'Geburah') ||
+    request.thinking !== undefined && request.thinking !== 'max' ||
+    task?.readScope?.length || task?.writeScope?.length
+  )) throw Object.assign(new Error('Claude Code review requires validated Geburah reviewer packet, none access, and max thinking'), { code: 'YHWH_WORKER_ENFORCEMENT_REJECTED' });
   enforceWorkerExecution({ provider: request.provider, model: request.model, access: request.access, reviewerValidated, probe, probeToken, probeApproved, task });
   if (request.thinking === undefined) request.thinking = policy.defaultThinking;
   if (['anthropic','yhwh-reviewer-api'].includes(request.provider) && request.access !== 'none') throw new Error('Claude review requires none access');
@@ -249,7 +256,8 @@ export function summarize(raw, request) {
   const messages = events.filter(event => event.type === 'message_end' && event.message?.role === 'assistant').map(event => event.message);
   const last = messages.at(-1);
   const errors = messages.filter(message => ['error', 'aborted'].includes(message.stopReason)).map(message => message.errorMessage || message.stopReason);
-  const toolErrors = events.filter(event => event.type === 'tool_execution_end' && event.isError).length;
+  const toolRecovery = accountToolErrors(events);
+  const toolErrors = toolRecovery.total;
   const toolsUsed = events.filter(event => event.type === 'tool_execution_start').map(event => event.toolName);
   const complete = events.some(event => event.type === 'agent_end');
   if (last?.usage && API_PROVIDERS.includes(request.provider)) { last.usage={...last.usage,cost:null,costUnavailable:true}; }
@@ -257,10 +265,23 @@ export function summarize(raw, request) {
   const actualModel = last?.model;
   const failureCode=raw.exitCode===4&&!last?raw.stderr.match(/^PI_(?:AUTH_(?:MISSING|INVALID|EXPIRED|INELIGIBLE)|CREDENTIAL_PREPARE_FAILED)$/m)?.[0]:undefined;
   const routeMismatch = !!last && (actualProvider !== request.provider || actualModel !== request.model);
-  return { ...(request.resultSubmissionRequired ? { resultSubmission: resultSubmissionFrom(events) } : {}), ...(request.configuredTransport?{configuredTransport:request.configuredTransport}:{}), target: request.target, provider: actualProvider, model: actualModel, requestedProvider: request.provider, requestedModel: request.model, ok: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && toolErrors === 0 && !routeMismatch, exitCode: raw.exitCode, failureCode, failure: raw.failure || failureCode || errors.join('; ') || (!last || !complete ? 'Missing complete assistant response' : toolErrors ? 'Tool execution failed' : routeMismatch ? 'Provider/model mismatch in Pi response' : null), text: (last?.content || []).filter(part => part.type === 'text').map(part => part.text).join('\n'), usage: last?.usage, toolsUsed, toolErrors, diagnostics: raw.stderr.slice(-6000), sandbox: raw.sandbox, cleanup: raw.cleanup, patch: raw.patch };
+  return { ...(request.resultSubmissionRequired ? { resultSubmission: resultSubmissionFrom(events) } : {}), ...(request.configuredTransport?{configuredTransport:request.configuredTransport}:{}), target: request.target, provider: actualProvider, model: actualModel, requestedProvider: request.provider, requestedModel: request.model, ok: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && toolRecovery.unrecoveredErrors === 0 && !routeMismatch, exitCode: raw.exitCode, failureCode, failure: raw.failure || failureCode || errors.join('; ') || (!last || !complete ? 'Missing complete assistant response' : toolRecovery.unrecoveredErrors ? 'Tool execution failed' : routeMismatch ? 'Provider/model mismatch in Pi response' : null), text: (last?.content || []).filter(part => part.type === 'text').map(part => part.text).join('\n'), usage: last?.usage, toolsUsed, toolErrors, ...toolRecovery, recoverableToolFailure: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && !routeMismatch && toolErrors > 0, recoverableFileToolFailure: toolRecovery.unrecoveredFileToolErrors > 0 && toolRecovery.unrecoveredErrors === toolRecovery.unrecoveredFileToolErrors, diagnostics: raw.stderr.slice(-6000), sandbox: raw.sandbox, cleanup: raw.cleanup, patch: raw.patch, patchValidation: raw.patchValidation };
 }
 
-export async function dispatch(request, signal, task = null, { resultFormat = 'json', onProgress, upstreamResults=[], editorBroker=null, probe = false, probeToken } = {}) {
+export function findClaudeCliEntry() {
+  const executableDir = dirname(process.execPath);
+  const adjacent = resolve(executableDir, 'claude.js');
+  if (existsSync(adjacent) && statSync(adjacent).isFile()) return realpathSync(adjacent);
+  const roots = [executableDir, resolve(executableDir, '..', 'lib', 'node_modules')];
+  for (const root of roots) {
+    for (const entry of [resolve(root, 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js'), resolve(root, '@anthropic-ai', 'claude-code', 'cli.js')]) {
+      if (existsSync(entry) && statSync(entry).isFile()) return realpathSync(entry);
+    }
+  }
+  throw Object.assign(new Error('Official Claude Code CLI entrypoint not found'), { code: 'CLAUDE_CLI_NOT_FOUND' });
+}
+
+export async function dispatch(request, signal, task = null, { resultFormat = 'json', onProgress, upstreamResults=[], editorBroker=null, probe = false, probeToken, claudeReviewerRunner = runClaudeReviewerCli, claudeCliEntryResolver = findClaudeCliEntry } = {}) {
   const dispatchStarted = performance.now();
   const structuredResultTool = !!task && resultFormat === 'json' && !probe && request.access !== 'none';
   if (editorBroker && (!editorRouteAllowed(request.provider, request.model) || probe)) throw Object.assign(new Error('Editor proxy is restricted to the native Luna worker route'), { code: 'YHWH_EDITOR_ROUTE_REJECTED' });
@@ -280,6 +301,19 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
   }
   enforceWorkerExecution({ provider: request.provider, model: request.model, access: request.access, reviewerValidated, probe, probeToken, probeApproved, task });
   if (process.env.PI_DISPATCH_ACTIVE === '1') throw new Error('Recursive Pi dispatch is disabled');
+  if (request.provider === 'claude-code-cli') {
+    const packet = probe ? `Return exactly ${probeToken} and nothing else.` : compileKetherTask(task, { resultFormat });
+    const result = await claudeReviewerRunner({ packet, nodePath: process.execPath, cliScript: claudeCliEntryResolver(), timeoutMs: request.timeoutSeconds * 1000, signal });
+    const failureCode = ['PI_AUTH_EXPIRED', 'PI_QUOTA_LIMITED'].includes(result.reason) ? result.reason : undefined;
+    return {
+      target: request.target, requestedProvider: request.provider, requestedModel: request.model,
+      provider: request.provider, model: request.model, ok: result.status === 'completed',
+      ...(result.text !== undefined ? { text: result.text } : {}), usage: result.usage ?? null,
+      toolsUsed: [], toolErrors: 0, runtime: 'host-cli', osSandbox: 'none',
+      ...(result.status !== 'completed' ? { failureCode: failureCode ?? result.reason, failure: failureCode ?? result.reason ?? 'Claude Code CLI failed' } : {}),
+      ...(result.resetTime ? { resetTime: result.resetTime } : {}),
+    };
+  }
   if (!sandboxRequested(process.env)) throw new Error('Pi task execution requires the verified WSL2 resource sandbox');
   let authentication;
   let apiPacket;
@@ -308,7 +342,7 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
   const executionBudget = calculateExecutionBudget({ overallTimeoutSeconds: request.timeoutSeconds, elapsedMs: performance.now() - dispatchStarted });
   if (!executionBudget.ok) return { ok:false, ...(structuredResultTool ? {resultSubmissionRequired:true} : {}), target:request.target, requestedProvider:request.provider, requestedModel:request.model, failureCode:'PI_EXECUTION_BUDGET_EXHAUSTED', failure:'No whole sandbox second remains', authentication, phaseTimings:{authenticationMs}, resourceLimits:request.resourceLimits, executionBudget };
   const sandboxResourceLimits = { ...request.resourceLimits, timeoutSeconds: executionBudget.sandboxSeconds };
-  const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker,structuredResultTool), { cwd: request.cwd, access: request.access, input, signal, editorBroker, apiPacket, resourceLimits: sandboxResourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, env,onProgress:progress });
+  const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker,structuredResultTool), { cwd: request.cwd, access: request.access, input, signal, editorBroker, apiPacket, resourceLimits: sandboxResourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, gatewayRequestId: request.gatewayRequestId, env,onProgress:progress });
   return { ...summarize(raw, { ...request, resultSubmissionRequired: structuredResultTool }), ...(structuredResultTool ? { resultSubmissionRequired: true } : {}), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits, executionBudget };
 }
 

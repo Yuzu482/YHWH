@@ -103,6 +103,28 @@ test('protocol parsing rejects partial output, multiple terminals and false succ
     ['claude', 'not-json'],
   ]) assert.throws(() => parseResult(client, output), /invalid_cli_result/);
 });
+test('runProcess uses an explicitly supplied environment without inheriting removed overrides', async t => {
+  const f = fixture(t), key = 'YHWH_TEST_CREDENTIAL_OVERRIDE';
+  const previous = process.env[key];
+  process.env[key] = 'fake-parent-secret';
+  t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
+  const result = await runProcess(process.execPath, ['-e', 'console.log(JSON.stringify({override:process.env.YHWH_TEST_CREDENTIAL_OVERRIDE,benign:process.env.YHWH_TEST_BENIGN}))'], {
+    cwd: f.root, timeoutMs: 5000, maxOutputBytes: 4096, env: { YHWH_TEST_BENIGN: 'retained' }
+  });
+  assert.equal(result.failure, null);
+  assert.deepEqual(JSON.parse(result.stdout), { benign: 'retained' });
+});
+
+test('job memory limits are bounded and require Job Object mode before spawn', async t => {
+  const f = fixture(t), opts = { cwd: f.root, timeoutMs: 1000, maxOutputBytes: 1024 };
+  for (const value of [0, 1, 128 * 1024 * 1024 - 1, 4 * 1024 * 1024 * 1024 + 1, 128 * 1024 * 1024 + 0.5, '134217728', NaN]) {
+    const result = await runProcess(path.join(f.root, 'must-not-spawn.exe'), [], { ...opts, processTreeMode: 'job-object', jobMemoryBytes: value });
+    assert.equal(result.failure, 'invalid_job_memory_limit');
+  }
+  const native = await runProcess(path.join(f.root, 'must-not-spawn.exe'), [], { ...opts, jobMemoryBytes: 128 * 1024 * 1024 });
+  assert.equal(native.failure, 'job_memory_requires_job_object');
+});
+
 test('bounded process handles missing executable, timeout, cancellation and oversized output', async t => {
   const f = fixture(t);
   const opts = { cwd: f.root, timeoutMs: 150, maxOutputBytes: 1024 };
@@ -273,12 +295,24 @@ test('offline acceptance stays model-free and failures are sanitized', async t =
   assert.equal(classifyFailure('unknown secret-value'), 'cli_exit_nonzero');
 });
 
+test('Windows Job Object enforces an opt-in memory cap and permits an ordinary child under a generous cap', { skip: process.platform !== 'win32' }, async t => {
+  const f = fixture(t), common = { cwd: f.root, timeoutMs: 15000, maxOutputBytes: 4096, processTreeMode: 'job-object' };
+  const ordinary = await runProcess(process.execPath, ['-e', 'console.log("ordinary-child-ok")'], { ...common, jobMemoryBytes: 1024 * 1024 * 1024 });
+  assert.equal(ordinary.failure, null); assert.equal(ordinary.exitCode, 0, ordinary.stderr);
+  assert.match(ordinary.stdout, /ordinary-child-ok/);
+  const pressure = await runProcess(process.execPath, ['-e', 'const b=Buffer.allocUnsafeSlow(256*1024*1024);for(let i=0;i<b.length;i+=4096)b[i]=1;console.log("allocation-complete")'],
+    { ...common, jobMemoryBytes: 128 * 1024 * 1024 });
+  assert.equal(pressure.failure, null, pressure.stderr);
+  assert.notEqual(pressure.exitCode, 0, 'child exceeding the job commit limit must not complete normally');
+  assert.doesNotMatch(pressure.stdout, /allocation-complete/);
+});
+
 test('Windows Job Object preserves stdin/argv and kills descendants after normal parent exit', { skip: process.platform !== 'win32' }, async t => {
   const f = fixture(t), arg = '中文 "quoted" trailing\\', input = 'stdin 中文\n';
   const options = { cwd: f.root, timeoutMs: 15000, maxOutputBytes: 65536, processTreeMode: 'job-object' };
-  const echo = await runProcess(process.execPath, ['-e', 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>console.log(JSON.stringify({arg:process.argv[1],s})))', arg], { ...options, input });
+  const echo = await runProcess(process.execPath, ['-e', 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>console.log(JSON.stringify({arg:process.argv[1],s,override:process.env.YHWH_TEST_CREDENTIAL_OVERRIDE,benign:process.env.YHWH_TEST_BENIGN})))', arg], { ...options, input, env: { YHWH_TEST_BENIGN: 'retained' } });
   assert.equal(echo.failure, null); assert.equal(echo.exitCode, 0, echo.stderr);
-  assert.deepEqual(JSON.parse(echo.stdout), { arg, s: input });
+  assert.deepEqual(JSON.parse(echo.stdout), { arg, s: input, benign: 'retained' });
   const code = 'const c=require("node:child_process").spawn(process.execPath,["-e","setInterval(()=>{},1000)"],{stdio:"ignore",windowsHide:true});console.log(c.pid);c.unref()';
   const r = await runProcess(process.execPath, ['-e', code], options);
   const pid = Number(r.stdout.trim());
@@ -320,3 +354,13 @@ test('Windows Job Object cancellation closes the job and removes a live descenda
  assert.equal(result.failure,'cancelled');assert(pid>0);
  await new Promise(r=>setTimeout(r,300));assert.throws(()=>process.kill(pid,0),{code:'ESRCH'});
 });
+
+  test('Windows Job Object transfers large Unicode stdin without truncation', { skip: process.platform !== 'win32' }, async t => {
+    const f = fixture(t), input = ('你好 🌍 — stdin transfer\n').repeat(5000);
+    assert(Buffer.byteLength(input, 'utf8') > 64 * 1024);
+    const result = await runProcess(process.execPath, ['-e', 'let s="";process.stdin.setEncoding("utf8");process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(JSON.stringify({text:s,bytes:Buffer.byteLength(s,"utf8")})))'], {
+      cwd: f.root, timeoutMs: 15000, maxOutputBytes: 2 * 1024 * 1024, processTreeMode: 'job-object', jobMemoryBytes: 2 * 1024 * 1024 * 1024, input
+    });
+    assert.equal(result.failure, null); assert.equal(result.exitCode, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { text: input, bytes: Buffer.byteLength(input, 'utf8') });
+  });

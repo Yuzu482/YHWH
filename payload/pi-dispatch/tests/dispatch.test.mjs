@@ -264,6 +264,27 @@ test('successful Pi response parsed without treating warnings as JSON', () => {
   assert.equal(summarize(raw, base).provider, 'openai-codex');
   assert.deepEqual(summarize(raw, base).toolsUsed, []);
 });
+test('dispatch accepts a later same-target edit recovery but preserves transport failure gates', () => {
+  const events = [
+    {type:'tool_execution_start',toolCallId:'edit-1',toolName:'edit',args:{path:'src\\a.js'}},
+    {type:'tool_execution_end',toolCallId:'edit-1',toolName:'edit',isError:true},
+    {type:'tool_execution_start',toolCallId:'edit-2',toolName:'edit',args:{path:'src/a.js'}},
+    {type:'tool_execution_end',toolCallId:'edit-2',toolName:'edit',isError:false},
+    {type:'message_end',message:{role:'assistant',provider:base.provider,model:base.model,stopReason:'stop',content:[{type:'text',text:'OK'}]}},
+    {type:'agent_end'},
+  ];
+  const raw = {exitCode:0,failure:null,stderr:'',stdout:events.map(JSON.stringify).join('\n')};
+  const result=summarize(raw,base);
+  assert.equal(result.ok,true);
+  assert.equal(result.toolErrors,1);
+  assert.equal(result.recoveredErrors,1);
+  assert.equal(result.unrecoveredErrors,0);
+  assert.equal(summarize({...raw,failure:'transport failed'},base).ok,false);
+  const unrecovered=summarize({...raw,stdout:raw.stdout.replace('edit-2','different')},base);
+  assert.equal(unrecovered.ok,false);
+  assert.equal(unrecovered.unrecoveredErrors,1);
+});
+
 test('tool execution names are exposed for caller verification', () => {
   const raw = { exitCode: 0, stderr: '', stdout: JSON.stringify({ type: 'tool_execution_start', toolName: 'lsp_symbols' }) + '\n' + JSON.stringify({ type: 'message_end', message: { role: 'assistant', provider: base.provider, model: base.model, stopReason: 'stop', content: [{ type: 'text', text: 'OK' }] } }) + '\n' + JSON.stringify({ type: 'agent_end' }) };
   assert.deepEqual(summarize(raw, base).toolsUsed, ['lsp_symbols']);

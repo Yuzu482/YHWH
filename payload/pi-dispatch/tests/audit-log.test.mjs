@@ -63,6 +63,23 @@ test('large result redaction finishes within a bounded child process without dro
   assert.equal(JSON.parse(child.stdout).ok, true);
 });
 
+test('audit record preserves host CLI runtime evidence', () => {
+  const record = buildAuditRecord({ requestId: 'cli-review', operation: 'dispatch_subagent', input: { access: 'none', provider: 'claude-code-cli' }, task: { role: 'Geburah', objective: 'private packet' }, result: { ok: true, runtime: 'host-cli', osSandbox: 'none' }, durationMs: 1 });
+  assert.equal(record.runtime, 'host-cli');
+  assert.equal(record.outcome, 'completed');
+  assert.doesNotMatch(JSON.stringify(record), /private packet/);
+});
+
+test('audit distinguishes host verification waiting from worker failure', () => {
+  const record = buildAuditRecord({ requestId:'host-wait', operation:'dispatch_subagent', input:{access:'workspace-write'}, result:{ok:false,status:'awaiting-host-verification',failure:'awaiting-host-verification'}, durationMs:1 });
+  assert.equal(record.status,'awaiting-host-verification');
+  assert.equal(record.outcome,'awaiting-host-verification');
+  const verified = buildAuditRecord({ requestId:'host-pass', operation:'record_host_verification', input:{access:'none'}, result:{ok:true,state:'completed',outcome:'completed',artifactSha256:'a'.repeat(64),recordSha256:'b'.repeat(64),checks:[{checkName:'npm test',exitCode:0,command:'private command',outputSummary:'private output'}]}, durationMs:1 });
+  assert.equal(verified.hostVerification.checkCount,1);
+  assert.equal(verified.hostVerification.passedChecks,1);
+  assert.doesNotMatch(JSON.stringify(verified),/private command|private output/);
+});
+
 test('audit usage normalizes token counters and logger persists JSONL', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pi-audit-'));
   try {
@@ -79,6 +96,10 @@ test('audit usage normalizes token counters and logger persists JSONL', () => {
     const saved = JSON.parse(readFileSync(file, 'utf8').trim());
     assert.equal(saved.tokens.totalTokens, 17);
     assert.equal(saved.tools.counts.read, 2);
+    assert.equal(saved.tools.errors, 1);
+    assert.equal(saved.tools.recoveredErrors, 0);
+    assert.equal(saved.tools.unrecoveredErrors, 1);
+    assert.equal(saved.tools.errors, saved.tools.recoveredErrors + saved.tools.unrecoveredErrors);
     assert.equal(saved.durationMs, 12);
     assert.equal(saved.failureReason, 'authorization=[REDACTED]');
     assert.doesNotMatch(JSON.stringify(saved), /secret-value|Inspect safely/);

@@ -1,5 +1,103 @@
+import {createHash} from 'node:crypto';
+
 export const RESULT_PREFIX = 'KETHER_RESULT_JSON=';
 export const RESULT_STATUSES = Object.freeze(['completed', 'failed', 'blocked', 'unverified']);
+
+const HOST_EXECUTION_REASON = /(?:\bnot\s+run\b|\bunrun\b|\bnot\s+executed\b|\bunavailable\b).*(?:host|execution|command|test|build|install|check|verification)|(?:host|execution|command|test|build|install|check|verification).*(?:\bnot\s+run\b|\bunrun\b|\bnot\s+executed\b|\bunavailable\b)|host\s+(?:is\s+)?assigned\s+to\s+(?:execute|run|verify)/i;
+const FILE_TOOL_ERROR = /(?:\b(?:read|edit|write)\b.*\b(?:error|fail(?:ed|ure)?|reject(?:ed)?|denied)\b|\b(?:error|fail(?:ed|ure)?|reject(?:ed)?|denied)\b.*\b(?:read|edit|write)\b)/i;
+const SHA256 = /^[a-f0-9]{64}$/;
+const UUID_V4 = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+const MAX_HOST_CHECKS = 32;
+
+function rejectedHostVerificationCandidate() { return {eligible: false, requiredCheckNames: []}; }
+
+function exactUniqueStrings(value, {max = 256} = {}) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > max) return false;
+  const seen = new Set();
+  for (const item of value) {
+    if (typeof item !== 'string' || !item.trim() || item.length > 4096 || item.includes('\0') || seen.has(item)) return false;
+    seen.add(item);
+  }
+  return true;
+}
+
+function sameStringSet(left, right) {
+  return exactUniqueStrings(left) && exactUniqueStrings(right) &&
+    left.length === right.length && [...left].sort().every((item, index) => item === [...right].sort()[index]);
+}
+
+/**
+ * Qualify a worker patch only when its validated result explicitly names checks
+ * that could not run in the worker environment. patchProof must be created by
+ * the gateway only after trustedPatchProof succeeds; it is not task/model input.
+ */
+export function evaluateHostVerificationCandidate({task, access, raw, value, patchProof} = {}) {
+  const denied = rejectedHostVerificationCandidate();
+  if (!task || task.role !== 'Chesed' || access !== 'workspace-write' ||
+      typeof task.requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(task.requestId)) return denied;
+  if (!raw || !value || !['completed', 'unverified', 'blocked'].includes(value.status)) return denied;
+  if (typeof value.result !== 'string' || !value.result.trim() || !Array.isArray(value.evidence) ||
+      value.evidence.length === 0 || value.evidence.some(item => typeof item !== 'string' || !item.trim()) ||
+      !exactUniqueStrings(value.changedFiles) || !Array.isArray(value.errors) ||
+      value.errors.some(item => typeof item !== 'string' || !item.trim()) ||
+      !Array.isArray(value.assumptions) || value.assumptions.some(item => typeof item !== 'string') ||
+      !Array.isArray(value.uncertainty) || value.uncertainty.some(item => typeof item !== 'string')) return denied;
+
+  const checks = value.deliverable?.checks;
+  if (!Array.isArray(checks) || checks.length === 0 || checks.length > MAX_HOST_CHECKS) return denied;
+  const names = new Set();
+  const requiredCheckNames = [];
+  for (const check of checks) {
+    if (!check || typeof check.name !== 'string' || !check.name.trim() || check.name.length > 128 || names.has(check.name) ||
+        typeof check.evidence !== 'string' || !check.evidence.trim()) return denied;
+    names.add(check.name);
+    if (check.outcome === 'failed' || !['passed', 'unverified'].includes(check.outcome)) return denied;
+    if (check.outcome === 'unverified') {
+      if (!HOST_EXECUTION_REASON.test(check.evidence)) return denied;
+      requiredCheckNames.push(check.name);
+    }
+  }
+  if (!requiredCheckNames.length) return denied;
+
+  const requestId = task.requestId;
+  const validation = raw.patchValidation;
+  if (raw.requestId !== requestId || !validation || validation.ok !== true || validation.requestId !== requestId ||
+      !patchProof || patchProof.trusted !== true || patchProof.requestId !== requestId ||
+      patchProof.jobId !== validation.jobId || !UUID_V4.test(validation.jobId ?? '') ||
+      !SHA256.test(validation.patchSha256 ?? '') || !SHA256.test(validation.scopeSha256 ?? '') ||
+      patchProof.patchSha256 !== validation.patchSha256 || patchProof.scopeSha256 !== validation.scopeSha256 ||
+      !sameStringSet(patchProof.changedFiles, validation.changedFiles) ||
+      !sameStringSet(value.changedFiles, validation.changedFiles) ||
+      typeof raw.patch !== 'string' || !raw.patch.trim() ||
+      createHash('sha256').update(raw.patch, 'utf8').digest('hex') !== validation.patchSha256) return denied;
+
+  if (raw.exitCode !== 0 || raw.failureCode || raw.routeMismatch === true || raw.authFailure === true ||
+      raw.providerFailure === true || raw.transportError === true || raw.timeout === true || raw.agentError === true ||
+      raw.truncated === true || raw.outputTruncated === true || raw.textTruncated === true ||
+      raw.cleanupError === true || raw.cleanup?.ok === false) return denied;
+  if (typeof raw.provider !== 'string' || !raw.provider || raw.provider !== raw.requestedProvider ||
+      typeof raw.model !== 'string' || !raw.model || raw.model !== raw.requestedModel ||
+      (task.provider !== undefined && task.provider !== raw.requestedProvider) ||
+      (task.model !== undefined && task.model !== raw.requestedModel)) return denied;
+
+  const usesWsl = raw.osSandbox === 'wsl2-bwrap' || raw.sandbox?.backend === 'wsl2-bwrap' ||
+    (typeof raw.sandbox === 'string' && /wsl/i.test(raw.sandbox));
+  if (usesWsl && raw.cleanup?.ok !== true) return denied;
+
+  const recoverableFileFailure = raw.recoverableToolFailure === true && raw.recoverableFileToolFailure === true &&
+    Number.isInteger(raw.toolErrors) && raw.toolErrors > 0 && Number.isInteger(raw.unrecoveredErrors) &&
+    raw.unrecoveredErrors > 0 && raw.unrecoveredFileToolErrors === raw.unrecoveredErrors &&
+    Number.isInteger(raw.fileToolErrors) && raw.fileToolErrors === raw.unrecoveredFileToolErrors &&
+    (!raw.failure || raw.failure === 'Tool execution failed') && !raw.failureCode;
+  if (raw.ok !== true && !recoverableFileFailure) return denied;
+  if (raw.failure && !(recoverableFileFailure && raw.failure === 'Tool execution failed')) return denied;
+  if (value.errors.length > 0) {
+    if (!recoverableFileFailure || value.errors.length !== raw.unrecoveredFileToolErrors ||
+        value.errors.some(error => typeof error !== 'string' || !FILE_TOOL_ERROR.test(error))) return denied;
+  }
+
+  return {eligible: true, requiredCheckNames};
+}
 
 const MAX_RESULT_BYTES = 512 * 1024;
 const MAX_DEPTH = 12;

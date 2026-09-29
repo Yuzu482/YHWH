@@ -1,5 +1,5 @@
 # Trusted Windows x64 launcher: attach the child before it can create descendants.
-param([string]$Executable,[string]$ArgumentsBase64,[string]$WorkingDirectory,[int]$ParentPid)
+param([string]$Executable,[string]$ArgumentsBase64,[string]$WorkingDirectory,[int]$ParentPid,[string]$JobMemoryBytes)
 $ErrorActionPreference='Stop'
 try {
 Add-Type -TypeDefinition @'
@@ -32,13 +32,15 @@ public static class YhwhJob {
   foreach(char c in s) { if(c=='\\'){slashes++;continue;} if(c=='\"'){b.Append('\\',slashes*2+1);b.Append(c);}else {b.Append('\\',slashes);b.Append(c);} slashes=0; }
   b.Append('\\',slashes*2);b.Append('"');return b.ToString();
  }
- public static int Run(string exe,string[] args,string cwd,int parentPid) {
+ public static int Run(string exe,string[] args,string cwd,int parentPid,long jobMemoryBytes) {
   if(IntPtr.Size!=8) return 125;
   IntPtr job=IntPtr.Zero,parent=IntPtr.Zero,limits=IntPtr.Zero; PI pi=new PI(); SI si=new SI();
   try {
    parent=OpenProcess(0x100000,false,parentPid); if(parent==IntPtr.Zero) return 125;
    job=CreateJobObject(IntPtr.Zero,null); if(job==IntPtr.Zero) return 125;
-   limits=Marshal.AllocHGlobal(144); Marshal.Copy(new byte[144],0,limits,144); Marshal.WriteInt32(limits,16,0x2000);
+   limits=Marshal.AllocHGlobal(144); Marshal.Copy(new byte[144],0,limits,144);
+   Marshal.WriteInt32(limits,16,0x2000 | (jobMemoryBytes > 0 ? 0x0200 : 0));
+   if(jobMemoryBytes > 0) Marshal.WriteInt64(limits,120,jobMemoryBytes);
    if(!SetInformationJobObject(job,9,limits,144)) return 125;
    si.cb=Marshal.SizeOf(typeof(SI));si.flags=0x100;si.input=Dup(-10);si.output=Dup(-11);si.error=Dup(-12);
    var command=new StringBuilder(Quote(exe));foreach(string arg in args){command.Append(' ');command.Append(Quote(arg));}
@@ -56,6 +58,11 @@ public static class YhwhJob {
  }
 }
 '@
+$memoryLimit=0L
+if ($PSBoundParameters.ContainsKey('JobMemoryBytes')) {
+ if ($JobMemoryBytes -notmatch '^[0-9]+$' -or $JobMemoryBytes.Length -gt 19) { throw 'invalid_job_memory_limit' }
+ if (-not [long]::TryParse($JobMemoryBytes,[ref]$memoryLimit) -or $memoryLimit -lt 134217728L -or $memoryLimit -gt 4294967296L) { throw 'invalid_job_memory_limit' }
+}
 $cliArguments=[string[]](ConvertFrom-Json ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($ArgumentsBase64))))
-exit [YhwhJob]::Run($Executable,$cliArguments,$WorkingDirectory,$ParentPid)
+exit [YhwhJob]::Run($Executable,$cliArguments,$WorkingDirectory,$ParentPid,$memoryLimit)
 } catch { [Console]::Error.WriteLine('job_object_launcher_failed'); exit 125 }

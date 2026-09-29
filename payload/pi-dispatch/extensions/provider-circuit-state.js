@@ -32,8 +32,12 @@ export function classifyProviderResult(result, error = null) {
   if(/^PI_AUTH_(?:RENEW_|LOCK_|CLI_|HOME_)/.test(result?.failureCode??''))return {healthy:false,category:'authentication_maintenance',impact:false};
   const routeMatched = result?.provider && result?.model
     && result.provider === result.requestedProvider && result.model === result.requestedModel;
-  if (routeMatched && !error && (!result?.failure || result?.toolErrors > 0)) return { healthy: true, category: 'provider_reachable', impact: true };
-  const detail = `${error?.message || ''} ${result?.failure || ''} ${result?.diagnostics || ''}`.toLowerCase();
+  if (routeMatched && result?.exitCode !== 124 && !error && (!result?.failure || result?.toolErrors > 0)) return { healthy: true, category: 'provider_reachable', impact: true };
+  const benignWarning = 'Warning: Model "gpt-6-luna" not found for provider "openai-codex". Using custom model id.';
+  const diagnostics = typeof result?.diagnostics === 'string'
+    ? result.diagnostics.split(/\r?\n/).filter(line => line !== benignWarning).join('\n')
+    : result?.diagnostics || '';
+  const detail = `${error?.message || ''} ${result?.failure || ''} ${diagnostics}`.toLowerCase();
   if (/model.{0,200}(not supported|not available|does not exist|not found)|unsupported model|model_not_found/.test(detail)) return { healthy: false, category: 'model_unavailable', impact: true };
   if (/authentication|unauthori[sz]ed|\b401\b|\b403\b|token.{0,24}(expired|invalid)|login required|provider is not configured|api.?key.{0,24}(missing|invalid|required)/.test(detail)) return { healthy: false, category: 'authentication', impact: true };
   if (/sigabrt|bun has crashed|panic\(main thread\)/.test(detail)) return { healthy: false, category: 'runtime_crash', impact: true };
@@ -42,6 +46,7 @@ export function classifyProviderResult(result, error = null) {
   if (/timeout|timed out/.test(detail)) return { healthy: false, category: 'timeout', impact: true };
   if (/econnreset|econnrefused|enotfound|eai_again|network|socket|dns|tls|connection (?:closed|lost|failed)/.test(detail)) return { healthy: false, category: 'network', impact: true };
   if (/provider\/model mismatch|route mismatch/.test(detail)) return { healthy: false, category: 'route_mismatch', impact: true };
+  if (result?.exitCode === 124) return { healthy: false, category: 'timeout', impact: true };
   if (error || result?.failure) return { healthy: false, category: 'provider_failure', impact: true };
   return { healthy: false, category: 'not_assessed', impact: false };
 }

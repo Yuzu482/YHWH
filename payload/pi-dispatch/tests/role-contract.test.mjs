@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {roleResultSchema,validateRoleResult,requireRoleFields,resultDigest} from '../extensions/role-contract.js';
-import {prepareHandoff,completedContract,validateHandoff,collectHandoffResults} from '../extensions/stage-handoff.js';
+import {prepareHandoff,completedContract,validateHandoff,collectHandoffResults,workspaceDigest} from '../extensions/stage-handoff.js';
 import {createRequestLedger} from '../extensions/request-ledger.js';
 import {roleValue,handoff,ref} from './contract-fixtures.mjs';
 
@@ -25,11 +26,40 @@ test('completed cannot hide errors, missing evidence, unresolved clarification o
   n.status='unverified';n.deliverable.verdict='unverified';assert.equal(validateRoleResult(n,'Netzach').ok,true);
 });
 
+test('Netzach hostEvidence requires bounded typed references and trusted synchronous resolution',()=>{
+  const make=()=>{const n=roleValue('Netzach');const c=n.deliverable.checks[0];c.evidence='';c.hostEvidence={requestId:'run:1',artifactSha256:'a'.repeat(64),recordSha256:'b'.repeat(64),checkName:'focused tests'};return n;};
+  const resolve=()=>({ok:true});
+  assert.equal(validateRoleResult(make(),'Netzach',{hostEvidenceResolver:resolve}).ok,true);
+  for (const options of [{},{hostEvidenceResolver:()=>({ok:false,code:'HOST_EVIDENCE_LINKED_REQUIRED'})},{hostEvidenceResolver:()=>({ok:true,forged:true})},{hostEvidenceResolver:()=>{throw Error('no')}},{hostEvidenceResolver:()=>Promise.resolve({ok:true})}]) assert.equal(validateRoleResult(make(),'Netzach',options).ok,false);
+  const malformed=[{...make().deliverable.checks[0].hostEvidence,extra:true},{...make().deliverable.checks[0].hostEvidence,requestId:'!'},{...make().deliverable.checks[0].hostEvidence,recordSha256:'A'.repeat(64)},{...make().deliverable.checks[0].hostEvidence,checkName:'x'.repeat(129)}];
+  for(const ref of malformed){const n=make();n.deliverable.checks[0].hostEvidence=ref;assert.equal(validateRoleResult(n,'Netzach',{hostEvidenceResolver:resolve}).ok,false);}
+  const other=roleValue('Chesed');other.deliverable.checks=[{...roleValue('Netzach').deliverable.checks[0],hostEvidence:make().deliverable.checks[0].hostEvidence}];
+  assert.equal(validateRoleResult(other,'Chesed').ok,false);
+});
+
 test('handoffs reject skipped stages, wrong roles, duplicate inputs and undeclared dependencies',()=>{
   assert.throws(()=>validateHandoff(handoff('implementing'),{role:'Chesed'}),/requires predecessor/);
   assert.throws(()=>validateHandoff(handoff('planned',[ref('x','Yesod','scouted')]),{role:'Chochmah'}),/Invalid/);
   assert.throws(()=>validateHandoff(handoff('planned',[ref('x','Malkuth','scouted'),ref('x','Malkuth','scouted')]),{role:'Chochmah'}),/duplicate/);
   assert.throws(()=>prepareHandoff({role:'Chesed'},{dependsOnRequestIds:['x']},'root',{}),/explicit typed handoff/);
+});
+
+test('awaiting host verification is a soft dependency wait and only its completed durable projection satisfies handoff',()=>{
+  const cwd='workspace-host-check';
+  const priorValue=roleValue('Chesed','patch ready');
+  const runGoal='Verify implementation',runAcceptance=['checks pass'];
+  const runAnchorSha256=createHash('sha256').update(JSON.stringify({runGoal,runAcceptance})).digest('hex');
+  const contract={version:2,role:'Chesed',stage:'implementing',mode:'linked',parentRunId:'host-run',workspaceSha256:workspaceDigest(cwd),resultSha256:resultDigest(priorValue),handoffVersion:2,runAnchorSha256,phaseIndex:1};
+  const task={role:'Netzach',handoff:{version:2,stage:'verifying',runGoal,runAcceptance,phaseIndex:1,inputs:[ref('host-write','Chesed','implementing',contract.resultSha256)]}};
+  const input={requestId:'host-verify',parentRunId:'host-run',dependsOnRequestIds:['host-write']};
+  let state={state:'awaiting-host-verification'};
+  const ledger={enabled:true,getOutcome:()=>state};
+  const ready=prepareHandoff(task,input,cwd,ledger);
+  assert.equal(ready(),false);
+  state={state:'completed',contract,handoffResult:priorValue};
+  assert.equal(ready(),true);
+  state={state:'failed'};
+  assert.throws(()=>ready(),/Predecessor contract/);
 });
 
 test('v2 handoffs bind goal and acceptance, version, run and phase; only approved post-review advances a phase',()=>{
