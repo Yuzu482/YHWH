@@ -67,7 +67,7 @@ $stage = Join-Path $stageBase 'pi-kether-portable'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 try {
   # Enumerate by allowlist and prune local state even when -SkipTests is used.
-  $allowed = @('install','payload','templates','docs','.readme-assets','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','THIRD_PARTY.en.md','LICENSE','NOTICE','licenses','.gitignore')
+  $allowed = @('install','payload','templates','docs','.readme-assets','.test','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','THIRD_PARTY.en.md','LICENSE','NOTICE','licenses','.gitignore')
   # Use only paths recorded in the Git index; never recursively enumerate local trees.
   $gitInfo = New-Object System.Diagnostics.ProcessStartInfo
   $gitInfo.FileName = 'git'
@@ -97,9 +97,11 @@ try {
     if ($relative.StartsWith('/') -or $relative -match '(^|/)\.\.?(/|$)') { throw "Unsafe tracked path: $relative" }
     $parts = $relative.Split('/')
     if (-not $allowedSet.ContainsKey($parts[0])) { continue }
+    $isBaselineFile = $relative -eq '.test/baseline-failures.json'
     $skip = $false
     foreach ($part in $parts) {
-      if ($part -match '^(node_modules|\.git|\.test|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { $skip = $true; break }
+      if ($part -match '^(node_modules|\.git|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { $skip = $true; break }
+      if ($part -eq '.test' -and -not $isBaselineFile) { $skip = $true; break }
     }
     if ($skip) { continue }
     $source = Join-Path $root ($relative.Replace('/',[IO.Path]::DirectorySeparatorChar))
