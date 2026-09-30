@@ -56,21 +56,22 @@ function classifyOutput(stderr, stdout = '') {
   return null;
 }
 
-export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeoutMs, signal, env, runProcessImpl = runProcess, cleanupImpl = fs.rmSync } = {}) {
+export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeoutMs, preflightBudgetMs = 10000, signal, env, runProcessImpl = runProcess, cleanupImpl = fs.rmSync, nowImpl = Date.now } = {}) {
   if (typeof packet !== 'string' || !packet.length || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
+      !Number.isSafeInteger(preflightBudgetMs) || preflightBudgetMs < 1 ||
       !existsFile(nodePath) || !existsFile(cliScript) || !/\.[cm]?js$/i.test(cliScript))
     return clean({ status: 'failed', reason: 'invalid_configuration' });
   const safeEnv = sanitizeClaudeReviewerEnv(env === undefined ? process.env : env);
   let cwd;
-  const startedAt = Date.now();
-  const remaining = () => Math.max(0, timeoutMs - (Date.now() - startedAt));
+  const startedAt = nowImpl();
+  const remaining = () => Math.max(0, timeoutMs - (nowImpl() - startedAt));
   try {
     cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-claude-review-'));
     const execute = options => runProcessImpl(nodePath, options.args, {
       cwd, input: options.input, timeoutMs: options.timeoutMs, maxOutputBytes: MAX_OUTPUT_BYTES, signal,
       processTreeMode: 'job-object', jobMemoryBytes: JOB_MEMORY_BYTES, env: safeEnv,
     });
-    const helpBudget = Math.min(remaining(), 10000);
+    const helpBudget = Math.min(remaining(), preflightBudgetMs);
     if (!helpBudget) return clean({ status: 'failed', reason: 'preflight_timeout' });
     const help = await execute({ args: [cliScript, '--help'], input: '', timeoutMs: helpBudget });
     if (help.failure) return clean({ status: 'failed', reason: help.failure === 'timeout' ? 'preflight_timeout' : 'preflight_failed' });
@@ -78,7 +79,7 @@ export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeou
     if (adapters.claude.requiredFlags.some(flag => !help.stdout.includes(flag))) return clean({ status: 'failed', reason: 'unsupported_cli' });
     if (fs.readdirSync(cwd).length !== 0) return clean({ status: 'failed', reason: 'temporary_directory_not_empty' });
 
-    const statusBudget = Math.min(remaining(), 10000);
+    const statusBudget = Math.min(remaining(), preflightBudgetMs);
     if (!statusBudget) return clean({ status: 'failed', reason: 'preflight_timeout' });
     const auth = await execute({ args: [cliScript, 'auth', 'status', '--json'], input: '', timeoutMs: statusBudget });
     if (auth.failure) return clean({ status: 'failed', reason: auth.failure === 'timeout' ? 'preflight_timeout' : 'preflight_failed' });

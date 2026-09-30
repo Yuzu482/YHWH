@@ -144,20 +144,21 @@ function launch(c, args, options) {
   return runProcess(c.executable, [...(c.nodeScript ? [c.nodeScript] : []), ...args], options);
 }
 
-export async function doctor(config, { signal, helpCache, digestCache, onPhase } = {}) {
+export async function doctor(config, { signal, helpCache, digestCache, onPhase, preflightBudgetMs = 10000, runProcessImpl = runProcess } = {}) {
+  if (!Number.isSafeInteger(preflightBudgetMs) || preflightBudgetMs < 1) fail('invalid_preflight_budget');
   const workerEnforcement = getWorkerEnforcementStatus();
   validateConfig(config);
   const clients = {}, digestMetrics = { hits: 0, misses: 0, bytesRead: 0 };
   for (const id of Object.keys(adapters)) {
     const c = config.clients[id];
     if (!c?.enabled) { clients[id] = { status: 'disabled', authenticated: 'unverified' }; continue; }
-    const options = { cwd: ownRoot, timeoutMs: 10000, maxOutputBytes: 256 * 1024, signal };
+    const options = { cwd: ownRoot, timeoutMs: preflightBudgetMs, maxOutputBytes: 256 * 1024, signal };
     if (![c.executable, ...(c.nodeScript ? [c.nodeScript] : [])].every(p => fs.existsSync(p) && fs.statSync(p).isFile())) {
       clients[id] = { status: 'missing', authenticated: 'unverified' }; continue;
     }
     onPhase?.('version');
     const identity = JSON.stringify([id, c.expectedVersion, ...[c.executable, ...(c.nodeScript ? [c.nodeScript] : [])].map(fileIdentity)]);
-    const v = await launch(c, adapters[id].versionArgs, options);
+    const v = await runProcessImpl(c.executable, [...(c.nodeScript ? [c.nodeScript] : []), ...adapters[id].versionArgs], options);
     const observedVersion = v.stdout.trim();
     if (v.failure || v.exitCode !== 0 || observedVersion !== c.expectedVersion) {
       clients[id] = { status: v.failure || (v.exitCode !== 0 ? 'version_probe_failed' : 'version_mismatch'), authenticated: 'unverified' }; continue;
@@ -165,7 +166,7 @@ export async function doctor(config, { signal, helpCache, digestCache, onPhase }
     onPhase?.('help');
     const cached = helpCache?.get(identity);
     const helpCacheHit = !!cached && Date.now() - cached.at < 60000;
-    const h = helpCacheHit ? cached.result : await launch(c, adapters[id].helpArgs, options);
+    const h = helpCacheHit ? cached.result : await runProcessImpl(c.executable, [...(c.nodeScript ? [c.nodeScript] : []), ...adapters[id].helpArgs], options);
     if (!helpCacheHit && !h.failure && h.exitCode === 0 && helpCache) {
       if (helpCache.size >= 16) helpCache.delete(helpCache.keys().next().value);
       helpCache.set(identity, { at: Date.now(), result: h });
@@ -209,12 +210,12 @@ export async function runHeadless(config, request, options = {}) {
   } finally { clearInterval(timer); }
 }
 
-async function executeHeadless(config, request, { signal, helpCache, digestCache, onProgress, onStarted, heartbeat = false, totalStarted }) {
+async function executeHeadless(config, request, { signal, helpCache, digestCache, onProgress, onStarted, heartbeat = false, totalStarted, preflightBudgetMs = 10000, runProcessImpl = runProcess }) {
   assertHeadlessExecutionAllowed();
   const cwd = validateRequest(config, request), c = config.clients[request.client];
   if (signal.aborted) return { status: 'blocked', reason: 'cancelled', modelCalls: 0 };
   // Probe only the requested client; unrelated installations cannot block it.
-  const check = await doctor({ ...config, clients: { [request.client]: c } }, { signal, helpCache, digestCache, onPhase: phase => onProgress({ type: 'phase', phase }) });
+  const check = await doctor({ ...config, clients: { [request.client]: c } }, { signal, helpCache, digestCache, preflightBudgetMs, runProcessImpl, onPhase: phase => onProgress({ type: 'phase', phase }) });
   if (signal.aborted || check.clients[request.client].status !== 'ready') return { status: 'blocked', reason: signal.aborted ? 'cancelled' : check.clients[request.client].status, modelCalls: 0,
     evidence: { totalMs: Date.now() - totalStarted, preflightMs: Date.now() - totalStarted, durationMs: 0, digestCache: check.digestCache } };
   onProgress({ type: 'cache', helpCacheHit: check.clients[request.client].helpCacheHit, digestCache: check.digestCache });
@@ -233,7 +234,7 @@ async function executeHeadless(config, request, { signal, helpCache, digestCache
     if (response) firstResponseMs ??= Date.now() - started;
     onProgress({ type: response ? 'response' : 'activity', eventCount });
   };
-  const result = await launch(c, call.args, { cwd, input: call.input, timeoutMs: config.timeoutSeconds * 1000, maxOutputBytes: config.maxOutputBytes, signal,
+  const result = await runProcessImpl(c.executable, [...(c.nodeScript ? [c.nodeScript] : []), ...call.args], { cwd, input: call.input, timeoutMs: config.timeoutSeconds * 1000, maxOutputBytes: config.maxOutputBytes, signal,
     onStarted: () => { onProgress({ type: 'phase', phase: 'running' }); onStarted?.(); }, processTreeMode: config.processTreeMode ?? 'native',
     onStdout: chunk => {
       if (firstOutputMs === null) onProgress({ type: 'first-output' });

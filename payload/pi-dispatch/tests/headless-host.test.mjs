@@ -6,8 +6,18 @@ import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { adapters, invocation, parseResult } from '../scripts/headless-adapters.mjs';
-import { doctor, fingerprint, resolveWorkspace, runHeadless, runProcess, validateConfig, createHeadlessSession, classifyFailure, runHeadlessBatch } from '../scripts/headless-host.mjs';
-import { acceptHeadless } from '../scripts/headless-acceptance.mjs';
+import { doctor as productionDoctor, fingerprint, resolveWorkspace, runHeadless as productionRunHeadless, runProcess, validateConfig, createHeadlessSession as productionCreateHeadlessSession, classifyFailure, runHeadlessBatch } from '../scripts/headless-host.mjs';
+import { acceptHeadless as productionAcceptHeadless } from '../scripts/headless-acceptance.mjs';
+
+// Real-spawn integration helpers deliberately allow ample test-only startup time.
+const TEST_PREFLIGHT_BUDGET_MS = 60000;
+const doctor = (config, options = {}) => productionDoctor(config, { preflightBudgetMs: TEST_PREFLIGHT_BUDGET_MS, ...options });
+const runHeadless = (config, request, options = {}) => productionRunHeadless(config, request, { preflightBudgetMs: TEST_PREFLIGHT_BUDGET_MS, ...options });
+const acceptHeadless = (...args) => productionAcceptHeadless(...args);
+const createHeadlessSession = (...args) => {
+  const session = productionCreateHeadlessSession(...args);
+  return { ...session, run: (config, request, options = {}) => session.run(config, request, { preflightBudgetMs: TEST_PREFLIGHT_BUDGET_MS, ...options }) };
+};
 
 let previousWorkerEnforcement;
 test.beforeEach(() => {
@@ -41,7 +51,7 @@ console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:1}}));
 else console.log(JSON.stringify({event:'result',result:{status:'SUCCESS',response:JSON.parse(input).message.content}}));
 }
 `);
-  const config = { schemaVersion: 1, workspaceRoots: [root], timeoutSeconds: 5, maxOutputBytes: 65536,
+  const config = { schemaVersion: 1, workspaceRoots: [root], timeoutSeconds: 60, maxOutputBytes: 65536,
     clients: { [client]: { enabled: true, executable: process.execPath, nodeScript: script, expectedVersion: 'fixture 1.0.0', model: 'fixture-model', policy: adapters[client].policies[0], ...(client === 'antigravity' ? { acceptNativePermissions: true } : {}) } } };
   return { root, script, config, request: { client, cwd: root, prompt: '你好 $(untrusted); `literal`\nsecond line' } };
 }
@@ -59,6 +69,47 @@ for (const client of Object.keys(adapters)) test(`${client}: probe, stdin roundt
   const call = invocation(client, f.config.clients[client], f.request.prompt);
   assert(!call.args.some(a => a.includes('untrusted')));
   assert(!call.args.some(a => /dangerously|bypassPermissions/.test(a)));
+});
+
+test('preflight budget defaults to 10 seconds and injected doctor probes honor 60 seconds', async t => {
+  const f = fixture(t), seen = [];
+  const runProcessImpl = async (_exe, _args, options) => {
+    seen.push(options.timeoutMs);
+    return { failure: null, exitCode: 0, stdout: seen.length % 2 ? 'fixture 1.0.0' : Object.values(adapters).flatMap(a => a.requiredFlags).join(' '), stderr: '' };
+  };
+  const defaultProbe = await productionDoctor(f.config, { runProcessImpl });
+  assert.equal(defaultProbe.clients.codex.status, 'ready'); assert.deepEqual(seen, [10000, 10000]);
+  seen.length = 0;
+  const customProbe = await doctor(f.config, { preflightBudgetMs: 60000, runProcessImpl });
+  assert.equal(customProbe.clients.codex.status, 'ready'); assert.deepEqual(seen, [60000, 60000]);
+  await assert.rejects(doctor(f.config, { preflightBudgetMs: 0, runProcessImpl }), /invalid_preflight_budget/);
+});
+
+test('doctor classifies injected version and help timeouts; runHeadless propagates explicit preflight budget', async t => {
+  const f = fixture(t), seen = [];
+  let index = 0;
+  const versionTimeout = await productionDoctor(f.config, { preflightBudgetMs: 60000, runProcessImpl: async (_exe, _args, options) => {
+    seen.push(options.timeoutMs); index++;
+    return { failure: index === 1 ? 'timeout' : null, exitCode: 0, stdout: 'fixture 1.0.0', stderr: '' };
+  } });
+  assert.equal(versionTimeout.clients.codex.status, 'timeout'); assert.deepEqual(seen, [60000]);
+  index = 0; seen.length = 0;
+  const helpTimeout = await productionDoctor(f.config, { preflightBudgetMs: 60000, runProcessImpl: async (_exe, args, options) => {
+    seen.push(options.timeoutMs); index++;
+    return args.includes('--version')
+      ? { failure: null, exitCode: 0, stdout: 'fixture 1.0.0', stderr: '' }
+      : { failure: 'timeout', exitCode: null, stdout: '', stderr: '' };
+  } });
+  assert.equal(helpTimeout.clients.codex.status, 'timeout'); assert.deepEqual(seen, [60000, 60000]);
+  const propagated = [];
+  const result = await runHeadless(f.config, f.request, { preflightBudgetMs: 60000, runProcessImpl: async (_exe, args, options) => {
+    propagated.push(options.timeoutMs);
+    if (args.includes('--version')) return { failure: null, exitCode: 0, stdout: 'fixture 1.0.0', stderr: '' };
+    if (args.includes('--help')) return { failure: null, exitCode: 0, stdout: Object.values(adapters).flatMap(a => a.requiredFlags).join(' '), stderr: '' };
+    return { failure: 'spawn_failed', exitCode: null, stdout: '', stderr: '' };
+  } });
+  assert.equal(result.status, 'failed'); assert.equal(result.reason, 'spawn_failed');
+  assert.deepEqual(propagated, [60000, 60000, 60000]);
 });
 
 test('default configuration is inert and does not run any CLI', async () => {
@@ -167,8 +218,8 @@ test('timeout terminates a spawned descendant as well as its parent', async t =>
 
 test('session cache preserves exact-version checks and progress contains metadata only', async t => {
   const f = fixture(t), session = createHeadlessSession(), events = [];
-  const first = await session.run(f.config, f.request, { onProgress: e => events.push(e) });
-  const second = await session.run(f.config, f.request);
+  const first = await session.run(f.config, f.request, { preflightBudgetMs: TEST_PREFLIGHT_BUDGET_MS, onProgress: e => events.push(e) });
+  const second = await session.run(f.config, f.request, { preflightBudgetMs: TEST_PREFLIGHT_BUDGET_MS });
   assert.equal(first.evidence.helpCacheHit, false); assert.equal(second.evidence.helpCacheHit, true);
   assert(first.evidence.totalMs >= first.evidence.durationMs);
   assert(first.evidence.firstResponseMs >= 0); assert.equal(first.evidence.eventCount, 2);
@@ -276,7 +327,7 @@ test('batch-events CLI streams NDJSON and finishes with the same complete batch 
   fs.writeFileSync(config, JSON.stringify(f.config)); fs.writeFileSync(requests, JSON.stringify([f.request, f.request]));
   const chunks = [];
   const output = await runProcess(process.execPath, [fileURLToPath(new URL('../scripts/headless-host.mjs', import.meta.url)), 'batch-events', config, requests], {
-    cwd: f.root, timeoutMs: 15000, maxOutputBytes: 1024 * 1024, onStdout: chunk => chunks.push(chunk.toString())
+    cwd: f.root, timeoutMs: 60000, maxOutputBytes: 1024 * 1024, onStdout: chunk => chunks.push(chunk.toString())
   });
   assert.equal(output.exitCode, 0); assert.equal(output.failure, null); assert(chunks.length > 2);
   const events = output.stdout.trim().split('\n').map(line => JSON.parse(line));
@@ -296,7 +347,7 @@ test('offline acceptance stays model-free and failures are sanitized', async t =
 });
 
 test('Windows Job Object enforces an opt-in memory cap and permits an ordinary child under a generous cap', { skip: process.platform !== 'win32' }, async t => {
-  const f = fixture(t), common = { cwd: f.root, timeoutMs: 15000, maxOutputBytes: 4096, processTreeMode: 'job-object' };
+  const f = fixture(t), common = { cwd: f.root, timeoutMs: 60000, maxOutputBytes: 4096, processTreeMode: 'job-object' };
   const ordinary = await runProcess(process.execPath, ['-e', 'console.log("ordinary-child-ok")'], { ...common, jobMemoryBytes: 1024 * 1024 * 1024 });
   assert.equal(ordinary.failure, null); assert.equal(ordinary.exitCode, 0, ordinary.stderr);
   assert.match(ordinary.stdout, /ordinary-child-ok/);
@@ -309,7 +360,7 @@ test('Windows Job Object enforces an opt-in memory cap and permits an ordinary c
 
 test('Windows Job Object preserves stdin/argv and kills descendants after normal parent exit', { skip: process.platform !== 'win32' }, async t => {
   const f = fixture(t), arg = '中文 "quoted" trailing\\', input = 'stdin 中文\n';
-  const options = { cwd: f.root, timeoutMs: 15000, maxOutputBytes: 65536, processTreeMode: 'job-object' };
+  const options = { cwd: f.root, timeoutMs: 60000, maxOutputBytes: 65536, processTreeMode: 'job-object' };
   const echo = await runProcess(process.execPath, ['-e', 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>console.log(JSON.stringify({arg:process.argv[1],s,override:process.env.YHWH_TEST_CREDENTIAL_OVERRIDE,benign:process.env.YHWH_TEST_BENIGN})))', arg], { ...options, input, env: { YHWH_TEST_BENIGN: 'retained' } });
   assert.equal(echo.failure, null); assert.equal(echo.exitCode, 0, echo.stderr);
   assert.deepEqual(JSON.parse(echo.stdout), { arg, s: input, benign: 'retained' });
@@ -335,7 +386,7 @@ test('batch stops at the first failure and leaves remaining requests unstarted',
 test('Windows Job Object cleans its child after the Node runner is abruptly killed', { skip: process.platform !== 'win32' }, async t => {
   const f = fixture(t), pidFile = path.join(f.root, 'child.pid'), runnerFile = path.join(f.root, 'runner.mjs');
   const code = `require('node:fs').writeFileSync(${JSON.stringify(pidFile)},String(process.pid));setInterval(()=>{},1000)`;
-  fs.writeFileSync(runnerFile, `import {runProcess} from ${JSON.stringify(new URL('../scripts/headless-host.mjs', import.meta.url).href)};await runProcess(process.execPath,['-e',${JSON.stringify(code)}],{cwd:${JSON.stringify(f.root)},timeoutMs:20000,maxOutputBytes:1024,processTreeMode:'job-object'});`);
+  fs.writeFileSync(runnerFile, `import {runProcess} from ${JSON.stringify(new URL('../scripts/headless-host.mjs', import.meta.url).href)};await runProcess(process.execPath,['-e',${JSON.stringify(code)}],{cwd:${JSON.stringify(f.root)},timeoutMs:60000,maxOutputBytes:1024,processTreeMode:'job-object'});`);
   const runner = spawn(process.execPath, [runnerFile], { stdio: 'ignore', windowsHide: true }); let pid;
   t.after(() => { try { runner.kill(); } catch {} if (pid) { try { process.kill(pid); } catch {} } });
   for (let i = 0; i < 100 && !fs.existsSync(pidFile); i++) await new Promise(r => setTimeout(r, 100));
@@ -350,7 +401,7 @@ test('Windows Job Object cancellation closes the job and removes a live descenda
  t.after(()=>{if(pid){try{process.kill(pid)}catch{}}});
  const code='const c=require("node:child_process").spawn(process.execPath,["-e","setInterval(()=>{},1000)"],{stdio:"ignore",windowsHide:true});console.log(c.pid);setInterval(()=>{},1000)';
  let output='';
- const result=await runProcess(process.execPath,['-e',code],{cwd:f.root,timeoutMs:15000,maxOutputBytes:1024,processTreeMode:'job-object',signal:controller.signal,onStdout:chunk=>{output+=chunk;if(output.includes('\n')){pid=Number(output.trim());controller.abort()}}});
+ const result=await runProcess(process.execPath,['-e',code],{cwd:f.root,timeoutMs:60000,maxOutputBytes:1024,processTreeMode:'job-object',signal:controller.signal,onStdout:chunk=>{output+=chunk;if(output.includes('\n')){pid=Number(output.trim());controller.abort()}}});
  assert.equal(result.failure,'cancelled');assert(pid>0);
  await new Promise(r=>setTimeout(r,300));assert.throws(()=>process.kill(pid,0),{code:'ESRCH'});
 });
@@ -359,7 +410,7 @@ test('Windows Job Object cancellation closes the job and removes a live descenda
     const f = fixture(t), input = ('你好 🌍 — stdin transfer\n').repeat(5000);
     assert(Buffer.byteLength(input, 'utf8') > 64 * 1024);
     const result = await runProcess(process.execPath, ['-e', 'let s="";process.stdin.setEncoding("utf8");process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(JSON.stringify({text:s,bytes:Buffer.byteLength(s,"utf8")})))'], {
-      cwd: f.root, timeoutMs: 15000, maxOutputBytes: 2 * 1024 * 1024, processTreeMode: 'job-object', jobMemoryBytes: 2 * 1024 * 1024 * 1024, input
+      cwd: f.root, timeoutMs: 60000, maxOutputBytes: 2 * 1024 * 1024, processTreeMode: 'job-object', jobMemoryBytes: 2 * 1024 * 1024 * 1024, input
     });
     assert.equal(result.failure, null); assert.equal(result.exitCode, 0, result.stderr);
     assert.deepEqual(JSON.parse(result.stdout), { text: input, bytes: Buffer.byteLength(input, 'utf8') });

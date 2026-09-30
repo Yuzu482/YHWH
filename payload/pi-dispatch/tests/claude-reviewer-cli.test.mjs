@@ -36,7 +36,7 @@ console.log(JSON.stringify({type:'result',subtype:'success',is_error:false,resul
   return { root, script, wrapped };
 }
 const invoke = (f, options = {}) => runClaudeReviewerCli({ packet: 'review packet only', nodePath: process.execPath,
-  cliScript: f.script, timeoutMs: 30000, env: { ANTHROPIC_API_KEY: 'fake-token', aNtHrOpIc_AuTh_ToKeN: 'fake-token', ANTHROPIC_BASE_URL: 'https://fake.invalid', CLAUDE_CODE_FAKE: 'fake-token', CLAUDE_REVIEW_BENIGN: 'retained' },
+  cliScript: f.script, timeoutMs: 120000, preflightBudgetMs: 60000, env: { ANTHROPIC_API_KEY: 'fake-token', aNtHrOpIc_AuTh_ToKeN: 'fake-token', ANTHROPIC_BASE_URL: 'https://fake.invalid', CLAUDE_CODE_FAKE: 'fake-token', CLAUDE_REVIEW_BENIGN: 'retained' },
   runProcessImpl: f.wrapped, ...options });
 
 test('sanitizes protected environment names case-insensitively without mutating caller env', () => {
@@ -87,6 +87,36 @@ test('auth preflight fails logged-out and uncertain states before model invocati
   const malformed = fixture(t, 'malformed-status');
   assert.equal((await invoke(malformed)).reason, 'preflight_failed');
   assert.equal(fs.existsSync(path.join(malformed.root, 'observed.json')), false);
+});
+
+test('preflight budgets default to 10 seconds, accept 60 seconds and remain capped by remaining time', async t => {
+  const f = fixture(t);
+  const base = { packet: 'packet', nodePath: process.execPath, cliScript: f.script, timeoutMs: 120000, env: {} };
+  for (const [budget, expected] of [[undefined, 10000], [60000, 60000]]) {
+    const seen = [];
+    const result = await runClaudeReviewerCli({ ...base, nowImpl: () => 0, ...(budget === undefined ? {} : { preflightBudgetMs: budget }), runProcessImpl: async (_exe, args, opts) => {
+      seen.push(opts.timeoutMs);
+      return args.includes('--help') ? { exitCode: 0, stdout: '--print --output-format --tools --strict-mcp-config --safe-mode --mcp-config --disallowedTools --permission-mode --no-session-persistence --model --effort', stderr: '' } : { exitCode: 0, stdout: '{"loggedIn":false}', stderr: '' };
+    }});
+    assert.equal(result.reason, 'PI_AUTH_EXPIRED'); assert.deepEqual(seen, [expected, expected]);
+  }
+  let clock = 0;
+  const capped = await runClaudeReviewerCli({ ...base, timeoutMs: 1, preflightBudgetMs: 60000, nowImpl: () => clock,
+    runProcessImpl: async () => { clock = 1; return { exitCode: 0, stdout: '--print --output-format --tools --strict-mcp-config --safe-mode --mcp-config --disallowedTools --permission-mode --no-session-persistence --model --effort', stderr: '' }; } });
+  assert.equal(capped.reason, 'preflight_timeout');
+  let capClock = 0;
+  const helpCapped = await runClaudeReviewerCli({ ...base, timeoutMs: 60000, preflightBudgetMs: 60000,
+    nowImpl: () => capClock,
+    runProcessImpl: async (_exe, args, opts) => {
+      if (args.includes('--help')) { assert.equal(opts.timeoutMs, 60000); capClock = 1; return { exitCode: 0, stdout: '--print --output-format --tools --strict-mcp-config --safe-mode --mcp-config --disallowedTools --permission-mode --no-session-persistence --model --effort', stderr: '' }; }
+      assert.equal(opts.timeoutMs, 59999);
+      return { exitCode: 0, stdout: '{"loggedIn":false}', stderr: '' };
+    } });
+  assert.equal(helpCapped.reason, 'PI_AUTH_EXPIRED');
+  let exhaustedClock = 0;
+  const exhausted = await runClaudeReviewerCli({ ...base, timeoutMs: 1, preflightBudgetMs: 60000, nowImpl: () => exhaustedClock,
+    runProcessImpl: async (_exe, args, opts) => { if (args.includes('--help')) { exhaustedClock = 1; return { exitCode: 0, stdout: '--print --output-format --tools --strict-mcp-config --safe-mode --mcp-config --disallowedTools --permission-mode --no-session-persistence --model --effort', stderr: '' }; } return { exitCode: 0, stdout: '{"loggedIn":true}', stderr: '' }; } });
+  assert.equal(exhausted.reason, 'preflight_timeout');
 });
 
 test('timeout and malformed JSON are distinct sanitized failures', async t => {
