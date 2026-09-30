@@ -62,6 +62,8 @@ if (Test-Path -LiteralPath $validator) {
   }
 }
 
+& (Join-Path $root 'install\Test-PluginVersion.ps1')
+
 $stageBase = Join-Path ([IO.Path]::GetTempPath()) ('pi-kether-build-' + [guid]::NewGuid().ToString('N'))
 $stage = Join-Path $stageBase 'pi-kether-portable'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -70,7 +72,7 @@ try {
   $allowed = @('install','payload','templates','docs','.readme-assets','.test','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','THIRD_PARTY.en.md','LICENSE','NOTICE','licenses','.gitignore')
   # Use only paths recorded in the Git index; never recursively enumerate local trees.
   $gitInfo = New-Object System.Diagnostics.ProcessStartInfo
-  $gitInfo.FileName = 'git'
+  $gitInfo.FileName = (Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
   $gitInfo.Arguments = ' -c safe.directory="' + $root.Replace('"','\"') + '" ls-files -z'
   $gitInfo.WorkingDirectory = $root
   $gitInfo.UseShellExecute = $false
@@ -119,6 +121,8 @@ try {
     New-Item -ItemType Directory -Force -Path $parent | Out-Null
     Copy-Item -LiteralPath $source -Destination $destination
   }
+  & (Join-Path $root 'install\Stamp-PluginVersion.ps1') -SourceRepositoryRoot $root -StagingPackageRoot $stage | Out-Null
+  $provenanceData = Get-Content -LiteralPath (Join-Path $stage 'build-provenance.json') -Raw | ConvertFrom-Json
   $zip = Join-Path $release "pi-kether-portable-$version.zip"
   if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
   Compress-Archive -LiteralPath $stage -DestinationPath $zip -CompressionLevel Optimal
@@ -127,6 +131,8 @@ try {
   [ordered]@{
     name = 'pi-kether-portable'; version = $version; file = [IO.Path]::GetFileName($zip)
     sha256 = $hash; builtAt = (Get-Date).ToUniversalTime().ToString('o')
+    sourceCommit = $provenanceData.sourceCommit; shortHash = $provenanceData.shortHash
+    dirty = $provenanceData.dirty; pluginVersion = $provenanceData.pluginVersion
   } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $release 'release-manifest.json') -Encoding utf8NoBOM
   Write-Host "Release: $zip"
   Write-Host "SHA256: $hash"
