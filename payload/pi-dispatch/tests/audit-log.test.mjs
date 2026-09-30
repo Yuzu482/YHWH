@@ -109,6 +109,61 @@ test('audit usage normalizes token counters and logger persists JSONL', () => {
   }
 });
 
+test('audit outcomes separate successful operation from task decision', () => {
+  const completed = buildAuditRecord({ operation: 'dispatch_subagent', result: { ok: true, status: 'completed' } });
+  assert.equal(completed.outcome, 'completed');
+  assert.equal(completed.operationOutcome, 'completed');
+  assert.equal(completed.taskOutcome, 'completed');
+
+  const failedTask = buildAuditRecord({ operation: 'record_host_verification', result: { ok: true, state: 'failed', outcome: 'failed' } });
+  assert.equal(failedTask.outcome, 'completed');
+  assert.equal(failedTask.operationOutcome, 'completed');
+  assert.equal(failedTask.taskOutcome, 'failed');
+
+  const waiting = buildAuditRecord({ operation: 'dispatch_subagent', result: { ok: false, status: 'awaiting-host-verification', failure: 'awaiting-host-verification', exitCode: 0, sandbox: 'wsl2-bwrap' } });
+  assert.equal(waiting.operationOutcome, 'completed');
+  assert.equal(waiting.taskOutcome, 'awaiting-host-verification');
+  assert.equal(waiting.runtime, 'wsl2-bwrap');
+  for (const [decision, expected] of [['approve', 'completed'], ['request-changes', 'changes-requested'], ['insufficient-materials', 'blocked']]) {
+    const review = buildAuditRecord({ operation: 'review', result: { ok: true, status: 'completed', reviewValidation: { ok: true, decision } } });
+    assert.equal(review.operationOutcome, 'completed');
+    assert.equal(review.taskOutcome, expected);
+    assert.equal(review.reviewDecision, decision);
+  }
+  const review = buildAuditRecord({ operation: 'review', result: { ok: false, status: 'failed', failure: 'review_changes_requested', reviewValidation: { ok: true, decision: 'request-changes' } } });
+  assert.equal(review.operationOutcome, 'completed');
+  assert.equal(review.taskOutcome, 'changes-requested');
+  const invalidReview = buildAuditRecord({ operation: 'review', result: { ok: false, status: 'failed', reviewValidation: { ok: false, decision: 'approve' } } });
+  assert.equal(invalidReview.operationOutcome, 'failed');
+  assert.equal(invalidReview.taskOutcome, 'failed');
+  for (const state of ['blocked', 'unverified']) assert.equal(buildAuditRecord({ operation: 'dispatch_subagent', result: { ok: true, status: state } }).taskOutcome, state);
+  assert.equal(buildAuditRecord({ operation: 'dispatch_subagent', failure: 'PI_AUTH_MISSING' }).operationOutcome, 'failed');
+  const rejected = buildAuditRecord({ operation: 'dispatch_subagent', result: { ok: false, failure: 'rejected' } });
+  assert.equal(rejected.operationOutcome, 'failed');
+  assert.equal(rejected.taskOutcome, 'failed');
+});
+
+test('runtime requires dispatch evidence and failed task outcomes receive critical retention', () => {
+  const actual = buildAuditRecord({ operation: 'dispatch_subagent', input: { provider: 'some-provider' }, result: { ok: true, osSandbox: 'wsl2-bwrap', sandbox: 'wsl2-bwrap', exitCode: 0, phaseTimings: { processMs: 5 } } });
+  assert.equal(actual.runtime, 'wsl2-bwrap');
+  const configuredOnly = buildAuditRecord({ operation: 'dispatch_subagent', result: { ok: false, osSandbox: 'wsl2-bwrap', failure: 'PI_AUTH_MISSING', phaseTimings: { authenticationMs: 10 }, timings: { executionMs: 10 } } });
+  assert.equal(configuredOnly.runtime, undefined);
+  const missing = buildAuditRecord({ operation: 'dispatch_subagent', input: { provider: 'some-provider' }, result: { ok: false, failure: 'preflight' } });
+  assert.equal(missing.runtime, undefined);
+  const noResult = buildAuditRecord({ operation: 'dispatch_subagent', input: { provider: 'some-provider' } });
+  assert.equal(noResult.runtime, undefined);
+  assert.equal(noResult.operationOutcome, 'unknown');
+
+  const dir = mkdtempSync(join(tmpdir(), 'pi-audit-task-outcome-'));
+  try {
+    const file = join(dir, 'audit.jsonl');
+    const logger = createAuditLogger(file);
+    logger.record(buildAuditRecord({ operation: 'record_host_verification', result: { ok: true, state: 'failed', outcome: 'failed' } }));
+    logger.close();
+    assert.match(readFileSync(`${file}.critical`, 'utf8'), /"taskOutcome":"failed"/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('audit logger rotates and protects failed or write records longer', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pi-audit-retention-'));
   try {

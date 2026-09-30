@@ -148,6 +148,21 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
   const reason = failure ?? result?.failure ?? (result?.ok === false ? 'execution failed' : null);
   const formatDiagnostic = summarizeFormatDiagnostic(result?.formatValidation);
   const hostVerification = summarizeHostVerification(result?.hostVerification ?? (operation==='record_host_verification' ? result : null));
+  // Dispatch can return a completed operation while the task awaits host verification or has a valid review decision.
+  const awaitingHost = result?.status === 'awaiting-host-verification' || result?.failure === 'awaiting-host-verification';
+  const reviewDecision = result?.reviewValidation?.decision ?? result?.reviewDecision;
+  const validReview = result?.reviewValidation?.ok === true && ['approve', 'request-changes', 'insufficient-materials'].includes(result.reviewValidation.decision);
+  const validChangeRequest = result?.failure === 'review_changes_requested' && validReview && reviewDecision === 'request-changes';
+  const operationOutcome = result?.ok === true && !reason || awaitingHost || validChangeRequest ? 'completed' : result || failure ? 'failed' : 'unknown';
+  const taskState = operation === 'record_host_verification'
+    ? result?.state ?? result?.status ?? result?.outcome
+    : result?.status ?? result?.state ?? result?.outcome;
+  const taskOutcome = awaitingHost || taskState === 'awaiting-host-verification'
+    ? 'awaiting-host-verification'
+    : validReview ? ({ approve: 'completed', 'request-changes': 'changes-requested', 'insufficient-materials': 'blocked' })[reviewDecision]
+      : ['blocked', 'unverified'].includes(taskState) ? taskState
+        : ['completed', 'failed', 'changes-requested'].includes(taskState) ? taskState
+          : result?.ok === false ? 'failed' : result?.ok === true && !reason ? 'completed' : 'unknown';
   return {
     auditVersion: AUDIT_VERSION,
     timestamp,
@@ -163,7 +178,9 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     },
     phaseTimings: result?.phaseTimings,
     executionMode: result?.executionMode,
-    runtime: result?.runtime,
+    // A configured backend is runtime evidence only after the process actually ran.
+    runtime: result?.runtime ?? ((finiteNumber(result?.exitCode) !== undefined || finiteNumber(result?.phaseTimings?.processMs) > 0)
+      ? result?.osSandbox ?? (operation === 'dispatch_subagent' ? result?.sandbox : undefined) : undefined),
     status: result?.status,
     lspStatus: operation==='lsp_request'?result?.status:undefined,
     failureCode: result?.failureCode,
@@ -179,6 +196,8 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     tokens: summarizeUsage(result?.usage),
     patch: summarizePatch(result?.patch),
     outcome: result?.status === 'awaiting-host-verification' ? 'awaiting-host-verification' : result?.ok === true && !reason ? 'completed' : 'failed',
+    operationOutcome,
+    taskOutcome,
     failureReason: reason ? redactSensitiveText(reason) : null,
   };
 }
@@ -257,7 +276,7 @@ export function createAuditLogger(filePath, options = {}) {
       if (closed) throw new Error('audit logger is closed');
       const line = `${JSON.stringify(value)}\n`;
       append('general', line);
-      if (value?.outcome === 'failed' || value?.access === 'workspace-write' || value?.operation === 'retention_cleanup') append('critical', line);
+      if (value?.outcome === 'failed' || value?.taskOutcome === 'failed' || value?.access === 'workspace-write' || value?.operation === 'retention_cleanup') append('critical', line);
     },
     prune,
     close() {
