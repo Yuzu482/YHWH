@@ -1,4 +1,4 @@
-import {sanitizeResult} from './result-export.js';
+import {sanitizeResult, sanitizeCapturedResult} from './result-export.js';
 import { createHash, randomUUID } from 'node:crypto';
 import {validateRoleResult, resultDigest} from './role-contract.js';
 import {
@@ -135,7 +135,7 @@ export function createRequestLedger(directory, options = {}) {
       if (current.requestId !== requestId || current.digest !== digest) {
         throw new RequestLedgerError('idempotency_key_reused', 'requestId was already used for a different write request', { requestId, digest });
       }
-      return { value: await current.promise, digest, disposition: 'replayed', source: 'in-flight' };
+      return { value: sanitizeCapturedResult(await current.promise), digest, disposition: 'replayed', source: 'in-flight' };
     }
 
     const entryDir = join(root, key);
@@ -153,7 +153,7 @@ export function createRequestLedger(directory, options = {}) {
       if (final.requestId !== requestId || final.requestDigest !== digest) {
         throw new RequestLedgerError('idempotency_key_reused', 'requestId was already used for a different write request', { requestId, digest });
       }
-      return { value: final.result, digest, disposition: 'replayed', source: 'persistent' };
+      return { value: sanitizeCapturedResult(final.result,{mode:'stored'}), digest, disposition: 'replayed', source: 'persistent' };
     }
     throw new RequestLedgerError('idempotency_in_doubt', 'write request was previously started but has no durable completion record; automatic re-execution is blocked', { requestId, digest });
   }
@@ -187,7 +187,7 @@ export function createRequestLedger(directory, options = {}) {
         ...started,
         state: 'completed',
         completedAt: new Date().toISOString(),
-        result: sanitizeForPersistence(value),
+        result: sanitizeCapturedResult(value,{mode:'capture'}),
       });
       return value;
     });
@@ -240,7 +240,7 @@ export function createRequestLedger(directory, options = {}) {
     const templateSnapshot = sanitizeForPersistence(contractTemplate);
     const pending = createHostPending({...input, contractTemplateSha256:hostRecordDigest(templateSnapshot)});
     if (hostRecordDigest(originalResult) !== pending.resultSha256) throw new RequestLedgerError('host_result_binding_mismatch', 'original result does not match pending digest');
-    const snapshot = sanitizeResult(originalResult);
+    const snapshot = sanitizeCapturedResult(originalResult,{mode:'capture'});
     const paths = hostPaths(pending.requestId);
     if (existsSync(paths.pending)) {
       const prior = loadHostPending(pending.requestId);
@@ -314,17 +314,17 @@ export function createRequestLedger(directory, options = {}) {
       const stored = validateHostSource(paths, pending);
       if (!stored) return null;
       const recordPath = paths.attestation;
-      if (!existsSync(recordPath)) return {...stored.result, state:'awaiting-host-verification', ok:false, contract:undefined};
+      if (!existsSync(recordPath)) return sanitizeCapturedResult({...stored.result, state:'awaiting-host-verification', ok:false, contract:undefined},{mode:'stored'});
       let recordSha256; try { recordSha256 = readJson(recordPath).recordSha256; } catch { return null; }
       const record = getHostVerification({requestId, artifactSha256:pending.artifactSha256, recordSha256});
       if (!record) return null;
-      if (record.outcome !== 'completed') return {...stored.result, state:'failed', ok:false, contract:undefined};
+      if (record.outcome !== 'completed') return sanitizeCapturedResult({...stored.result, state:'failed', ok:false, contract:undefined},{mode:'stored'});
       const source = stored.result?.structuredResult ?? stored.result?.response ?? stored.result;
       const structuredResult = {...(source && typeof source === 'object' ? source : {}), status:'completed'};
       if (!validateRoleResult(structuredResult, 'Chesed').ok) return null;
       const contract = {...stored.contractTemplate, resultSha256:resultDigest(structuredResult)};
       const hostEvidence = record.commands.map(({checkName,command,exitCode,outputSummary})=>({checkName,command,exitCode,outputSummary}));
-      return {...stored.result, state:'completed', ok:true, contract, structuredResult, hostEvidence};
+      return sanitizeCapturedResult({...stored.result, state:'completed', ok:true, contract, structuredResult, hostEvidence},{mode:'stored'});
     } catch { return null; }
   }
 

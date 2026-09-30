@@ -78,6 +78,8 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/controlled-provider.mjs /
 install -o root -g root -m 0644 /tmp/pi-kether-install/provider-transport.mjs /opt/pi-kether/scripts/provider-transport.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/controlled-provider.js /opt/pi-kether/extensions/controlled-provider.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/anthropic-api-credential.mjs /opt/pi-kether/scripts/anthropic-api-credential.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/patch-policy.mjs /opt/pi-kether/scripts/patch-policy.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/audit-log.js /opt/pi-kether/extensions/audit-log.js
 install -d -o root -g root -m 0711 /var/lib/pi-kether/jobs
 
 jdtls_archive="jdt-language-server-${JDTLS_VERSION}-${JDTLS_BUILD}.tar.gz"

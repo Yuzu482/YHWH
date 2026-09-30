@@ -6,6 +6,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { basename, parse, relative } from 'node:path/win32';
 
 const PATCH_MARKER = '\nPI_SANDBOX_PATCH_B64=';
+const PATCH_META_MARKER = '\nPI_SANDBOX_PATCH_META=';
+const PATCH_FAILURES = new Set(['PI_PATCH_CONTAINS_ISSUED_CREDENTIAL', 'PI_PATCH_TOKEN_INVALID', 'PI_PATCH_INVALID_BYTES']);
 
 // WSL otherwise translates the gateway's Windows cwd into any currently mounted
 // drive, including another job's temporary host-work mount, preventing unmount.
@@ -88,12 +90,25 @@ export function validateSandboxPatch(patch, { job, requestId, writeScope = [], a
   } catch { return { patchValidation: { ok: false, requestId, jobId: job }, failure: 'sandbox-patch-validation-failed' }; }
 }
 
-function stripPatch(stdout) {
+export function stripPatch(stdout, stderr = '') {
+  const terminal = stderr.endsWith('\n') ? stderr.slice(0, -1).split('\n').at(-1) : stderr.split('\n').at(-1);
+  if (PATCH_FAILURES.has(terminal)) return { stdout: '', stderr: '', failure: terminal };
   const index = stdout.lastIndexOf(PATCH_MARKER);
-  if (index < 0) return { stdout, patch: undefined };
-  const encoded = stdout.slice(index + PATCH_MARKER.length).trim();
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new Error('Sandbox returned an invalid patch payload');
-  return { stdout: stdout.slice(0, index), patch: Buffer.from(encoded, 'base64').toString('utf8') };
+  if (index < 0) return { stdout, patch: undefined, stderr };
+  const tail = stdout.slice(index + PATCH_MARKER.length);
+  const metaIndex = tail.indexOf(PATCH_META_MARKER.slice(1));
+  if (metaIndex < 0) throw new Error('Sandbox returned an invalid patch payload');
+  const encodedRaw = tail.slice(0, metaIndex).replace(/[\r\n]/g, '');
+  if (encodedRaw.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encodedRaw)) throw new Error('Sandbox returned an invalid patch payload');
+  const bytes = Buffer.from(encodedRaw, 'base64');
+  if (bytes.toString('base64') !== encodedRaw) throw new Error('Sandbox returned an invalid patch payload');
+  const metaText = tail.slice(metaIndex + PATCH_META_MARKER.length - 1).trim();
+  let meta;
+  try { meta = JSON.parse(metaText); } catch { throw new Error('Sandbox returned invalid patch metadata'); }
+  if (meta?.ok !== true || meta.patchPolicy !== 'issued-credential-v1' || typeof meta.secretLikeContent !== 'boolean' || !Number.isSafeInteger(meta.patchBytes) || meta.patchBytes !== bytes.length || !/^[a-f0-9]{64}$/.test(meta.patchSha256 ?? '') || createHash('sha256').update(bytes).digest('hex') !== meta.patchSha256) throw new Error('Sandbox returned invalid patch metadata');
+  const patch = bytes.toString('utf8');
+  if (!Buffer.from(patch, 'utf8').equals(bytes)) throw new Error('Sandbox returned invalid patch bytes');
+  return { stdout: stdout.slice(0, index), stderr, patch, patchPolicy: meta.patchPolicy, secretLikeContent: meta.secretLikeContent, patchSha256: meta.patchSha256, patchBytes: meta.patchBytes };
 }
 
 export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket } = {}) {
@@ -134,21 +149,29 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
       signal?.removeEventListener('abort', abort);
       timeline.close();
       await editorRpc?.close();
+      const patchFailure = (() => {
+        const terminal = stderr.endsWith('\n') ? stderr.slice(0, -1).split('\n').at(-1) : stderr.split('\n').at(-1);
+        return PATCH_FAILURES.has(terminal) ? terminal : null;
+      })();
       const cleanupStarted=Date.now();
       const cleanup = await cleanupWslJob(distro, job, { env });
       timeline.cleaned(Date.now()-cleanupStarted);
       if (!cleanup.ok) {
         failure ||= `sandbox-cleanup-failed:${cleanup.error || 'unknown'}`;
-        if (cleanup.stderr) stderr += `${stderr ? '\n' : ''}[cleanup] ${cleanup.stderr}`;
+
+      }
+      if (patchFailure) {
+        done({ exitCode: code, failure: patchFailure, failureCode: patchFailure, stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode}, phaseTimings: timeline.snapshot() });
+        return;
       }
       try {
-        const separated = stripPatch(stdout);
+        const separated = stripPatch(stdout, stderr);
         const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access });
         const patchValidation = proof.patchValidation;
         if (proof.failure) failure ||= proof.failure;
-        done({ exitCode: code, failure, stdout: separated.stdout, stderr, patch: separated.patch, patchValidation, sandbox: 'wsl2-bwrap', cleanup,phaseTimings:timeline.snapshot() });
-      } catch (error) {
-        done({ exitCode: code, failure: error.message, stdout: '', stderr, sandbox: 'wsl2-bwrap', cleanup,phaseTimings:timeline.snapshot() });
+        done({ exitCode: code, failure, stdout: separated.stdout, stderr: separated.stderr, patch: separated.patch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: separated.patchSha256, patchBytes: separated.patchBytes } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
+      } catch {
+        done({ exitCode: code, failure: 'PI_PATCH_INVALID_BYTES', failureCode: 'PI_PATCH_INVALID_BYTES', stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode},phaseTimings:timeline.snapshot() });
       }
     };
     const collect = (stream) => (chunk) => {

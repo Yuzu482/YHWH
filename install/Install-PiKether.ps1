@@ -271,6 +271,8 @@ if ($installWsl) {
     (Join-Path $pluginTarget 'scripts\provider-transport.mjs')='/tmp/pi-kether-install/provider-transport.mjs'
     (Join-Path $pluginTarget 'extensions\controlled-provider.js')='/tmp/pi-kether-install/controlled-provider.js'
     (Join-Path $pluginTarget 'scripts\anthropic-api-credential.mjs')='/tmp/pi-kether-install/anthropic-api-credential.mjs'
+    (Join-Path $pluginTarget 'scripts\patch-policy.mjs')='/tmp/pi-kether-install/patch-policy.mjs'
+    (Join-Path $pluginTarget 'extensions\audit-log.js')='/tmp/pi-kether-install/audit-log.js'
   }
   foreach ($pair in $transfers.GetEnumerator()) { Copy-ToWsl $pair.Key $pair.Value }
   & wsl.exe -d $WslDistro -u root -- env PI_KETHER_HARDEN_DISTRO=1 bash /tmp/pi-kether-install/provision-wsl.sh
