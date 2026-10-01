@@ -29,10 +29,18 @@ function fixture(t,wait=true) {
  return {schemaVersion:1,workspaceRoots:[root],timeoutSeconds:wait?30:10,maxOutputBytes:65536,clients:{codex:{enabled:true,executable:process.execPath,nodeScript:script,expectedVersion:'fixture 1',model:'fixture',policy:'read-only'}}};
 }
 test('live cancellation starts only after CLI launch and confirms the requested stop',async t=>{
+ const realMkdtemp=fs.mkdtempSync,acceptanceDirectories=[];
+ t.mock.method(fs,'mkdtempSync',(prefix,...args)=>{
+  const directory=realMkdtemp(prefix,...args);
+  if(path.basename(prefix)==='yhwh-cli-acceptance-')acceptanceDirectories.push(directory);
+  return directory;
+ });
  const result=await acceptHeadless(fixture(t),{live:true,cancel:true});
  assert.equal(result.clients.codex.response,'passed');assert.equal(result.clients.codex.cancellation,'passed');
  assert.equal(result.clients.codex.cancellationEvidence.started,true);assert.equal(result.clients.codex.cancellationEvidence.cancelRequested,true);
  assert.equal(result.complete,false);assert.equal(result.clients.codex.permissions,'unverified');
+ assert.equal(acceptanceDirectories.length,1);
+ assert.equal(fs.existsSync(acceptanceDirectories[0]),false,'actual CLI fixture is removed after cancellation');
 });
 test('completion before the cancellation timer is not a successful cancellation',async t=>{
  // Keep the real CLI launch, but control the cancellation clock for this branch.
