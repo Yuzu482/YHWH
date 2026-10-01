@@ -1,6 +1,8 @@
 import {roleValue,handoff,ref} from './contract-fixtures.mjs';
 import {listenHttpFixture} from './http-fixture.mjs';
 import {resultDigest} from '../extensions/role-contract.js';
+import {runAnchor,completedContract} from '../extensions/stage-handoff.js';
+import {createRequestLedger} from '../extensions/request-ledger.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, join, resolve } from 'node:path';
@@ -13,7 +15,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { BoundedExecutor, createGatewayApp, createGatewayRuntime, registerMcpResponseCleanup, resolveAllowedCwd, resolveAllowedFile } from '../scripts/gateway.mjs';
+import { BoundedExecutor, createGatewayApp, createGatewayRuntime, registerMcpResponseCleanup, resolveAllowedCwd, resolveAllowedFile, resolveBoundHostEvidence } from '../scripts/gateway.mjs';
 import { createMemoryProviderCircuitState } from '../extensions/provider-circuit-state.js';
 import { parseProbeArgs } from '../scripts/gateway-client.mjs';
 import { trustedPatchProof } from '../scripts/gateway.mjs';
@@ -25,6 +27,12 @@ const testsDir = resolve(root, 'tests');
 const token = 'test-token-0123456789-0123456789-abcdef';
 const verifiedSandbox = { ok: true, backend: 'wsl2-bwrap', hostMountVisible: false, windowsInterop: false, bubblewrap: true, pi: true, resourceLimits: true };
 const execFileAsync=promisify(execFile);
+
+test('run anchor preserves canonical bytes and rejects malformed inputs', () => {
+  assert.equal(runAnchor({runGoal:'runtime-golden',runAcceptance:['alpha','beta']}),'bce09b763afc13b87fd9135181af252dba86b1a65087fe50b4e875ceb4e6fedf');
+  assert.equal(runAnchor({runGoal:'  Mixed-CaSe 中文 e\u0301  ',runAcceptance:[' Zeta ','é',' Alpha ','测试']}),'c919c9c83a11f7cb2a0f8885958fa90eabd16267a871d4d81d4bba607e2fe927');
+  for (const value of [{runGoal:'',runAcceptance:['a']},{runGoal:'  ',runAcceptance:['a']},{runGoal:'g',runAcceptance:[]},{runGoal:'g',runAcceptance:['  ']},{runGoal:'g',runAcceptance:'a'}]) assert.throws(()=>runAnchor(value));
+});
 
 test('trusted sandbox patch proof binds request, job, patch hash, scope, and in-scope changed files', () => {
   const patch = '--- /var/lib/pi-kether/jobs/11111111-1111-4111-8111-111111111111/baseline/a.js\n+++ /var/lib/pi-kether/jobs/11111111-1111-4111-8111-111111111111/workspace/a.js\n@@ -0,0 +1 @@\n+ok\n';
@@ -83,6 +91,99 @@ test('MCP response cleanup covers response errors', async () => {
 });
 
 function formattedTaskResult(task) { return 'KETHER_RESULT_JSON='+JSON.stringify(roleValue(task.role,task.objective)); }
+
+test('durable host attestation anchors linked v2 evidence to the recorded Chesed contract', async () => {
+  const ledgerDir=mkdtempSync(join(tmpdir(),'pi-linked-anchor-ledger-'));
+  const parentRunId='runtime-quality-20261001';
+  const goal='Add cross-project runtime-code quality rules and safe readonly fixture snapshots/advisory preflight; deliver restricted-check design only, preserving isolation.';
+  const acceptance=['Worker-authored scoped changes verified by primary host real checks and independent review.','Fixture reads remain readonly; escaped/sensitive paths fail; warnings advisory and auditable.','Restricted execution is design only and deployment waits for user decision.'];
+  const preId='runtime-quality-20261001-scope-review-2';
+  const preTask={role:'Geburah',objective:'Seed synthetic pre-review predecessor',acceptance:['Synthetic fixture only'],readScope:['tests/gateway.test.mjs'],writeScope:[],reviewPacket:{version:1,stage:'pre-change',requirements:{status:'provided',content:['Synthetic fixture']},changes:{status:'provided',content:['Synthetic fixture']},context:{status:'provided',content:['Synthetic fixture']},verification:{status:'provided',content:['Synthetic fixture']}},handoff:{version:2,stage:'pre-review',inputs:[{requestId:'planned-fixture',role:'Chochmah',stage:'planned',resultSha256:'a'.repeat(64)}],runGoal:goal,runAcceptance:acceptance,phaseIndex:1}};
+  const preValue=roleValue('Geburah');
+  const ledger=createRequestLedger(ledgerDir);
+  ledger.recordOutcome(preId,{ok:true,contract:completedContract(preTask,{parentRunId},root,preValue),structuredResult:preValue});
+  const preRecord=ledger.getOutcome(preId);
+  const taskFor=(role,stage,inputs,extra={})=>({contractVersion:2,role,objective:goal,acceptance,readScope:['tests/gateway.test.mjs'],writeScope:role==='Chesed'?['tests/gateway.test.mjs']:[],handoff:{version:2,stage,inputs,runGoal:goal,runAcceptance:acceptance,phaseIndex:1},...extra});
+  const preRef={requestId:preId,role:'Geburah',stage:'pre-review',resultSha256:preRecord.contract.resultSha256};
+  const checkName='host npm test';
+  const evidenceResponses=[];
+  let attestationDigest='';
+  const evidenceVariants=[{checkName,recordSha256:'pending'},{checkName:'different synthetic check',recordSha256:'pending'},{checkName,recordSha256:'f'.repeat(64)}];
+  const patch='--- /var/lib/pi-kether/jobs/11111111-1111-4111-8111-111111111111/baseline/tests/gateway.test.mjs\n+++ /var/lib/pi-kether/jobs/11111111-1111-4111-8111-111111111111/workspace/tests/gateway.test.mjs\n@@ -0,0 +1 @@\n+synthetic\n';
+  const scope=['tests/gateway.test.mjs'];
+  const canonical=compileWriteScope(scope).map(item=>`${item.tree?'tree':'file'}:${item.path}`).sort().join('\\n');
+  const proof={ok:true,requestId:'linked-chesed',jobId:'11111111-1111-4111-8111-111111111111',changedFiles:scope,patchSha256:createHash('sha256').update(patch,'utf8').digest('hex'),scopeSha256:createHash('sha256').update(canonical,'utf8').digest('hex')};
+  const linkedDispatch=async(request,_signal,task)=>{
+    if(task.role==='Chesed'){
+      const value=roleValue('Chesed');
+      value.changedFiles=scope;
+      value.deliverable.checks=[{name:checkName,outcome:'unverified',evidence:'Host is assigned to run verification; fixture check not run by synthetic worker'}];
+      return {ok:true,requestId:request.gatewayRequestId,requestedProvider:request.provider,requestedModel:request.model,provider:request.provider,model:request.model,exitCode:0,cleanup:{ok:true},text:'KETHER_RESULT_JSON='+JSON.stringify(value),patch,patchValidation:proof};
+    }
+    const variant=evidenceVariants[evidenceResponses.length];
+    if(variant.recordSha256==='pending')variant.recordSha256=attestationDigest;
+    const value=roleValue('Netzach');value.deliverable.checks=[{name:checkName,outcome:'passed',evidence:'Synthetic fixture text only; not production evidence.'}];
+    value.deliverable.checks[0].hostEvidence={requestId:'linked-chesed',artifactSha256:proof.patchSha256,recordSha256:variant.recordSha256,checkName:variant.checkName};
+    evidenceResponses.push(value);return {ok:true,provider:request.provider,model:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value)};
+  };
+  try {
+    await withGateway(async({client})=>{
+      const receipt=await receiptFor(client,'task-tiers');
+      const chesed=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,parentRunId,requestId:'linked-chesed',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',workflowReceipt:receipt,dependsOnRequestIds:[preId],...declaredT1(scope),task:taskFor('Chesed','implementing',[preRef])}}));
+      assert.equal(chesed.status,'awaiting-host-verification',JSON.stringify(chesed));
+      const recorded=parsed(await client.callTool({name:'record_host_verification',arguments:{requestId:'linked-chesed',artifactSha256:chesed.hostVerification.artifactSha256,commands:[{checkName,command:'synthetic fixture command',exitCode:0,outputSummary:'Synthetic fixture text only; no production command ran.'}],workflowReceipt:receipt}}));
+      assert.equal(recorded.state,'completed');
+      const hostRecord=ledger.getHostVerification({requestId:'linked-chesed',artifactSha256:chesed.hostVerification.artifactSha256,recordSha256:recorded.recordSha256});
+      assert.equal(hostRecord.outcome,'completed');
+      const completed=ledger.getOutcome('linked-chesed');
+      assert.equal(completed.state,'completed');
+      const chesedRef={requestId:'linked-chesed',role:'Chesed',stage:'implementing',resultSha256:completed.contract.resultSha256};
+      const evidenceRef={requestId:'linked-chesed',artifactSha256:proof.patchSha256,recordSha256:recorded.recordSha256,checkName};
+      const resolverArgs={task:taskFor('Netzach','verifying',[chesedRef]),parentRunId,cwd:root,ledger};
+      assert.equal(resolveBoundHostEvidence(evidenceRef,resolverArgs).ok,true);
+      for(const patch of [
+        {runAnchorSha256:undefined},{runAnchorSha256:'invalid'},{runAnchorSha256:completed.contract.runAnchorSha256.toUpperCase()},
+        {handoffVersion:1},{phaseIndex:2},{parentRunId:'foreign'},{workspaceSha256:'f'.repeat(64)},{mode:'standalone'},{role:'Hod'},{stage:'planned'},
+      ]) {
+        const alteredLedger={getHostVerification:args=>ledger.getHostVerification(args),getOutcome:()=>({...completed,contract:{...completed.contract,...patch}})};
+        assert.equal(resolveBoundHostEvidence(evidenceRef,{...resolverArgs,ledger:alteredLedger}).ok,false,JSON.stringify(patch));
+      }
+      for(const patch of [{goal:'foreign'},{phase:2},{workspace:'foreign'},{parentRunId:'foreign'},{outcome:'failed'},{commands:[{checkName,exitCode:1}]}]) {
+        const alteredLedger={getOutcome:args=>ledger.getOutcome(args),getHostVerification:()=>({...hostRecord,...patch})};
+        assert.equal(resolveBoundHostEvidence(evidenceRef,{...resolverArgs,ledger:alteredLedger}).ok,false,JSON.stringify(patch));
+      }
+      for(const patch of [{runGoal:'foreign'},{runAcceptance:[...acceptance].reverse()},{runAcceptance:['foreign']},{phaseIndex:2}]) {
+        assert.equal(resolveBoundHostEvidence(evidenceRef,{...resolverArgs,task:{...resolverArgs.task,handoff:{...resolverArgs.task.handoff,...patch}}}).ok,false);
+      }
+      assert.equal(resolveBoundHostEvidence(evidenceRef,{...resolverArgs,task:{...resolverArgs.task,handoff:undefined}}).ok,false);
+      assert.equal(resolveBoundHostEvidence({...evidenceRef,recordSha256:'f'.repeat(64)},resolverArgs).ok,false);
+      const invoke=async(id)=>parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,parentRunId,requestId:id,provider:'openai-codex',model:'gpt-6-luna',access:'read',workflowReceipt:receipt,dependsOnRequestIds:['linked-chesed'],task:taskFor('Netzach','verifying',[chesedRef])}}));
+      attestationDigest=recorded.recordSha256;
+      evidenceVariants[0].recordSha256=recorded.recordSha256;
+      const valid=await invoke('linked-netzach-positive');
+      assert.equal(valid.ok,true,JSON.stringify(valid));
+      assert.equal(valid.contract.role,'Netzach');
+      const wrongName=await invoke('linked-netzach-wrong-check');
+      assert.equal(wrongName.ok,false);
+      const wrongDigest=await invoke('linked-netzach-wrong-digest');
+      assert.equal(wrongDigest.ok,false);
+      assert.equal(evidenceResponses.length,3);
+    },{requestLedgerDir:ledgerDir,dispatchFn:linkedDispatch});
+  } finally { rmSync(ledgerDir,{recursive:true,force:true}); }
+});
+
+test('runtime preflight is returned on async admission and terminal execution without blocking dispatch',async()=>{
+  const records=[];
+  await withGateway(async({client})=>{
+    const input={requestId:'preflight-advisory',cwd:root,access:'read',provider:'openai-codex',model:'gpt-6-luna',task:{role:'Malkuth',objective:'Inspect a subprocess file',readScope:['package.json'],acceptance:['Report observed source']}};
+    const admitted=parsed(await client.callTool({name:'submit_subagent',arguments:input}));
+    assert.equal(admitted.ok,true);assert.equal(admitted.preflight.warnings[0].code,'missing_interface_contract');
+    const result=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...input,requestId:'preflight-direct'}}));
+    assert.equal(result.ok,true);assert.deepEqual(result.preflight.counts,{missing_interface_contract:1});
+  },{auditLogger:{enabled:true,record:value=>records.push(value)}});
+  assert.ok(records.some(r=>r.operation==='dispatch_subagent'&&r.preflight?.counts.missing_interface_contract===1));
+  assert.ok(records.every(r=>r.preflight===undefined||JSON.stringify(r.preflight).includes('Inspect a subprocess file')===false));
+});
 
 function parsed(result) {
   return JSON.parse(result.content[0].text);

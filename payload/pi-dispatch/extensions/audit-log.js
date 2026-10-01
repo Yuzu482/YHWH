@@ -144,6 +144,13 @@ function summarizeHostVerification(value) {
   };
 }
 
+function summarizeRuntimePreflight(value) {
+  // Audit admission is intentionally independent of untrusted messages and counters.
+  const warnings=Array.isArray(value?.warnings)?value.warnings:[];
+  const codes=['script_without_real_run','output_without_parent_path','mixed_layers','missing_interface_contract'].filter(code=>warnings.some(item=>item?.code===code));
+  return {advisory:true,codes,counts:Object.fromEntries(codes.map(code=>[code,1]))};
+}
+
 export function buildAuditRecord({ timestamp = new Date().toISOString(), requestId, operation, input, task, result, durationMs, failure }) {
   const reason = failure ?? result?.failure ?? (result?.ok === false ? 'execution failed' : null);
   const formatDiagnostic = summarizeFormatDiagnostic(result?.formatValidation);
@@ -170,6 +177,7 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     operation,
     access: input?.access,
     envelope: summarizeTaskEnvelope(task),
+    ...(result?.preflight ? {preflight:summarizeRuntimePreflight(result.preflight)} : {}),
     route: {
       requestedProvider: input?.provider,
       requestedModel: input?.model,

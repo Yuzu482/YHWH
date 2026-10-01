@@ -1,5 +1,5 @@
 import {validateRoleResult,ROLE_SCHEMAS} from '../extensions/role-contract.js';
-import {prepareHandoff,completedContract,collectHandoffResults,HANDOFF_POLICY} from '../extensions/stage-handoff.js';
+import {prepareHandoff,completedContract,collectHandoffResults,HANDOFF_POLICY,runAnchor} from '../extensions/stage-handoff.js';
 import {checkClaudeAuth,CLAUDE_API_POLICY} from './claude-api-auth.mjs';
 import {OPENAI_AUTH_POLICY} from './openai-auth-store.mjs';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -15,6 +15,7 @@ import {codeGraph,CODE_GRAPH_POLICY} from './code-graph.mjs';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import * as z from 'zod/v4';
 import { dispatch, validateKetherInvocation } from './dispatch.mjs';
+import {runtimePreflight} from './runtime-preflight.mjs';
 import { publicCapabilities } from './provider-policy.mjs';
 import {LSP_METHODS,lspParameters,runDirectLsp} from './direct-lsp.mjs';
 import { probeWslSandbox } from './wsl-sandbox.mjs';
@@ -54,6 +55,24 @@ export function trustedPatchProof(response, requestId, writeScope) {
     const actual = validateUnifiedPatch(response.patch, writeScope, `${base}/baseline`, `${base}/workspace`).sort();
     return JSON.stringify(actual) === JSON.stringify([...proof.changedFiles].sort()) && proof.changedFiles.every(path => typeof path === 'string' && isAllowedPath(normalizeScopedPath(path).path, scope));
   } catch { return false; }
+}
+
+export function resolveBoundHostEvidence(ref, {task, parentRunId, cwd, ledger}) {
+  const linked=task.role==='Netzach'&&task.handoff?.inputs?.some(input=>input.requestId===ref.requestId&&input.role==='Chesed'&&input.stage==='implementing');
+  if(!linked)return {ok:false,code:'HOST_EVIDENCE_LINKED_REQUIRED'};
+  const record=ledger?.getHostVerification({requestId:ref.requestId,artifactSha256:ref.artifactSha256,recordSha256:ref.recordSha256});
+  const prior=ledger?.getOutcome(ref.requestId);
+  const contract=prior?.contract;
+  const handoff=task.handoff;
+  const expectedGoal=handoff?.runGoal??task.objective;
+  const expectedPhase=handoff?.version===2?handoff.phaseIndex:1;
+  let expectedAnchor;
+  try { expectedAnchor=handoff?.version===2?runAnchor(handoff):null; } catch { return {ok:false,code:'HOST_EVIDENCE_UNRESOLVED'}; }
+  if(!record||record.outcome!=='completed'||record.requestId!==ref.requestId||record.parentRunId!==parentRunId||record.workspace!==cwd||
+    record.goal!==expectedGoal||record.phase!==expectedPhase||prior?.state!=='completed'||contract?.mode!=='linked'||contract.role!=='Chesed'||contract.stage!=='implementing'||contract.parentRunId!==parentRunId||contract.workspaceSha256!==createHash('sha256').update(cwd).digest('hex')||
+    (handoff?.version===2&&(contract.handoffVersion!==2||contract.phaseIndex!==expectedPhase||!/^([a-f0-9]{64})$/.test(contract.runAnchorSha256??'')||!/^([a-f0-9]{64})$/.test(expectedAnchor)||contract.runAnchorSha256!==expectedAnchor))||
+    !Array.isArray(record.commands)||!record.commands.some(command=>command.checkName===ref.checkName&&command.exitCode===0)) return {ok:false,code:'HOST_EVIDENCE_UNRESOLVED'};
+  return {ok:true};
 }
 
 function textResult(value, isError = false) {
@@ -127,7 +146,7 @@ const handoffSchema=z.discriminatedUnion('version',[handoffV1Schema,handoffV2Sch
 const taskSchema = z.object({
   contractVersion:z.literal(2).optional(), handoff:handoffSchema.optional(),
   role: z.string().min(1).max(64), objective: z.string().min(1).max(20000),
-  context: stringList, readScope: stringList, writeScope: stringList,
+  context: stringList, readScope: stringList, writeScope: stringList, fixtureScope:stringList,
   forbidden: stringList, dependencies: stringList, acceptance: stringList,
   returnFields: z.array(z.string().min(1).max(64)).max(32).optional(), assumptions: stringList,
   reviewPacket: reviewPacketSchema.optional(),
@@ -329,6 +348,7 @@ export function createGatewayRuntime(options) {
   }
 
   async function runInvocation(input, signal, forcedTask = null, operation = 'dispatch_subagent', deferRecords = false, lifecycle = null, trustedProbeToken = null) {
+    const preflight=operation==='probe_model'?undefined:runtimePreflight(forcedTask??input.task);
     const requestId = ensureRequestId(input.requestId);
     const started = Date.now();
     const task = forcedTask ?? input.task;
@@ -400,7 +420,7 @@ export function createGatewayRuntime(options) {
         acquire: lockRequest ? () => writeLocks?.tryAcquire(lockRequest) : undefined,
         release: lockRequest ? lock => writeLocks?.release(lock) : undefined,
       });
-      const response = { ...result, timings, requestId, parentRunId: input.parentRunId, resourceLimits: invocation.request.resourceLimits, osSandbox: result.osSandbox ?? (cliReviewerCandidate || trustedCliRecoveryProbe ? 'none' : osSandbox), writeEnabled, writeScopeEnforced: input.access === 'workspace-write' };
+      const response = { ...result, preflight, timings, requestId, parentRunId: input.parentRunId, resourceLimits: invocation.request.resourceLimits, osSandbox: result.osSandbox ?? (cliReviewerCandidate || trustedCliRecoveryProbe ? 'none' : osSandbox), writeEnabled, writeScopeEnforced: input.access === 'workspace-write' };
       delete response.contract;
       if (operation !== 'probe_model') {
         let validation;
@@ -440,21 +460,7 @@ export function createGatewayRuntime(options) {
           response.failure ??= `result_format_invalid:${validation.code}`;
         }
         if (validation.ok) {
-          const hostEvidenceResolver=ref=>{
-            const linked=invocation.task.role==='Netzach'&&invocation.task.handoff?.inputs?.some(inputRef=>inputRef.requestId===ref.requestId&&inputRef.role==='Chesed'&&inputRef.stage==='implementing');
-            if(!linked)return {ok:false,code:'HOST_EVIDENCE_LINKED_REQUIRED'};
-            const record=ledger?.getHostVerification({requestId:ref.requestId,artifactSha256:ref.artifactSha256,recordSha256:ref.recordSha256});
-            const prior=ledger?.getOutcome(ref.requestId);
-            const contract=prior?.contract;
-            const handoff=invocation.task.handoff;
-            const expectedGoal=handoff?.runGoal??invocation.task.objective;
-            const expectedPhase=handoff?.version===2?handoff.phaseIndex:1;
-            if(!record||record.outcome!=='completed'||record.requestId!==ref.requestId||record.parentRunId!==input.parentRunId||record.workspace!==cwd||
-              record.goal!==expectedGoal||record.phase!==expectedPhase||prior?.state!=='completed'||contract?.mode!=='linked'||contract.role!=='Chesed'||contract.stage!=='implementing'||contract.parentRunId!==input.parentRunId||contract.workspaceSha256!==createHash('sha256').update(cwd).digest('hex')||
-              (handoff?.version===2&&(contract.handoffVersion!==2||contract.phaseIndex!==expectedPhase||contract.runAnchorSha256!==handoff.runAnchorSha256))||
-              !record.commands.some(command=>command.checkName===ref.checkName&&command.exitCode===0)) return {ok:false,code:'HOST_EVIDENCE_UNRESOLVED'};
-            return {ok:true};
-          };
+          const hostEvidenceResolver=ref=>resolveBoundHostEvidence(ref,{task:invocation.task,parentRunId:input.parentRunId,cwd,ledger});
           response.roleValidation=validateRoleResult(validation.value,invocation.task.role,{hostEvidenceResolver});
           if (!response.roleValidation.ok) { response.ok=false; response.failure=`role_schema_invalid:${response.roleValidation.message}`; }
           else {
@@ -526,7 +532,8 @@ export function createGatewayRuntime(options) {
         if (assessment.impact) error.providerCircuit = circuit.record({ provider: input.provider, model: input.model, ...assessment, durationMs, probe: operation === 'probe_model' });
       }
       error.timings=timings;error.phaseTimings=phaseTimings;
-      audit?.record(buildAuditRecord({ requestId, operation, input, task, result:{timings,phaseTimings}, durationMs, failure: error.message }));
+      audit?.record(buildAuditRecord({ requestId, operation, input, task, result:{preflight,timings,phaseTimings}, durationMs, failure: error.message }));
+      error.preflight=preflight;
       error.requestId = requestId;
       throw error;
     }
@@ -539,7 +546,7 @@ export function createGatewayRuntime(options) {
         const result = await runInvocation(input, signal, null, 'dispatch_subagent', false, lifecycle);
         return { response: result, isError: result.ok === false && result.status !== 'awaiting-host-verification' };
       } catch (error) {
-        return { response: { ok: false, requestId: error.requestId ?? input.requestId, error: error.message, code:error.code, timings:error.timings, phaseTimings:error.phaseTimings, waitReasons:error.waitReasons,
+        return { response: { ok: false, preflight:error.preflight, requestId: error.requestId ?? input.requestId, error: error.message, code:error.code, timings:error.timings, phaseTimings:error.phaseTimings, waitReasons:error.waitReasons,
           ...(error.code==='REVIEW_MATERIALS_MISSING'?{status:'blocked',reviewDecision:'insufficient-materials',missingMaterials:error.missingMaterials}:{}),osSandbox, writeEnabled }, isError: true };
       }
     };
@@ -664,7 +671,7 @@ export function createGatewayRuntime(options) {
       const {workflowReceipt:_,...invocation}=input;
       try {
         const submission = taskMonitor.submit(invocation, (signal, markRunning, markWaiting, markProgress) => executeSubagent(invocation, signal, { onRunning: markRunning, onWaiting:markWaiting,onProgress:markProgress }));
-        return structuredResult({ ok: true, ...submission });
+        return structuredResult({ ok: true, ...submission, preflight:runtimePreflight(input.task) });
       } catch (error) {
         return structuredResult({ ok: false, requestId: input.requestId, error: redactSensitiveText(error.message) }, true);
       }

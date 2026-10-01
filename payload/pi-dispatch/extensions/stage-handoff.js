@@ -43,7 +43,8 @@ export function validateHandoff(value, task) {
   return {version:2,stage:value.stage,inputs:value.inputs.map(input=>({...input})),runGoal:value.runGoal,runAcceptance:[...value.runAcceptance],phaseIndex:value.phaseIndex};
 }
 
-function runAnchor(handoff) {
+export function runAnchor(handoff) {
+  if (!handoff || typeof handoff.runGoal !== 'string' || !handoff.runGoal.trim() || !Array.isArray(handoff.runAcceptance) || handoff.runAcceptance.length === 0 || !handoff.runAcceptance.every(item => typeof item === 'string' && !!item.trim())) fail('Invalid run anchor inputs');
   return createHash('sha256').update(JSON.stringify({runGoal:handoff.runGoal,runAcceptance:handoff.runAcceptance})).digest('hex');
 }
 
