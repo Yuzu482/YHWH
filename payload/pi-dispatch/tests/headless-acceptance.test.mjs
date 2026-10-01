@@ -35,6 +35,10 @@ test('live cancellation starts only after CLI launch and confirms the requested 
  assert.equal(result.complete,false);assert.equal(result.clients.codex.permissions,'unverified');
 });
 test('completion before the cancellation timer is not a successful cancellation',async t=>{
+ // Keep the real CLI launch, but control the cancellation clock for this branch.
+ // The production 1500ms timer can beat Node startup on a saturated CI runner.
+ const realSetTimeout=global.setTimeout;
+ t.mock.method(global,'setTimeout',(callback,delay,...args)=>realSetTimeout(callback,delay===1500?60000:delay,...args));
  const result=await acceptHeadless(fixture(t,false),{live:true,cancel:true});
  assert.equal(result.clients.codex.cancellation,'unverified');assert.equal(result.clients.codex.cancellationEvidence.reason,'completed_before_cancel');
 });
