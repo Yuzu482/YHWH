@@ -29,6 +29,16 @@ test('validation is strict and writing is opt-in', () => {
   assert.throws(() => validateRequest({ ...base, cwd: dirname(cwd) }, false, cwd), /launch directory/);
   for (const extra of [{ target: 'bad' }, { timeoutSeconds: 0 }, { cwd: '.' }, { provider: '--flag' }, { prompt: '' }, { arbitraryArgs: [] }, { model: undefined }]) assert.throws(() => validate({ ...base, ...extra }));
 });
+
+test('readonly fixtureScope is bounded, literal and cannot intersect writable scope', () => {
+  const task={...semanticTask,fixtureScope:['samples/input.txt','cases/**']};
+  assert.deepEqual(validateKetherInvocation({cwd,access:'read',task},false,cwd).task.fixtureScope,task.fixtureScope);
+  for(const fixtureScope of [null,['a/*'],['a/**/b'],['a?.txt'],['a/[x]'],['../a'],['/a'],['C:/a'],['a\\b'],['a:ads'],['NUL.txt'],['COM1'],['a.'],['a '],['a/~1'],['a\x7f'],['e\u0301'],['.env'],['.PI/auth.json'],['a', 'A'],['a/**','a/b'],Array(65).fill('a')]) {
+    assert.throws(()=>validateKetherTask({...semanticTask,fixtureScope}));
+  }
+  for(const [fixtureScope,writeScope] of [[['a/**'],['a/b']],[['a/b'],['a/**']],[['a'],['A']],[['a/b'],['a']]]) assert.throws(()=>validateKetherTask({...semanticTask,fixtureScope,writeScope}),/overlap/);
+  assert.throws(()=>validateKetherInvocation({cwd,access:'none',task:{...reviewerTask,fixtureScope:['samples/input.txt']}},false,cwd),/none access/);
+});
 test('resource profiles are fixed and callers can only shorten runtime', () => {
   assert.deepEqual(Object.keys(publicResourceProfiles()), ['small', 'standard', 'large']);
   assert.equal(resolveResourceLimits('small').memoryBytes, 1024 * 1024 * 1024);

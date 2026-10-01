@@ -2,7 +2,7 @@ import {roleResultSchema,requireRoleFields} from './role-contract.js';
 import {validateHandoff} from './stage-handoff.js';
 import {validateReviewPacket,isReviewer,REVIEW_FIELDS} from './review-contract.js';
 const TASK_KEYS = new Set([
-  'role', 'objective', 'context', 'readScope', 'writeScope', 'forbidden',
+  'role', 'objective', 'context', 'readScope', 'writeScope', 'fixtureScope', 'forbidden',
   'dependencies', 'acceptance', 'returnFields', 'assumptions', 'reviewPacket', 'contractVersion', 'handoff',
 ]);
 
@@ -14,6 +14,25 @@ const DEFAULT_RETURN_FIELDS = [
 const ALLOWED_MODELS = new Map([
   ['openai-codex', new Set(['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-luna', 'gpt-6-sol'])],
 ]);
+
+// Fixture paths are portable, literal POSIX paths. Never silently normalize aliases.
+export function validateFixtureScope(values = [], writes = []) {
+  if (!Array.isArray(values) || values.length > 64) throw new Error('fixtureScope must be an array with at most 64 items');
+  const fixtures = values.map(value => {
+    if (typeof value !== 'string' || !value || value.length > 4000 || value !== value.trim() || value !== value.normalize('NFC') || /[\\\u0000-\u001f\u007f:]/u.test(value)) throw new Error('Invalid fixtureScope path');
+    const name = value.endsWith('/**') ? value.slice(0, -3) : value;
+    const parts = name.split('/');
+    if (parts.length > 64 || parts.some(p => !p || p === '.' || p === '..' || /[*?\[\]{}~]/u.test(p) || /[. ]$/.test(p) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p))) throw new Error('Invalid fixtureScope path');
+    if (parts.some(p => /^(\.git|\.hg|\.svn|node_modules|library|temp|obj|bin|\.ssh|\.aws|\.azure|\.gnupg|\.pi|\.pi-lsp\.json|auth\.json|models(?:-store)?\.json|\.npmrc|\.pypirc|\.?credentials\.json|anthropic-api-key\.json|provider-(?:config|credentials)\.json)$/i.test(p) || /^\.env/i.test(p) || /\.(pem|key|p12|pfx)$/i.test(p))) throw new Error('Sensitive fixtureScope path');
+    return name.toLowerCase();
+  });
+  const overlaps = (a, b) => a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
+  for (let i = 0; i < fixtures.length; i++) {
+    if (fixtures.slice(0, i).some(p => overlaps(p, fixtures[i]))) throw new Error('Overlapping fixtureScope paths');
+    if (writes.some(p => overlaps(String(p).replaceAll('\\', '/').replace(/\/\*\*$/, '').normalize('NFC').trim().toLowerCase(), fixtures[i].normalize('NFC')))) throw new Error('fixtureScope overlaps writeScope');
+  }
+  return [...values];
+}
 
 function boundedText(value, name, max = 20000) {
   if (typeof value !== 'string' || !value.trim() || value.length > max || value.includes('\0')) {
@@ -50,6 +69,7 @@ export function validateKetherTask(value) {
     context: boundedList(value.context, 'context'),
     readScope: boundedList(value.readScope, 'readScope'),
     writeScope: boundedList(value.writeScope, 'writeScope'),
+    fixtureScope: validateFixtureScope(value.fixtureScope, value.writeScope ?? []),
     forbidden: boundedList(value.forbidden, 'forbidden'),
     dependencies: boundedList(value.dependencies, 'dependencies'),
     acceptance: boundedList(value.acceptance, 'acceptance'),

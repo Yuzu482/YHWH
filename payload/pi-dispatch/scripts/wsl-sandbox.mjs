@@ -1,4 +1,5 @@
 import {createExecutionTimeline} from '../extensions/execution-timeline.js';
+import {validateFixtureScope} from '../extensions/kether-envelope.js';
 import {createEditorRpc} from './editor-rpc.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { validateUnifiedPatch, compileWriteScope } from '../extensions/write-scope-guard.js';
@@ -111,7 +112,11 @@ export function stripPatch(stdout, stderr = '') {
   return { stdout: stdout.slice(0, index), stderr, patch, patchPolicy: meta.patchPolicy, secretLikeContent: meta.secretLikeContent, patchSha256: meta.patchSha256, patchBytes: meta.patchBytes };
 }
 
-export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket } = {}) {
+export function buildSandboxScopeManifest({readScope = [], writeScope = [], fixtureScope = []} = {}) {
+  return Buffer.from(JSON.stringify({read:readScope, write:writeScope, fixtures:validateFixtureScope(fixtureScope, writeScope)}), 'utf8').toString('base64');
+}
+
+export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], fixtureScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket } = {}) {
   return new Promise((done) => {
     if (!resourceLimits?.profile || !Number.isInteger(resourceLimits.timeoutSeconds) || !Number.isInteger(resourceLimits.outputBytes)) {
       done({ exitCode: null, failure: 'invalid-resource-limits', stdout: '', stderr: '', sandbox: 'wsl2-bwrap' });
@@ -124,7 +129,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     if (!/^[A-Za-z0-9._-]+$/.test(hostUser)) throw new Error('Unable to determine a safe Windows user name');
     if (!/^[a-f0-9-]{36}$/.test(gatewayInstanceId)) throw new Error('Invalid gateway instance id');
     if (!Number.isInteger(gatewayWindowsPid) || gatewayWindowsPid < 1) throw new Error('Invalid gateway Windows pid');
-    const scopeManifest = Buffer.from(JSON.stringify({ read: readScope, write: writeScope }), 'utf8').toString('base64');
+    const scopeManifest = buildSandboxScopeManifest({readScope, writeScope, fixtureScope});
     const commandArgs = wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args]);
     const timeline=createExecutionTimeline({onProgress});
     let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false;

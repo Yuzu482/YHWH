@@ -103,7 +103,7 @@ export function validateKetherInvocation(value, allowWrite = false, launchRoot =
   const access = value.access ?? 'none';
   if (!probe) validateRoleAccess(task.role, access);
   if (access === 'read' && !task.readScope.length) throw new Error('read access requires explicit readScope');
-  if (access === 'none' && (task.readScope.length || task.writeScope.length)) throw new Error('none access cannot declare file scopes');
+  if (access === 'none' && (task.readScope.length || task.writeScope.length || task.fixtureScope.length)) throw new Error('none access cannot declare file scopes');
   for (const entry of task.readScope) compileWriteScope([entry]);
   if (access === 'read' && task.writeScope.length) throw new Error('read access cannot declare writeScope');
   if (access === 'workspace-write' && task.writeScope.length === 0) throw new Error('workspace-write requires explicit writeScope');
@@ -302,7 +302,7 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
   let reviewerValidated = false;
   if (!probe && isReviewerRoute(request.provider, request.model) && task && request.access === 'none') {
     const normalizedTask = validateKetherTask(task);
-    if (normalizedTask.readScope?.length || normalizedTask.writeScope?.length) throw new Error('none access cannot declare file scopes');
+    if (normalizedTask.readScope?.length || normalizedTask.writeScope?.length || normalizedTask.fixtureScope?.length) throw new Error('none access cannot declare file scopes');
     const roleRoute = resolveRoleModel(normalizedTask.role, request.model, request.provider);
     const reviewerTask = { ...normalizedTask, role: roleRoute.role };
     requireRoleFields(reviewerTask);
@@ -356,7 +356,7 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
   const executionBudget = calculateExecutionBudget({ overallTimeoutSeconds: request.timeoutSeconds, elapsedMs: performance.now() - dispatchStarted });
   if (!executionBudget.ok) return { ok:false, ...(structuredResultTool ? {resultSubmissionRequired:true} : {}), target:request.target, requestedProvider:request.provider, requestedModel:request.model, failureCode:'PI_EXECUTION_BUDGET_EXHAUSTED', failure:'No whole sandbox second remains', authentication, phaseTimings:{authenticationMs}, resourceLimits:request.resourceLimits, executionBudget };
   const sandboxResourceLimits = { ...request.resourceLimits, timeoutSeconds: executionBudget.sandboxSeconds };
-  const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker,structuredResultTool), { cwd: request.cwd, access: request.access, input, signal, editorBroker, apiPacket, resourceLimits: sandboxResourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, gatewayRequestId: request.gatewayRequestId, env,onProgress:progress });
+  const raw = await runWslSandbox(buildPiArgs(request, 'wsl2',!!editorBroker,structuredResultTool), { cwd: request.cwd, access: request.access, input, signal, editorBroker, apiPacket, resourceLimits: sandboxResourceLimits, writeScope: task?.writeScope ?? [], readScope: task?.readScope ?? [], fixtureScope: task?.fixtureScope ?? [], gatewayInstanceId: request.gatewayInstanceId, gatewayWindowsPid: request.gatewayWindowsPid, gatewayRequestId: request.gatewayRequestId, env,onProgress:progress });
   return { ...summarize(raw, { ...request, resultSubmissionRequired: structuredResultTool }), ...(structuredResultTool ? { resultSubmissionRequired: true } : {}), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits, executionBudget };
 }
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { cleanupWslJob, validateSandboxPatch, wslSandboxArgs } from '../scripts/wsl-sandbox.mjs';
+import { cleanupWslJob, validateSandboxPatch, wslSandboxArgs, buildSandboxScopeManifest } from '../scripts/wsl-sandbox.mjs';
 
 test('WSL patch proof binds real scoped diff headers to the host job and fails closed', () => {
   const job = '11111111-1111-4111-8111-111111111111';
@@ -31,6 +31,13 @@ test('WSL task and health launches use a native cwd without changing scoped argu
     assert.deepEqual(wslSandboxArgs('test-distro',tail),['-d','test-distro','-u','root','--cd','/','--',...tail]);
     assert.equal(tail.length,3);
   }
+});
+
+test('Node caller sends fixtures separately from readonly source and writable paths', () => {
+  const input={readScope:['src/**'],writeScope:['new/file.js'],fixtureScope:['samples/**']};
+  assert.deepEqual(JSON.parse(Buffer.from(buildSandboxScopeManifest(input),'base64').toString('utf8')),{read:['src/**'],write:['new/file.js'],fixtures:['samples/**']});
+  assert.throws(()=>buildSandboxScopeManifest({...input,fixtureScope:null}));
+  assert.throws(()=>buildSandboxScopeManifest({...input,fixtureScope:['new/**']}));
 });
 
 test('WSL cleanup cannot inherit a transient Windows-drive mount as cwd', async () => {
