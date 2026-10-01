@@ -1,9 +1,10 @@
 import {exportResult} from './result-export.js';
+import { resolveRolePreset } from '../scripts/role-presets.mjs';
 import { createTaskHeartbeat } from './task-heartbeat.js';
 import { createHash } from 'node:crypto';
 import { redactSensitiveText, summarizePatch, summarizeUsage } from './audit-log.js';
 
-const TERMINAL = new Set(['completed', 'failed', 'cancelled', 'blocked']);
+const TERMINAL = new Set(['completed', 'failed', 'cancelled', 'blocked', 'awaiting-host-verification']);
 
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
@@ -30,6 +31,8 @@ function publicRecord(record, now = Date.now()) {
     parentRunId: record.parentRunId,
     gatewayInstanceId: record.gatewayInstanceId,
     role: record.role,
+    displayName: record.displayName,
+    displayNameZh: record.displayNameZh,
     state: record.state,
     requestedProvider: record.provider,
     requestedModel: record.model,
@@ -54,6 +57,7 @@ function publicRecord(record, now = Date.now()) {
     cancellable: !TERMINAL.has(record.state) && record.state !== 'cancelling',
     outcome: TERMINAL.has(record.state) ? {
       ok: result?.ok === true,
+      ...(record.state==='awaiting-host-verification'?{hostVerification:result?.hostVerification??null}:{}),
       tools: toolSummary(result),
       tokens: summarizeUsage(result?.usage),
       patch: summarizePatch(result?.patch),
@@ -92,11 +96,15 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
     const controller = new AbortController();
     const heartbeat = createHeartbeat();
     const now = new Date().toISOString();
+    const canonicalRole = (() => { try { return resolveRolePreset(input.task?.role || '').id; } catch { return null; } })();
+    const rolePreset = canonicalRole ? resolveRolePreset(canonicalRole) : null;
     const record = {
       requestId,
       parentRunId: input.parentRunId,
       gatewayInstanceId,
       role: /^[A-Za-z][A-Za-z0-9._ -]{0,63}$/.test(input.task?.role || '') ? input.task.role : 'unknown',
+      displayName: rolePreset?.displayName,
+      displayNameZh: rolePreset?.displayNameZh,
       provider: input.provider,
       model: input.model,
       access: input.access,
@@ -139,6 +147,9 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
       if (record.state === 'cancelling' || controller.signal.aborted) {
         record.state = 'cancelled';
         record.failureReason = 'cancelled by Tifereth';
+      } else if (record.result?.status === 'awaiting-host-verification') {
+        record.state = 'awaiting-host-verification';
+        record.failureReason = null;
       } else if (record.result?.status==='blocked' || record.result?.reviewValidation?.decision==='insufficient-materials') {
         record.state='blocked';record.failureReason=redactSensitiveText(record.result.error??record.result.failure);
       } else if (record.result?.ok === true && envelope?.isError !== true) {
@@ -174,6 +185,18 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
     return {ok:true,ready:true,requestId,state:record.state,gatewayInstanceId,...exportResult(record.result??{ok:false,error:record.failureReason},page)};
   }
 
+  function resolveHostVerification(requestId, result) {
+    const record=records.get(requestId);
+    if (!record || record.state!=='awaiting-host-verification' || !result || !['completed','failed'].includes(result.state)) return false;
+    record.result=result;
+    record.state=result.state;
+    record.finishedAt=new Date().toISOString();
+    record.failureReason=result.state==='failed' ? redactSensitiveText(result.failure??'host verification failed') : null;
+    record.heartbeat.stop();
+    trim();
+    return true;
+  }
+
   function list({ parentRunId, limit = 50 } = {}) {
     return [...records.values()]
       .filter(record => !parentRunId || record.parentRunId === parentRunId)
@@ -194,5 +217,5 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
     return { accepted: true, reason: 'cancellation_requested', task: publicRecord(record) };
   }
 
-  return { submit, get, getResult, list, cancel, get size() { return records.size; } };
+  return { submit, get, getResult, resolveHostVerification, list, cancel, get size() { return records.size; } };
 }

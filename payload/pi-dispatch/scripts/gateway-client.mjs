@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { planCooperativeRun } from './cooperative-run.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -9,6 +10,32 @@ function options(env = process.env) {
   const config = JSON.parse(readFileSync(resolve(env.PI_GATEWAY_CONFIG), 'utf8').replace(/^\uFEFF/, ''));
   const token = readFileSync(resolve(env.PI_GATEWAY_TOKEN_FILE || config.tokenFile), 'utf8').trim();
   return { url: `http://${config.host ?? '127.0.0.1'}:${config.port ?? 7331}/mcp`, token };
+}
+
+async function withWriteReceipt(client,requests){
+  if(!requests.some(request=>request.access==='workspace-write'))return requests;
+  const response=await client.callTool({name:'get_workflow',arguments:{topic:'task-tiers'}});
+  if(response.isError)throw new Error('Cannot retrieve task-tiers workflow topic');
+  const receipt=JSON.parse(response.content?.find(item=>item.type==='text')?.text??'{}').receipt;
+  if(typeof receipt!=='string'||!receipt)throw new Error('Gateway did not issue a workflow receipt');
+  return requests.map(request=>request.access==='workspace-write'?{...request,workflowReceipt:receipt}:request);
+}
+
+export function parseProbeArgs(args) {
+  const positional = [];
+  let recovery = false;
+  for (const arg of args) {
+    if (arg === '--recovery') {
+      if (recovery) throw new Error('Duplicate --recovery flag');
+      recovery = true;
+    } else if (arg.startsWith('-')) {
+      throw new Error(`Unknown probe flag: ${arg}`);
+    } else {
+      positional.push(arg);
+    }
+  }
+  if (positional.length < 2 || positional.length > 3) throw new Error('Invalid probe arguments');
+  return { provider: positional[0], model: positional[1], resourceProfile: positional[2] ?? 'standard', recovery };
 }
 
 async function main(args) {
@@ -22,7 +49,8 @@ async function main(args) {
     const transport = new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: { Authorization: `Bearer ${token}` } } });
     try {
       await client.connect(transport);
-      const settled = await Promise.allSettled(plan.requests.map(request => client.callTool({ name: 'submit_subagent', arguments: request }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 })));
+      const requests=await withWriteReceipt(client,plan.requests);
+      const settled = await Promise.allSettled(requests.map(request => client.callTool({ name: 'submit_subagent', arguments: request }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 })));
       const receipts = settled.map((result, index) => {
         const request = plan.requests[index];
         const unitId = spec.units[index].id;
@@ -47,23 +75,35 @@ async function main(args) {
     if (command === 'capabilities' && args.length === 0) return await client.callTool({ name: 'list_capabilities', arguments: {} });
     if (command === 'dispatch' && args.length === 1) {
       const request = JSON.parse(readFileSync(resolve(args[0]), 'utf8').replace(/^\uFEFF/, ''));
-      return await client.callTool({ name: 'dispatch_subagent', arguments: request }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });
+      const [prepared]=await withWriteReceipt(client,[request]);
+      return await client.callTool({ name: 'dispatch_subagent', arguments: prepared }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });
     }
-    if (command === 'probe' && args.length >= 2 && args.length <= 3) {
-      return await client.callTool({ name: 'probe_model', arguments: { provider: args[0], model: args[1], cwd: process.cwd(), resourceProfile: args[2] ?? 'standard', timeoutSeconds: 180, requestId: `probe-${Date.now()}` } }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });
+    if (command === 'record-host-verification' && args.length === 1) {
+      const submission=JSON.parse(readFileSync(resolve(args[0]),'utf8').replace(/^\uFEFF/,''));
+      const [receipt]=await withWriteReceipt(client,[{access:'workspace-write'}]);
+      return await client.callTool({name:'record_host_verification',arguments:{...submission,workflowReceipt:receipt.workflowReceipt}},undefined,{timeout:30000,maxTotalTimeout:30000});
+    }
+    if (command === 'host-pending' && args.length === 0) {
+      return await client.callTool({name:'list_host_verification_pending',arguments:{}},undefined,{timeout:30000,maxTotalTimeout:30000});
+    }
+    if (command === 'probe') {
+      const probe = parseProbeArgs(args);
+      return await client.callTool({ name: 'probe_model', arguments: { provider: probe.provider, model: probe.model, cwd: process.cwd(), resourceProfile: probe.resourceProfile, ...(probe.recovery ? { recovery: true } : {}), timeoutSeconds: 180, requestId: `probe-${Date.now()}` } }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });
     }
     if (command === 'lsp' && args.length >= 3 && args.length <= 4) {
       return await client.callTool({ name: 'lsp_request', arguments: { provider: args[0], model: args[1], cwd: process.cwd(), timeoutSeconds: 180, method: args[2], file: args[3] ?? 'scripts/gateway.mjs', requestId: `lsp-${Date.now()}` } }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });
     }
-    throw new Error('Usage: gateway-client.mjs capabilities | dispatch <request.json> | probe <provider> <model> [small|standard|large] | lsp <provider> <model> <method> [file] | cooperative-plan <spec.json> | cooperative-submit <spec.json>');
+    throw new Error('Usage: gateway-client.mjs capabilities | dispatch <request.json> | record-host-verification <evidence.json> | host-pending | probe <provider> <model> [small|standard|large] [--recovery] | lsp <provider> <model> <method> [file] | cooperative-plan <spec.json> | cooperative-submit <spec.json>');
   } catch (error) {
     error.message = `${stage}: ${error.message}`;
     throw error;
   } finally { await client.close().catch(() => {}); }
 }
 
-main(process.argv.slice(2)).then(result => {
-  const value = result.content?.[0]?.type === 'text' ? JSON.parse(result.content[0].text) : result;
-  console.log(JSON.stringify(value, null, 2));
-  process.exitCode = result.isError || value.ok === false ? 1 : 0;
-}).catch(error => { console.error(JSON.stringify({ ok: false, error: error.message })); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main(process.argv.slice(2)).then(result => {
+    const value = result.content?.[0]?.type === 'text' ? JSON.parse(result.content[0].text) : result;
+    console.log(JSON.stringify(value, null, 2));
+    process.exitCode = result.isError || value.ok === false ? 1 : 0;
+  }).catch(error => { console.error(JSON.stringify({ ok: false, error: error.message })); process.exitCode = 1; });
+}

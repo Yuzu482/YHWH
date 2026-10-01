@@ -26,15 +26,27 @@ function fixture(t,wait=true) {
  t.after(()=>{assert.equal(path.dirname(root),path.resolve(os.tmpdir()));fs.rmSync(root,{recursive:true,force:true})});
  const script=path.join(root,'cli.mjs');
  fs.writeFileSync(script,`const args=process.argv.slice(2);if(args.includes('--version'))console.log('fixture 1');else if(args.includes('--help'))console.log(${JSON.stringify(adapters.codex.requiredFlags.join(' '))});else{let s='';for await(const c of process.stdin)s+=c;if(${wait}&&s.includes('cancellation test'))await new Promise(()=>{setInterval(()=>{},1000)});const text=s.match(/YHWH_OK_[a-f0-9]{32}/)?.[0]??'missing';console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text}}));console.log(JSON.stringify({type:'turn.completed'}));}`);
- return {schemaVersion:1,workspaceRoots:[root],timeoutSeconds:10,maxOutputBytes:65536,clients:{codex:{enabled:true,executable:process.execPath,nodeScript:script,expectedVersion:'fixture 1',model:'fixture',policy:'read-only'}}};
+ return {schemaVersion:1,workspaceRoots:[root],timeoutSeconds:wait?30:10,maxOutputBytes:65536,clients:{codex:{enabled:true,executable:process.execPath,nodeScript:script,expectedVersion:'fixture 1',model:'fixture',policy:'read-only'}}};
 }
 test('live cancellation starts only after CLI launch and confirms the requested stop',async t=>{
+ const realMkdtemp=fs.mkdtempSync,acceptanceDirectories=[];
+ t.mock.method(fs,'mkdtempSync',(prefix,...args)=>{
+  const directory=realMkdtemp(prefix,...args);
+  if(path.basename(prefix)==='yhwh-cli-acceptance-')acceptanceDirectories.push(directory);
+  return directory;
+ });
  const result=await acceptHeadless(fixture(t),{live:true,cancel:true});
  assert.equal(result.clients.codex.response,'passed');assert.equal(result.clients.codex.cancellation,'passed');
  assert.equal(result.clients.codex.cancellationEvidence.started,true);assert.equal(result.clients.codex.cancellationEvidence.cancelRequested,true);
  assert.equal(result.complete,false);assert.equal(result.clients.codex.permissions,'unverified');
+ assert.equal(acceptanceDirectories.length,1);
+ assert.equal(fs.existsSync(acceptanceDirectories[0]),false,'actual CLI fixture is removed after cancellation');
 });
 test('completion before the cancellation timer is not a successful cancellation',async t=>{
+ // Keep the real CLI launch, but control the cancellation clock for this branch.
+ // The production 1500ms timer can beat Node startup on a saturated CI runner.
+ const realSetTimeout=global.setTimeout;
+ t.mock.method(global,'setTimeout',(callback,delay,...args)=>realSetTimeout(callback,delay===1500?60000:delay,...args));
  const result=await acceptHeadless(fixture(t,false),{live:true,cancel:true});
  assert.equal(result.clients.codex.cancellation,'unverified');assert.equal(result.clients.codex.cancellationEvidence.reason,'completed_before_cancel');
 });

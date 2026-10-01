@@ -35,6 +35,21 @@ switch($Action) {
   }
   'Build' { & (Join-Path $PSScriptRoot 'Build-Release.ps1') }
   'Verify' {
+    $gatewayRoot=Join-Path $PSScriptRoot 'payload/pi-dispatch'
+    $testOutputRoot=Join-Path $PSScriptRoot '.test'
+    $testLog=Join-Path $testOutputRoot 'workflow-verify-npm-test.tap.log'
+    New-Item -ItemType Directory -Path $testOutputRoot -Force | Out-Null
+    Push-Location $gatewayRoot
+    try {
+      & npm test 2>&1 | Out-File -FilePath $testLog -Encoding utf8NoBOM
+      $npmTestExit=$LASTEXITCODE
+      & node scripts/test-baseline.mjs --compare $testLog
+      $baselineExit=$LASTEXITCODE
+    } finally {
+      Pop-Location
+    }
+    if($npmTestExit -ne 0){throw "Pi Dispatch npm test failed (exit $npmTestExit); see $testLog"}
+    if($baselineExit -ne 0){throw "Pi Dispatch test baseline comparison failed (exit $baselineExit)."}
     $config=& (Join-Path $PSScriptRoot 'install/Read-WorkflowConfig.ps1') -ConfigFile $ConfigFile
     & (Join-Path $PSScriptRoot 'install/Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $config.wslDistro -Hosts $config.hosts -SkipWsl:($SkipWsl -or -not $config.installWsl)
   }

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { validateDeclaredWorkflowTier } from '../extensions/workflow-tier.js';
 
 const fail = message => { throw new TypeError(message); };
 
@@ -56,7 +57,19 @@ export function planCooperativeRun(spec) {
     }
     return { id, objective, acceptance, context, readScope, writeScope };
   });
-  const runAnchor = `cooperative-${createHash('sha256').update(JSON.stringify({ cwd, parentRunId, runGoal, runAcceptance, units, thinking })).digest('hex').slice(0, 24)}`;
+  let tierDeclaration = null;
+  if (allWrites.length) {
+    if (spec.writeTier !== 'T1') fail('cooperative writes require writeTier T1; T2 needs a linked pre-review handoff');
+    try {
+      validateDeclaredWorkflowTier(spec.tierDeclaration, spec.writeTier, allWrites);
+    } catch (error) {
+      fail(`invalid cooperative tierDeclaration: ${error.message}`);
+    }
+    tierDeclaration = { ...spec.tierDeclaration, files: [...spec.tierDeclaration.files] };
+  } else if (spec.writeTier !== undefined || spec.tierDeclaration !== undefined) {
+    fail('read-only cooperative runs cannot declare a write tier');
+  }
+  const runAnchor = `cooperative-${createHash('sha256').update(JSON.stringify({ cwd, parentRunId, runGoal, runAcceptance, units, thinking, writeTier: spec.writeTier, tierDeclaration })).digest('hex').slice(0, 24)}`;
   const requests = units.map(unit => {
     const task = {
       role: 'Chesed',
@@ -72,6 +85,10 @@ export function planCooperativeRun(spec) {
       provider: 'openai-codex', model: 'gpt-6-luna', thinking, resourceProfile: 'small', timeoutSeconds: 120,
       cwd, access: unit.writeScope.length ? 'workspace-write' : 'read', task,
     };
+    if (unit.writeScope.length) {
+      request.tier = 'T1';
+      request.tierDeclaration = Object.freeze({ ...tierDeclaration, files: Object.freeze([...unit.writeScope]) });
+    }
     if (Buffer.byteLength(JSON.stringify(request), 'utf8') > 8192) fail('emitted request exceeds 8 KiB');
     Object.freeze(task.context);
     Object.freeze(task.acceptance);

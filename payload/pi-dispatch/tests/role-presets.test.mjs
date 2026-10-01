@@ -10,10 +10,19 @@ test('static role registry covers canonical roles, aliases, access and ceilings'
     const preset = resolveRolePreset(role);
     assert.equal(preset.id, role);
     assert.ok(preset.purpose);
+    assert.ok(preset.displayName);
+    assert.ok(preset.displayNameZh);
     assert.deepEqual([...preset.allowedAccess], accesses);
-    for (const access of accesses) assert.ok(Array.isArray(preset.toolCeilings[access]));
+    for (const access of accesses) {
+      assert.ok(Array.isArray(preset.toolCeilings[access]));
+      if (access === 'read') assert.ok(preset.toolCeilings[access].includes('yhwh_source_window'));
+    }
   }
-  for (const [alias, canonical] of Object.entries({ worker: 'Chesed', researcher: 'Malkuth', reviewer: 'Geburah' })) assert.equal(resolveRolePreset(alias).id, canonical);
+  for (const [alias, canonical] of Object.entries({ worker: 'Chesed', researcher: 'Malkuth', reviewer: 'Geburah' })) {
+    assert.equal(resolveRolePreset(alias).id, canonical);
+    assert.equal(resolveRolePreset(alias).displayName, ROLE_PRESETS[canonical].displayName);
+    assert.equal(resolveRolePreset(alias).displayNameZh, ROLE_PRESETS[canonical].displayNameZh);
+  }
   assert.throws(() => resolveRolePreset('unknown'), /not admitted/);
   assert.throws(() => validateRoleAccess('Malkuth', 'workspace-write'), /does not allow/);
   assert.equal(validateRoleAccess('Chochmah', 'read').id, 'Chochmah');
@@ -28,12 +37,14 @@ test('gateway selects explicit role extension and enforces per-role tool ceiling
   const malkuthTools = args[args.indexOf('--tools') + 1].split(',');
   assert.ok(malkuthTools.includes('read'));
   assert.ok(malkuthTools.includes('yhwh_lsp_diagnostics'));
+  assert.ok(malkuthTools.includes('yhwh_source_window'));
   assert.ok(!malkuthTools.includes('edit'));
   const geburah = buildPiArgs(roleRequest('Geburah', 'none'), 'wsl2');
   assert.ok(geburah.includes('--no-tools'));
   const chesed = buildPiArgs(roleRequest('Chesed', 'workspace-write'), 'wsl2');
   const chesedTools = chesed[chesed.indexOf('--tools') + 1].split(',');
   assert.ok(chesedTools.includes('write'));
+  assert.ok(chesedTools.includes('yhwh_source_window'));
   assert.ok(!chesedTools.includes('code_rewrite'));
   assert.ok(!chesedTools.includes('bash'));
   for (const tool of ['read', 'grep', 'find', 'ls']) assert.ok(chesedTools.includes(tool));

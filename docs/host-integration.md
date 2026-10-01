@@ -59,7 +59,7 @@ node "$HOME\plugins\pi-dispatch\scripts\check-host-connection.mjs" D:\YHWH-Conne
 
 随后在目标宿主的新会话中，让主代理调用 `get_workflow(topic="primary")`、`get_workflow(topic="pi-routing")` 和 `list_capabilities`，确认根目录、角色绑定和沙箱状态。宿主会给工具加前缀，必须使用其实际发现的名称。确认模型与费用授权后，才做 worker/reviewer 心跳；测试写任务还需要人工核对返回补丁、主代理应用和最终结果。
 
-不具备文件编辑工具的聊天宿主仍能协调、检查和返回建议，但不能自动把沙箱补丁应用到真实项目。主代理必须明确移交给有能力且获授权的工具/人，不能报告虚假的“已修改”。
+不具备文件编辑工具的聊天宿主仍能协调、检查和返回建议，但不能自动把沙箱补丁应用到真实项目。主代理必须明确移交给有能力且获授权的工具/人，不能报告虚假的“已修改”。OpenDesign/生成式页面源码窗口、阶段任务包与浏览器验收边界见[生成页面适配说明](generated-page-adapter.md)。
 
 ## 多宿主同时使用与平台边界
 

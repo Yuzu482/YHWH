@@ -25,6 +25,7 @@
     .task-head { align-items: flex-start; }
     .state { flex: 0 0 auto; border-radius: 999px; padding: 3px 7px; font-size: 11px; background: color-mix(in srgb, CanvasText 10%, transparent); }
     .state.running, .state.queued, .state.cancelling { color: #2563eb; background: color-mix(in srgb, #2563eb 14%, transparent); }
+    .state.awaiting-host-verification { color: #a16207; background: color-mix(in srgb, #eab308 18%, transparent); }
     .state.completed { color: #15803d; background: color-mix(in srgb, #15803d 14%, transparent); }
     .state.failed, .state.cancelled, .state.blocked { color: #b91c1c; background: color-mix(in srgb, #b91c1c 14%, transparent); }
     .meta { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 5px 12px; }
@@ -101,7 +102,7 @@
       if (resizeFrame !== null) return;
       resizeFrame = requestAnimationFrame(() => {resizeFrame=null;reportHeight();});
     }
-    const stateLabels = { queued:"排队", running:"运行中", cancelling:"取消中", completed:"已完成", failed:"失败", cancelled:"已取消", blocked:"材料不足" };
+    const stateLabels = { queued:"排队", running:"运行中", cancelling:"取消中", "awaiting-host-verification":"待主机验收", completed:"已完成", failed:"失败", cancelled:"已取消", blocked:"材料不足" };
     const waitLabels={concurrency:'并发名额已满',provider_capacity:'Provider 名额已满',memory_capacity:'任务内存预算不足',cpu_capacity:'CPU 配额不足',host_memory:'宿主可用内存不足',dependency:'等待前置任务',write_lock:'等待写入范围锁'};
 
     function unwrap(value) {
@@ -151,7 +152,10 @@
       const waiting = (task.waitReasons||[]).map(r=>waitLabels[r]||r).join('、');
       const failure = `<div class="meta"><span>排队 ${duration(task.queueWaitMs)} / 上限 ${task.queueTimeoutSeconds??120}s</span><span>执行 ${duration(task.executionMs)}${task.executionTimeoutSeconds?' / 上限 '+task.executionTimeoutSeconds+'s':''}</span>${waiting?'<span>'+escapeText(waiting)+'</span>':''}${outcome?.reviewDecision?'<span>审查：'+escapeText(outcome.reviewDecision)+'</span>':''}${outcome?.failureReason?'<span>'+escapeText(outcome.failureReason)+'</span>':''}</div>`;
       const cancel = task.cancellable ? `<div class="task-actions"><button type="button" data-cancel="${escapeText(task.requestId)}">取消任务</button></div>` : "";
-      return `<article class="task"><div class="task-head"><div><h2>${escapeText(task.role)} · ${escapeText(task.requestId)}</h2><div class="meta"><span>${escapeText(route)}</span><span>${escapeText(task.access)}</span>${dependencies}</div></div><span class="state ${escapeText(task.state)}">${stateLabels[task.state] || escapeText(task.state)}</span></div><div class="meta"><span>耗时 ${duration(task.elapsedMs)}</span><span>${escapeText(tools)}</span><span>${escapeText(tokens)}</span></div>${failure}${phaseText?'<div class="meta">'+escapeText(phaseText)+'</div>':''}${cancel}</article>`;
+      const role = escapeText(task.role || 'unknown');
+      const friendlyName = escapeText(task.displayNameZh || task.displayName || task.role || 'unknown');
+      const roleDetail = `<span>${escapeText(task.displayName || task.role || 'unknown')} · ${role}</span>`;
+      return `<article class="task"><div class="task-head"><div><h2>${friendlyName} · ${escapeText(task.requestId)}</h2><div class="meta">${roleDetail}<span>${escapeText(route)}</span><span>${escapeText(task.access)}</span>${dependencies}</div></div><span class="state ${escapeText(task.state)}">${stateLabels[task.state] || escapeText(task.state)}</span></div><div class="meta"><span>耗时 ${duration(task.elapsedMs)}</span><span>${escapeText(tools)}</span><span>${escapeText(tokens)}</span></div>${failure}${phaseText?'<div class="meta">'+escapeText(phaseText)+'</div>':''}${cancel}</article>`;
     }
     function render(data) {
       if (!data?.gateway) return;

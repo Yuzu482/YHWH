@@ -29,6 +29,16 @@ test('validation is strict and writing is opt-in', () => {
   assert.throws(() => validateRequest({ ...base, cwd: dirname(cwd) }, false, cwd), /launch directory/);
   for (const extra of [{ target: 'bad' }, { timeoutSeconds: 0 }, { cwd: '.' }, { provider: '--flag' }, { prompt: '' }, { arbitraryArgs: [] }, { model: undefined }]) assert.throws(() => validate({ ...base, ...extra }));
 });
+
+test('readonly fixtureScope is bounded, literal and cannot intersect writable scope', () => {
+  const task={...semanticTask,fixtureScope:['samples/input.txt','cases/**']};
+  assert.deepEqual(validateKetherInvocation({cwd,access:'read',task},false,cwd).task.fixtureScope,task.fixtureScope);
+  for(const fixtureScope of [null,['a/*'],['a/**/b'],['a?.txt'],['a/[x]'],['../a'],['/a'],['C:/a'],['a\\b'],['a:ads'],['NUL.txt'],['COM1'],['a.'],['a '],['a/~1'],['a\x7f'],['e\u0301'],['.env'],['.PI/auth.json'],['a', 'A'],['a/**','a/b'],Array(65).fill('a')]) {
+    assert.throws(()=>validateKetherTask({...semanticTask,fixtureScope}));
+  }
+  for(const [fixtureScope,writeScope] of [[['a/**'],['a/b']],[['a/b'],['a/**']],[['a'],['A']],[['a/b'],['a']]]) assert.throws(()=>validateKetherTask({...semanticTask,fixtureScope,writeScope}),/overlap/);
+  assert.throws(()=>validateKetherInvocation({cwd,access:'none',task:{...reviewerTask,fixtureScope:['samples/input.txt']}},false,cwd),/none access/);
+});
 test('resource profiles are fixed and callers can only shorten runtime', () => {
   assert.deepEqual(Object.keys(publicResourceProfiles()), ['small', 'standard', 'large']);
   assert.equal(resolveResourceLimits('small').memoryBytes, 1024 * 1024 * 1024);
@@ -55,6 +65,21 @@ assert.equal(invocation.request.model, 'gpt-6-luna');
   }
   assert.match(compileKetherTask(invocation.task), /TASK_PACKET_JSON=/);
   assert.match(compileKetherTask(invocation.task), /KETHER_RESULT_JSON=/);
+  const compiledChesed = compileKetherTask({ ...semanticTask, role: 'Chesed' });
+  assert.match(compiledChesed, /required acceptance criterion within this task packet scope is missing, use unverified or blocked/);
+  assert.match(compiledChesed, /Checks explicitly assigned to a coordinator or later stage must always be listed as unverified in uncertainty and deliverable\.checks/);
+  assert.match(compiledChesed, /do not force overall status to unverified when all required acceptance criteria for this stage are met/);
+  assert.match(compiledChesed, /Use only tools actually authorized for this task/);
+  assert.match(compiledChesed, /if the known target is compressed, generated, or extremely long single-line source, and yhwh_source_window is present in the current tool list and the path is allowed by readScope, prefer bounded reads using an exact query\/occurrence or UTF-16 offset/i);
+  assert.match(compiledChesed, /Do not trigger a known-to-exceed-limit ordinary full read just to explore/);
+  assert.match(compiledChesed, /If the tool is unavailable, do not pretend to have read the source; report the limitation/);
+  assert.match(compiledChesed, /Ordinary source may still be read normally/);
+  assert.match(compiledChesed, /If shell or test tools are unavailable or unauthorized, do not attempt to call them; report the checks as unrun/);
+  const compiledMalkuth = compileKetherTask(semanticTask);
+  assert.match(compiledMalkuth, /required acceptance criterion within this task packet scope is missing/);
+  assert.match(compiledMalkuth, /Checks explicitly assigned to a coordinator or later stage must always be listed as unverified in uncertainty/);
+  assert.doesNotMatch(compiledMalkuth, /Checks explicitly assigned to a coordinator or later stage must always be listed as unverified in uncertainty and deliverable\.checks/);
+  assert.match(compiledMalkuth, /do not force overall status to unverified/);
   assert.throws(() => validate({ ...base, provider: 'anthropic', model: 'claude-sonnet-5' }), /YHWH_WORKER_ENFORCEMENT_REJECTED/);
   const reviewerInvocation = validateKetherInvocation({ cwd, access: 'none', task: reviewerTask }, false, cwd);
   assert.equal(reviewerInvocation.request.thinking, 'max');
@@ -190,10 +215,20 @@ test('model allowlists and exact provider/model routing', (t) => {
   assert.ok(args.includes('--no-extensions'));
   assert.ok(!buildPiArgs(validate(base)).includes('--extension'));
   assert.ok(buildPiArgs(validate({ ...base, access: 'read' })).includes('--extension'));
-  const wslArgs = buildPiArgs(validate({ ...base, access: 'workspace-write' }, true), 'wsl2');
+  const wslReadArgs = buildPiArgs(validate({ ...base, access: 'read' }), 'wsl2');
+  assert.ok(wslReadArgs.includes('/opt/pi-kether/extensions/source-window.js'));
+  assert.ok(wslReadArgs.at(-1).split(',').includes('yhwh_source_window'));
+  const wslWriteArgs = buildPiArgs(validate({ ...base, access: 'workspace-write' }, true), 'wsl2');
+  assert.ok(wslWriteArgs.includes('/opt/pi-kether/extensions/source-window.js'));
+  assert.ok(wslWriteArgs.at(-1).split(',').includes('yhwh_source_window'));
+  assert.ok(!buildPiArgs(validate({ ...base, access: 'read' })).includes('/opt/pi-kether/extensions/source-window.js'));
+  const wslNoneArgs = buildPiArgs(validate(base), 'wsl2');
+  assert.ok(!wslNoneArgs.includes('/opt/pi-kether/extensions/source-window.js'));
+  assert.ok(!wslNoneArgs.some(arg => arg.includes('yhwh_source_window')));
+  const wslArgs = wslWriteArgs;
   assert.ok(wslArgs.includes('/opt/pi-kether/extensions/auth-scrub.js'));
   assert.equal(new Set(wslArgs).has('/opt/pi-kether/node_modules/pi-lsp-extension/src/index.ts'), false);
-  assert.deepEqual(new Set(wslArgs.at(-1).split(',')), new Set(['read', 'grep', 'find', 'ls', 'edit', 'write', 'yhwh_lsp_diagnostics', 'yhwh_lsp_hover', 'yhwh_lsp_definition', 'yhwh_lsp_references', 'yhwh_lsp_symbols', 'yhwh_lsp_completions', 'yhwh_lsp_code_actions']));
+  assert.deepEqual(new Set(wslArgs.at(-1).split(',')), new Set(['read', 'grep', 'find', 'ls', 'edit', 'write', 'yhwh_source_window', 'yhwh_lsp_diagnostics', 'yhwh_lsp_hover', 'yhwh_lsp_definition', 'yhwh_lsp_references', 'yhwh_lsp_symbols', 'yhwh_lsp_completions', 'yhwh_lsp_code_actions']));
   assert.ok(wslArgs.includes('/opt/pi-kether/extensions/write-scope-guard.js'));
   assert.ok(!wslArgs.at(-1).split(',').includes('powershell'));
 });
@@ -239,6 +274,27 @@ test('successful Pi response parsed without treating warnings as JSON', () => {
   assert.equal(summarize(raw, base).provider, 'openai-codex');
   assert.deepEqual(summarize(raw, base).toolsUsed, []);
 });
+test('dispatch accepts a later same-target edit recovery but preserves transport failure gates', () => {
+  const events = [
+    {type:'tool_execution_start',toolCallId:'edit-1',toolName:'edit',args:{path:'src\\a.js'}},
+    {type:'tool_execution_end',toolCallId:'edit-1',toolName:'edit',isError:true},
+    {type:'tool_execution_start',toolCallId:'edit-2',toolName:'edit',args:{path:'src/a.js'}},
+    {type:'tool_execution_end',toolCallId:'edit-2',toolName:'edit',isError:false},
+    {type:'message_end',message:{role:'assistant',provider:base.provider,model:base.model,stopReason:'stop',content:[{type:'text',text:'OK'}]}},
+    {type:'agent_end'},
+  ];
+  const raw = {exitCode:0,failure:null,stderr:'',stdout:events.map(JSON.stringify).join('\n')};
+  const result=summarize(raw,base);
+  assert.equal(result.ok,true);
+  assert.equal(result.toolErrors,1);
+  assert.equal(result.recoveredErrors,1);
+  assert.equal(result.unrecoveredErrors,0);
+  assert.equal(summarize({...raw,failure:'transport failed'},base).ok,false);
+  const unrecovered=summarize({...raw,stdout:raw.stdout.replace('edit-2','different')},base);
+  assert.equal(unrecovered.ok,false);
+  assert.equal(unrecovered.unrecoveredErrors,1);
+});
+
 test('tool execution names are exposed for caller verification', () => {
   const raw = { exitCode: 0, stderr: '', stdout: JSON.stringify({ type: 'tool_execution_start', toolName: 'lsp_symbols' }) + '\n' + JSON.stringify({ type: 'message_end', message: { role: 'assistant', provider: base.provider, model: base.model, stopReason: 'stop', content: [{ type: 'text', text: 'OK' }] } }) + '\n' + JSON.stringify({ type: 'agent_end' }) };
   assert.deepEqual(summarize(raw, base).toolsUsed, ['lsp_symbols']);

@@ -16,6 +16,13 @@ test('global monitor refresh omits null parent and preserves requested limit',as
  let args;const ui=mount({callTool:async(_name,value)=>{args=value;return {structuredContent:snapshot};}});
  await ui.run('refresh()');assert.equal('parentRunId' in args,false);assert.equal(args.limit,10);assert.equal(ui.el('active').textContent,'0/4');assert.equal(ui.el('error').hidden,true);
 });
+test('web monitor renders Chinese friendly name with English and canonical role details and legacy fallback',()=>{
+ const ui=mount();
+ const markup=ui.run(`taskMarkup({role:'Malchut',displayName:'Queen',displayNameZh:'女王',requestId:'req',state:'running',requestedProvider:'p',requestedModel:'m',access:'read',elapsedMs:0,resourceProfile:'small',priority:1})`);
+ assert.match(markup,/>女王 · req/);assert.match(markup,/Queen · Malchut/);
+ const legacy=ui.run(`taskMarkup({role:'old-alias',requestId:'legacy',state:'running',requestedProvider:'p',requestedModel:'m',access:'read',elapsedMs:0,resourceProfile:'small',priority:1})`);
+ assert.match(legacy,/old-alias · legacy/);
+});
 test('MCP tool errors remain visible instead of claiming successful refresh',async()=>{
  const ui=mount({callTool:async()=>({isError:true,content:[{type:'text',text:'fixture validation failure'}]})});
  await ui.run('refresh()');assert.equal(ui.el('error').hidden,false);assert.match(ui.el('error').textContent,/validation/);assert.match(ui.el('status').textContent,/失败/);

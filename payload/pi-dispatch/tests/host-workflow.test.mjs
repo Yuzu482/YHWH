@@ -25,6 +25,10 @@ test('returns the frozen coordinator-only primary policy',()=>{
   assert.match(workflowInstructions,/block instead/i);
 });
 
+test('exposes only the governance skill as a skill topic',()=>{
+  assert.deepEqual(workflowTopic('primary').availableTopics.filter(topic=>topic.startsWith('skill:')),['skill:kether-governance']);
+});
+
 test('preserves catalog content and hash fields',()=>{
   const response=workflowTopic('primary');
   const content=catalog.topics.primary;
@@ -33,6 +37,16 @@ test('preserves catalog content and hash fields',()=>{
   assert.equal(response.sha256,createHash('sha256').update(content).digest('hex'));
   assert.deepEqual(response.availableTopics,Object.keys(catalog.topics));
   assert.equal(response.enforcement,'Pi invocation checks only; host compliance is not attested');
+});
+
+test('always-visible primary index and Pi dispatch skill stay within the context budget',()=>{
+  const skill=readFileSync(new URL('../skills/pi-dispatch/SKILL.md',import.meta.url),'utf8');
+  const primary=catalog.topics.primary;
+  assert.ok(Buffer.byteLength(primary,'utf8')+Buffer.byteLength(skill,'utf8')<=8000);
+  assert.match(primary,/\| Trigger \| Topic \|/);
+  assert.match(primary,/host has not injected it/);
+  assert.match(primary,/Before Pi routing or execution, call `list_capabilities`/);
+  assert.doesNotMatch(primary,/api_key_dpapi envelopes/);
 });
 
 test('rejects an unknown workflow topic',()=>{

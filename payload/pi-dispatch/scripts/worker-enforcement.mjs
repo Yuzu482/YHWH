@@ -18,7 +18,7 @@ export function getWorkerEnforcementStatus(env = process.env) {
 }
 
 export function isReviewerRoute(provider, model, config) {
-  if (provider === 'anthropic') return model === 'claude-sonnet-5';
+  if (provider === 'claude-code-cli' || provider === 'anthropic') return model === 'claude-sonnet-5';
   if (provider !== 'yhwh-reviewer-api') return false;
   const route = configuredRoute(provider, config ?? loadProviderConfig());
   return route?.semanticModel === 'claude-sonnet-5' && route.model === model;

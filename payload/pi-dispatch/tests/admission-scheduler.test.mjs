@@ -71,6 +71,19 @@ test('host memory reserve keeps a task queued until headroom is available', asyn
   assert.equal(started, true);
 });
 
+test('Claude Code CLI capacity is fixed at one despite scheduler overrides', async () => {
+  const executor = new ResourceAwareExecutor(4, 4, { availableMemoryBytes: () => 64 * GIB, providerCapacity: { 'claude-code-cli': 4 }, pollIntervalMs: 5 });
+  assert.equal(executor.state.providerCapacity['claude-code-cli'], 1);
+  let release;
+  let active = 0, maximum = 0;
+  const run = () => executor.run(async () => { active++; maximum = Math.max(maximum, active); await new Promise(resolvePromise => { release = resolvePromise; }); active--; }, 1000, null, { provider: 'claude-code-cli' });
+  const first = run(); await tick();
+  const second = run(); await tick();
+  assert.equal(maximum, 1);
+  release(); await first; await tick(); release(); await second;
+  assert.equal(maximum, 1);
+});
+
 test('default host reserve is at least 2 GiB and ten percent of physical memory', () => {
   assert.ok(SCHEDULER_POLICY.hostReserveBytes >= 2 * GIB);
   assert.ok(SCHEDULER_POLICY.hostReserveBytes >= totalmem() * 0.10);

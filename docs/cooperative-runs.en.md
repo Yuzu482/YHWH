@@ -8,16 +8,18 @@ Prepare a JSON file at the repository root, for example:
 {
   "cwd": "E:\\Projects\\Example",
   "parentRunId": "feature-20260925-01",
-  "runGoal": "Complete two independent modules",
+  "runGoal": "Complete two independent internal modules",
   "runAcceptance": ["Both modules pass their separate checks"],
+  "writeTier": "T1",
+  "tierDeclaration": {"files":["src/engine.mjs","src/view.mjs"],"estimatedLines":40,"isTestOrConfigChange":false,"publicApiOrProtocol":false,"dependencyOrLockfile":false,"securityAuthOrCredentials":false,"migration":false,"irreversibleOrNoRollback":false,"uncertainFileScope":false},
   "units": [
-    {"id":"api","objective":"Implement the API module","acceptance":["API checks pass"],"context":[],"readScope":["src/shared.mjs"],"writeScope":["src/api.mjs"]},
-    {"id":"ui","objective":"Implement the UI module","acceptance":["UI checks pass"],"context":[],"readScope":["src/shared.mjs"],"writeScope":["src/ui.mjs"]}
+    {"id":"engine","objective":"Implement the internal calculation module","acceptance":["Module checks pass"],"context":[],"readScope":["src/shared.mjs"],"writeScope":["src/engine.mjs"]},
+    {"id":"view","objective":"Implement the internal view module","acceptance":["Module checks pass"],"context":[],"readScope":["src/shared.mjs"],"writeScope":["src/view.mjs"]}
   ]
 }
 ```
 
-`cwd` must be an absolute directory allowed by the gateway; file scopes are exact paths relative to that directory. You may set an optional run-level `thinking` value: `low` or `medium`; the default is `medium`. This planner is intended for small runs with a fixed 120-second limit and does not accept `high` or `max`. Reserve `low` for exact, low-risk microtasks; prior comparisons are suggestive only and do not prove that `medium` will prevent output-format failures. Choosing a different `thinking` value results in different stable request IDs. Inspect the plan, then submit from a terminal authorized to access the local gateway:
+`cwd` must be an absolute directory allowed by the gateway; file scopes are exact paths relative to that directory. A cooperative run with writes must declare `writeTier: T1` and one `tierDeclaration` for the whole group. Its `files` must exactly cover all unit write files; the compiler preserves T1 on each emitted write and narrows its declared file list. T2 risks such as public interfaces, dependencies, security or migrations are rejected here and require a linked handoff with pre-review. Omit both fields for a read-only run. T1 still needs an independent post-review before acceptance. You may set an optional run-level `thinking` value: `low` or `medium`; the default is `medium`. This planner is intended for small runs with a fixed 120-second limit and does not accept `high` or `max`. Reserve `low` for exact, low-risk microtasks; prior comparisons are suggestive only and do not prove that `medium` will prevent output-format failures. Choosing a different `thinking` value results in different stable request IDs. Inspect the plan, then submit from a terminal authorized to access the local gateway:
 
 ```powershell
 node payload/pi-dispatch/scripts/gateway-client.mjs cooperative-plan .\spec.json

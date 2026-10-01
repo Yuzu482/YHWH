@@ -107,7 +107,8 @@ function summarizeTools(result) {
   for (const name of Array.isArray(result?.toolsUsed) ? result.toolsUsed : []) {
     if (typeof name === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(name)) counts[name] = (counts[name] || 0) + 1;
   }
-  return { counts, total: Object.values(counts).reduce((sum, count) => sum + count, 0), errors: finiteNumber(result?.toolErrors) || 0 };
+  return { counts, total: Object.values(counts).reduce((sum, count) => sum + count, 0), errors: finiteNumber(result?.toolErrors) || 0,
+    recoveredErrors: finiteNumber(result?.recoveredErrors) || 0, unrecoveredErrors: finiteNumber(result?.unrecoveredErrors) ?? finiteNumber(result?.toolErrors) ?? 0 };
 }
 
 function summarizeFormatDiagnostic(validation) {
@@ -129,9 +130,46 @@ function summarizeFormatDiagnostic(validation) {
   return summary;
 }
 
+function summarizeHostVerification(value) {
+  if (!value || typeof value !== 'object') return undefined;
+  const artifactSha256 = /^[a-f0-9]{64}$/.test(value.artifactSha256 ?? '') ? value.artifactSha256 : undefined;
+  const recordSha256 = /^[a-f0-9]{64}$/.test(value.recordSha256 ?? '') ? value.recordSha256 : undefined;
+  const checks = Array.isArray(value.checks) ? value.checks : Array.isArray(value.requiredCheckNames) ? value.requiredCheckNames : null;
+  return {
+    ...(typeof value.state === 'string' ? {state:value.state} : {}),
+    ...(typeof value.outcome === 'string' ? {outcome:value.outcome} : {}),
+    ...(artifactSha256 ? {artifactSha256} : {}),
+    ...(recordSha256 ? {recordSha256} : {}),
+    ...(checks ? {checkCount:checks.length, ...(Array.isArray(value.checks) ? {passedChecks:checks.filter(item=>item?.exitCode===0).length,failedChecks:checks.filter(item=>item?.exitCode!==0).length} : {})} : {}),
+  };
+}
+
+function summarizeRuntimePreflight(value) {
+  // Audit admission is intentionally independent of untrusted messages and counters.
+  const warnings=Array.isArray(value?.warnings)?value.warnings:[];
+  const codes=['script_without_real_run','output_without_parent_path','mixed_layers','missing_interface_contract'].filter(code=>warnings.some(item=>item?.code===code));
+  return {advisory:true,codes,counts:Object.fromEntries(codes.map(code=>[code,1]))};
+}
+
 export function buildAuditRecord({ timestamp = new Date().toISOString(), requestId, operation, input, task, result, durationMs, failure }) {
   const reason = failure ?? result?.failure ?? (result?.ok === false ? 'execution failed' : null);
   const formatDiagnostic = summarizeFormatDiagnostic(result?.formatValidation);
+  const hostVerification = summarizeHostVerification(result?.hostVerification ?? (operation==='record_host_verification' ? result : null));
+  // Dispatch can return a completed operation while the task awaits host verification or has a valid review decision.
+  const awaitingHost = result?.status === 'awaiting-host-verification' || result?.failure === 'awaiting-host-verification';
+  const reviewDecision = result?.reviewValidation?.decision ?? result?.reviewDecision;
+  const validReview = result?.reviewValidation?.ok === true && ['approve', 'request-changes', 'insufficient-materials'].includes(result.reviewValidation.decision);
+  const validChangeRequest = result?.failure === 'review_changes_requested' && validReview && reviewDecision === 'request-changes';
+  const operationOutcome = result?.ok === true && !reason || awaitingHost || validChangeRequest ? 'completed' : result || failure ? 'failed' : 'unknown';
+  const taskState = operation === 'record_host_verification'
+    ? result?.state ?? result?.status ?? result?.outcome
+    : result?.status ?? result?.state ?? result?.outcome;
+  const taskOutcome = awaitingHost || taskState === 'awaiting-host-verification'
+    ? 'awaiting-host-verification'
+    : validReview ? ({ approve: 'completed', 'request-changes': 'changes-requested', 'insufficient-materials': 'blocked' })[reviewDecision]
+      : ['blocked', 'unverified'].includes(taskState) ? taskState
+        : ['completed', 'failed', 'changes-requested'].includes(taskState) ? taskState
+          : result?.ok === false ? 'failed' : result?.ok === true && !reason ? 'completed' : 'unknown';
   return {
     auditVersion: AUDIT_VERSION,
     timestamp,
@@ -139,6 +177,7 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     operation,
     access: input?.access,
     envelope: summarizeTaskEnvelope(task),
+    ...(result?.preflight ? {preflight:summarizeRuntimePreflight(result.preflight)} : {}),
     route: {
       requestedProvider: input?.provider,
       requestedModel: input?.model,
@@ -147,6 +186,10 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     },
     phaseTimings: result?.phaseTimings,
     executionMode: result?.executionMode,
+    // A configured backend is runtime evidence only after the process actually ran.
+    runtime: result?.runtime ?? ((finiteNumber(result?.exitCode) !== undefined || finiteNumber(result?.phaseTimings?.processMs) > 0)
+      ? result?.osSandbox ?? (operation === 'dispatch_subagent' ? result?.sandbox : undefined) : undefined),
+    status: result?.status,
     lspStatus: operation==='lsp_request'?result?.status:undefined,
     failureCode: result?.failureCode,
     modelCalls: finiteNumber(result?.modelCalls),
@@ -157,9 +200,12 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     roleValidation:result?.roleValidation,
     ...(formatDiagnostic ? { formatDiagnostic } : {}),
     reviewDecision:result?.reviewValidation?.decision??result?.reviewDecision,
+    ...(hostVerification ? {hostVerification} : {}),
     tokens: summarizeUsage(result?.usage),
     patch: summarizePatch(result?.patch),
-    outcome: result?.ok === true && !reason ? 'completed' : 'failed',
+    outcome: result?.status === 'awaiting-host-verification' ? 'awaiting-host-verification' : result?.ok === true && !reason ? 'completed' : 'failed',
+    operationOutcome,
+    taskOutcome,
     failureReason: reason ? redactSensitiveText(reason) : null,
   };
 }
@@ -238,7 +284,7 @@ export function createAuditLogger(filePath, options = {}) {
       if (closed) throw new Error('audit logger is closed');
       const line = `${JSON.stringify(value)}\n`;
       append('general', line);
-      if (value?.outcome === 'failed' || value?.access === 'workspace-write' || value?.operation === 'retention_cleanup') append('critical', line);
+      if (value?.outcome === 'failed' || value?.taskOutcome === 'failed' || value?.access === 'workspace-write' || value?.operation === 'retention_cleanup') append('critical', line);
     },
     prune,
     close() {

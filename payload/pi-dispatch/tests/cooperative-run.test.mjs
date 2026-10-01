@@ -2,8 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planCooperativeRun } from '../scripts/cooperative-run.mjs';
 
+const declaration = (files = ['out/a', 'out/b']) => ({
+  files, estimatedLines: 20, isTestOrConfigChange: false,
+  publicApiOrProtocol: false, dependencyOrLockfile: false, securityAuthOrCredentials: false,
+  migration: false, irreversibleOrNoRollback: false, uncertainFileScope: false,
+});
+
 const base = (cwd = '/workspace') => ({
   cwd, parentRunId: 'parent-1', runGoal: 'Complete the run', runAcceptance: ['All units finish'],
+  writeTier: 'T1', tierDeclaration: declaration(),
   units: [
     { id: 'alpha', objective: 'Do alpha', acceptance: ['Alpha done'], context: ['alpha-only'], readScope: ['src/a'], writeScope: ['out/a'] },
     { id: 'beta', objective: 'Do beta', acceptance: ['Beta done'], context: ['beta-only'], readScope: ['src/b'], writeScope: ['out/b'] },
@@ -57,9 +64,14 @@ test('shares run identity while preserving unit-only context and access', () => 
   assert.ok(!requests[0].task.context.includes('beta-only'));
   assert.ok(!requests[1].task.context.includes('alpha-only'));
   assert.equal(requests[0].access, 'workspace-write');
+  assert.equal(requests[0].tier, 'T1');
+  assert.deepEqual(requests[0].tierDeclaration.files, ['out/a']);
+  assert.deepEqual(requests[1].tierDeclaration.files, ['out/b']);
   const readOnly = base();
   readOnly.units[0].writeScope = [];
+  readOnly.tierDeclaration.files = ['out/b'];
   assert.equal(planCooperativeRun(readOnly).requests[0].access, 'read');
+  assert.equal(planCooperativeRun(readOnly).requests[0].tier, undefined);
 });
 
 test('freezes nested request data and produces stable IDs', () => {
@@ -72,7 +84,25 @@ test('freezes nested request data and produces stable IDs', () => {
   for (const request of first.requests) {
     assert.ok(Object.isFrozen(request) && Object.isFrozen(request.task));
     for (const key of ['context', 'acceptance', 'readScope', 'writeScope']) assert.ok(Object.isFrozen(request.task[key]));
+    if (request.tierDeclaration) assert.ok(Object.isFrozen(request.tierDeclaration) && Object.isFrozen(request.tierDeclaration.files));
   }
+});
+
+test('write tier is explicit, covers the whole run, and changes stable IDs', () => {
+  let spec = base(); delete spec.writeTier;
+  assert.throws(() => planCooperativeRun(spec), /writeTier T1/);
+  spec = base(); delete spec.tierDeclaration;
+  assert.throws(() => planCooperativeRun(spec), /tierDeclaration/);
+  spec = base(); spec.tierDeclaration.files = ['out/a'];
+  assert.throws(() => planCooperativeRun(spec), /tierDeclaration/);
+  spec = base(); spec.tierDeclaration.publicApiOrProtocol = true;
+  assert.throws(() => planCooperativeRun(spec), /tierDeclaration/);
+  spec = base(); spec.writeTier = 'T2';
+  assert.throws(() => planCooperativeRun(spec), /linked pre-review/);
+  spec = base(); spec.tierDeclaration.estimatedLines = 21;
+  assert.notEqual(planCooperativeRun(spec).runAnchor, planCooperativeRun(base()).runAnchor);
+  spec = base(); spec.units.forEach(unit => { unit.writeScope = []; }); delete spec.writeTier; delete spec.tierDeclaration;
+  assert.equal(planCooperativeRun(spec).requests.every(request => request.access === 'read' && request.tier === undefined), true);
 });
 
 test('rejects unsafe scope paths', () => {

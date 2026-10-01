@@ -192,13 +192,30 @@ $piSettings | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $piSettingsPat
 
 if($installCodex){
 $skillsRoot = Join-Path $TargetHome '.agents\skills'
-Get-ChildItem -LiteralPath (Join-Path $payload 'workflow-skills') -Directory | ForEach-Object {
-  Copy-WithBackup $_.FullName (Join-Path $skillsRoot $_.Name) $backupRoot
+$workflowSkills = Get-ChildItem -LiteralPath (Join-Path $payload 'workflow-skills') -Directory
+$retiredCodexSkills = @($workflowSkills | Where-Object { $_.Name -ne 'kether-governance' })
+foreach ($skill in $retiredCodexSkills) {
+  $installedSkill = Join-Path $skillsRoot $skill.Name
+  if (Test-Path -LiteralPath $installedSkill) {
+    $relative = [IO.Path]::GetRelativePath([IO.Path]::GetFullPath($TargetHome), [IO.Path]::GetFullPath($installedSkill))
+    $backup = Join-Path $backupRoot $relative
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
+    Move-Item -LiteralPath $installedSkill -Destination $backup
+  }
 }
+$governanceSkill = Join-Path $payload 'workflow-skills\kether-governance'
+Copy-WithBackup $governanceSkill (Join-Path $skillsRoot 'kether-governance') $backupRoot
 
 $agentsPath = Join-Path $TargetHome '.codex\AGENTS.md'
 Get-ChildItem -LiteralPath $referencesSource -File -Filter '*.md' | ForEach-Object {
   Copy-WithBackup $_.FullName (Join-Path $TargetHome ('.codex\agent-references\' + $_.Name)) $backupRoot
+}
+$retiredGovernanceReference = Join-Path $TargetHome '.codex\agent-references\governance.md'
+if (-not (Test-Path -LiteralPath (Join-Path $referencesSource 'governance.md') -PathType Leaf) -and (Test-Path -LiteralPath $retiredGovernanceReference)) {
+  Assert-Under $retiredGovernanceReference $TargetHome
+  $archive = Join-Path $backupRoot '.codex\agent-references\governance.md'
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $archive) | Out-Null
+  Move-Item -LiteralPath $retiredGovernanceReference -Destination $archive
 }
 if (Test-Path -LiteralPath $agentsPath) { Copy-Item -LiteralPath $agentsPath -Destination (Join-Path $backupRoot 'AGENTS.md') -Force }
 Set-ManagedAgents $agentsPath (Get-Content -LiteralPath $templatePath -Raw)
@@ -229,6 +246,7 @@ if ($installWsl) {
     (Join-Path $pluginTarget 'scripts\validate-write-scope.mjs')='/tmp/pi-kether-install/validate-write-scope.mjs'
     (Join-Path $pluginTarget 'extensions\write-scope-guard.js')='/tmp/pi-kether-install/write-scope-guard.js'
     (Join-Path $pluginTarget 'extensions\auth-scrub.js')='/tmp/pi-kether-install/auth-scrub.js'
+    (Join-Path $payload 'pi-dispatch\extensions\source-window.js')='/tmp/pi-kether-install/source-window.js'
     (Join-Path $pluginTarget 'extensions\read-scope-guard.js')='/tmp/pi-kether-install/read-scope-guard.js'
     (Join-Path $payload 'pi-dispatch\extensions\role-presets.js')='/tmp/pi-kether-install/role-presets.js'
     (Join-Path $payload 'pi-dispatch\extensions\result-submit.js')='/tmp/pi-kether-install/result-submit.js'
@@ -253,6 +271,8 @@ if ($installWsl) {
     (Join-Path $pluginTarget 'scripts\provider-transport.mjs')='/tmp/pi-kether-install/provider-transport.mjs'
     (Join-Path $pluginTarget 'extensions\controlled-provider.js')='/tmp/pi-kether-install/controlled-provider.js'
     (Join-Path $pluginTarget 'scripts\anthropic-api-credential.mjs')='/tmp/pi-kether-install/anthropic-api-credential.mjs'
+    (Join-Path $pluginTarget 'scripts\patch-policy.mjs')='/tmp/pi-kether-install/patch-policy.mjs'
+    (Join-Path $pluginTarget 'extensions\audit-log.js')='/tmp/pi-kether-install/audit-log.js'
   }
   foreach ($pair in $transfers.GetEnumerator()) { Copy-ToWsl $pair.Key $pair.Value }
   & wsl.exe -d $WslDistro -u root -- env PI_KETHER_HARDEN_DISTRO=1 bash /tmp/pi-kether-install/provision-wsl.sh
@@ -284,6 +304,10 @@ $hostExports=Join-Path $stateRoot ('host-profiles\'+[guid]::NewGuid().ToString('
 & $nodePath (Join-Path $pluginTarget 'scripts\host-profiles.mjs') (Join-Path $pluginTarget '.mcp.json') $hostExports ($Hosts -join ',')
 if($LASTEXITCODE -ne 0){throw 'Host profile generation failed.'}
 @{hosts=@($Hosts);profiles=$hostExports}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $stateRoot 'installation-hosts.json') -Encoding utf8NoBOM
+if ($installCodex -and (Test-Path -LiteralPath (Join-Path $TargetHome '.agents/skills/hindsight-coding-agent/SKILL.md') -PathType Leaf)) {
+  & (Join-Path $PSScriptRoot 'Apply-HindsightWrapper.ps1') -TargetHome $TargetHome
+  if (-not $?) { throw 'Hindsight wrapper update failed.' }
+}
 & (Join-Path $PSScriptRoot 'Protect-PiState.ps1') -TargetHome $TargetHome
 & (Join-Path $packageRoot 'install\Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $WslDistro -Hosts $Hosts -SkipWsl:$(-not $installWsl)
 if ($LASTEXITCODE -ne 0) { throw 'Post-install self-test failed.' }

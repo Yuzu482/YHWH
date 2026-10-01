@@ -128,8 +128,10 @@ test('actual MCP session discovers read-only knowledge tool, enforces roots and 
   const server=runtime.makeServer(),client=new Client({name:'memory-test',version:'1'}),[a,b]=InMemoryTransport.createLinkedPair();
   try{
     await server.connect(b);await client.connect(a);const available=(await client.listTools()).tools.find(t=>t.name==='project_memory');assert.equal(available.annotations.readOnlyHint,true);
-    const result=await client.callTool({name:'project_memory',arguments:{cwd:f.root,action:'search',query:'架构'}});assert.equal(JSON.parse(result.content[0].text).matches,1);
-    const denied=await client.callTool({name:'project_memory',arguments:{cwd:tmpdir(),action:'list'}});assert.equal(denied.isError,true);
+    const missing=await client.callTool({name:'project_memory',arguments:{cwd:f.root,action:'search',query:'架构'}});assert.equal(JSON.parse(missing.content[0].text).code,'WORKFLOW_TOPIC_REQUIRED');
+    const {receipt:workflowReceipt}=JSON.parse((await client.callTool({name:'get_workflow',arguments:{topic:'project-memory'}})).content[0].text);
+    const result=await client.callTool({name:'project_memory',arguments:{cwd:f.root,action:'search',query:'架构',workflowReceipt}});assert.equal(JSON.parse(result.content[0].text).matches,1);
+    const denied=await client.callTool({name:'project_memory',arguments:{cwd:tmpdir(),action:'list',workflowReceipt}});assert.equal(denied.isError,true);
     const writer=await client.callTool({name:'project_memory',arguments:{cwd:f.root,action:'write'}});assert.equal(writer.isError,true);
     const caps=JSON.parse((await client.callTool({name:'list_capabilities',arguments:{}})).content[0].text);assert.equal(caps.projectMemory.readOnly,true);assert.equal(modelCalls,0);
     await runtime.shutdown();const closed=await client.callTool({name:'project_memory',arguments:{cwd:f.root}});assert.equal(closed.isError,true);

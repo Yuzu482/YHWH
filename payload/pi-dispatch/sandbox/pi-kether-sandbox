@@ -1,5 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set +a
+set +x
+
+select_native_issued_token() {
+  /opt/node/bin/node -e 'const x=JSON.parse(require("fs").readFileSync(process.argv[1]));const v=x.openaiAccess?.["access"+"Token"];if(typeof v!=="string"||!v)process.exit(1);process.stdout.write(v)' "$1" 2>/dev/null
+}
+
+select_api_issued_token() {
+  /opt/node/bin/node -e 'let s="";process.stdin.setEncoding("utf8");process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{const x=JSON.parse(s);const v=x.anthropicApi?.["api"+"Key"]??x.controlledApi?.["api"+"Key"];if(typeof v!=="string"||!v)process.exitCode=1;else process.stdout.write(v)}catch{process.exitCode=1}})' 2>/dev/null
+}
+
+emit_checked_patch() {
+  local token="$1" patch="$2" checked code
+  if checked=$(printf '%s' "$token" | /opt/node/bin/node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON /opt/pi-kether/scripts/patch-policy.mjs "$patch" 2>&1); then
+    printf '\nPI_SANDBOX_PATCH_B64='
+    base64 -w0 "$patch"
+    printf '\nPI_SANDBOX_PATCH_META=%s\n' "$checked"
+    return 0
+  fi
+  code="$checked"
+  if [[ "$code" == PI_PATCH_CONTAINS_ISSUED_CREDENTIAL || "$code" == PI_PATCH_TOKEN_INVALID || "$code" == PI_PATCH_INVALID_BYTES ]]; then
+    printf '\n%s\n' "$code" >&2
+  else
+    printf '%s\n' PI_PATCH_INVALID_BYTES >&2
+  fi
+  return 4
+}
 
 BASE=/var/lib/pi-kether/jobs
 PI_ENTRY=/opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
@@ -112,7 +139,7 @@ run_job() {
   local job="$1" drive="$2" relative_path="$3" access="$4" resource_profile="$5" timeout_seconds="$6" host_user="$7" scope_b64="$8" gateway_instance="$9" windows_pid="${10}"
   shift 10
   local direct_lsp=false bootstrap=/opt/pi-kether/scripts/secure-pi-bootstrap.mjs
-  local api_pipe=false api_packet=""
+  local api_pipe=false api_packet="" issued_token=""
   if [[ "${1:-}" == --api-pipe ]]; then api_pipe=true; shift; fi
   local editor_bridge=false
   if [[ "${1:-}" == --editor-bridge ]]; then
@@ -174,6 +201,7 @@ run_job() {
   CURRENT_JOB="$job"
   cleanup_current_job() {
     local original_status=$?
+    unset api_packet issued_token
     trap - EXIT INT TERM
     set +e
     exec 3<&-
@@ -205,6 +233,8 @@ run_job() {
   install -d -o pi-sandbox -g pi-sandbox -m 0700 "$home" "$home/agent"
   install -d -o root -g root -m 0700 "$mount_root/host-work" "$mount_root/host-c"
   printf '%s' "$scope_b64" | base64 -d -i >"$jobdir/scopes.json"
+  chown root:root "$jobdir/scopes.json"
+  chmod 0600 "$jobdir/scopes.json"
   /opt/node/bin/node -e 'const fs=require("fs"); fs.writeFileSync(process.argv[2],JSON.stringify(JSON.parse(fs.readFileSync(process.argv[1])).write))' "$jobdir/scopes.json" "$home/agent/write-scope.json"
   chown root:root "$home/agent/write-scope.json"
   chmod 0444 "$home/agent/write-scope.json"
@@ -235,6 +265,8 @@ run_job() {
     if [[ "$provider" != anthropic ]]; then umount "$mount_root/host-c"; fi
     # A kernel pipe supplies FD3. API plaintext is never written to a credential file.
     exec 3< <(printf '%s' "$api_packet")
+    issued_token=$(printf '%s' "$api_packet" | select_api_issued_token) || { unset api_packet issued_token; echo PI_PATCH_TOKEN_INVALID >&2; exit 4; }
+    [[ -n "$issued_token" ]] || { unset api_packet issued_token; echo PI_PATCH_TOKEN_INVALID >&2; exit 4; }
     unset api_packet
   elif [[ "$direct_lsp" == true ]]; then
     printf '{}' >"$jobdir/credentials.json"
@@ -245,6 +277,7 @@ run_job() {
     /opt/node/bin/node /opt/pi-kether/scripts/prepare-credentials.mjs "$provider" "$auth_source" "$jobdir/credentials.json"
     umount "$mount_root/host-c"
     exec 3<"$jobdir/credentials.json"
+    issued_token=$(select_native_issued_token "$jobdir/credentials.json") || { unset issued_token; echo PI_PATCH_TOKEN_INVALID >&2; exit 4; }
   fi
 
   if [[ "$access" == workspace-write ]]; then
@@ -272,6 +305,10 @@ run_job() {
   fi
   [[ "$access" == workspace-write ]] && workspace_bind=(--bind "$workspace" /workspace)
 
+  local fixture_bind=()
+  timeout 35s python3 /opt/pi-kether/scripts/snapshot-scope.py --fixture-bindings --workspace "$workspace" --manifest "$jobdir/scopes.json" --output "$jobdir/fixture-bindings.bin" || exit 8
+  mapfile -d '' -t fixture_bind <"$jobdir/fixture-bindings.bin"
+
   install -d -o pi-sandbox -g pi-sandbox -m 0700 "$jobdir/tmp"
   set +e
   ( printf '%s\n' "$BASHPID" >"$cgroup_dir/cgroup.procs"
@@ -281,6 +318,7 @@ run_job() {
     --ro-bind /etc/ssl /etc/ssl --ro-bind /etc/resolv.conf /etc/resolv.conf --ro-bind /etc/hosts /etc/hosts \
     --ro-bind /etc/nsswitch.conf /etc/nsswitch.conf "${java_bind[@]}" --dev /dev "${proc_bind[@]}" --bind "$jobdir/tmp" /tmp --dir /home/pi-sandbox \
     --bind "$home" /home/pi-sandbox --ro-bind "$home/agent/write-scope.json" /home/pi-sandbox/agent/write-scope.json "${workspace_bind[@]}" --chdir /workspace --clearenv \
+    "${fixture_bind[@]}" \
     --setenv HOME /home/pi-sandbox --setenv PI_CODING_AGENT_DIR /home/pi-sandbox/agent \
     --setenv PI_DISPATCH_ACTIVE 1 --setenv PI_TELEMETRY 0 \
     --setenv PI_WRITE_SCOPE_FILE /home/pi-sandbox/agent/write-scope.json \
@@ -303,7 +341,7 @@ run_job() {
 
   if [[ "$access" == workspace-write ]]; then
     local patch="$jobdir/changes.patch"
-    timeout 35s python3 /opt/pi-kether/scripts/snapshot-scope.py --verify "$baseline" "$workspace" "$jobdir/write-scope.json" || exit 8
+    timeout 35s python3 /opt/pi-kether/scripts/snapshot-scope.py --verify "$baseline" "$workspace" "$jobdir/write-scope.json" --manifest "$jobdir/scopes.json" || exit 8
     set +e
     diff -ruN "$baseline" "$workspace" >"$patch"
     local diff_status=$?
@@ -314,9 +352,8 @@ run_job() {
     local patch_size
     patch_size=$(stat -c %s "$patch")
     (( patch_size <= 4194304 )) || { echo "sandbox patch exceeds 4 MiB" >&2; exit 6; }
-    printf '\nPI_SANDBOX_PATCH_B64='
-    base64 -w0 "$patch"
-    printf '\n'
+    emit_checked_patch "$issued_token" "$patch" || { unset issued_token; exit 4; }
+    unset issued_token
   fi
   return "$status"
 }

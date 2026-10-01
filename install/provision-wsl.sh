@@ -53,6 +53,7 @@ install -D -o root -g root -m 0755 /tmp/pi-kether-install/pi-kether-sandbox /usr
 install -o root -g root -m 0644 /tmp/pi-kether-install/validate-write-scope.mjs /opt/pi-kether/scripts/validate-write-scope.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/write-scope-guard.js /opt/pi-kether/extensions/write-scope-guard.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/auth-scrub.js /opt/pi-kether/extensions/auth-scrub.js
+install -o root -g root -m 0644 /tmp/pi-kether-install/source-window.js /opt/pi-kether/extensions/source-window.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/read-scope-guard.js /opt/pi-kether/extensions/read-scope-guard.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/role-presets.js /opt/pi-kether/extensions/role-presets.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/result-submit.js /opt/pi-kether/extensions/result-submit.js
@@ -77,6 +78,8 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/controlled-provider.mjs /
 install -o root -g root -m 0644 /tmp/pi-kether-install/provider-transport.mjs /opt/pi-kether/scripts/provider-transport.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/controlled-provider.js /opt/pi-kether/extensions/controlled-provider.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/anthropic-api-credential.mjs /opt/pi-kether/scripts/anthropic-api-credential.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/patch-policy.mjs /opt/pi-kether/scripts/patch-policy.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/audit-log.js /opt/pi-kether/extensions/audit-log.js
 install -d -o root -g root -m 0711 /var/lib/pi-kether/jobs
 
 jdtls_archive="jdt-language-server-${JDTLS_VERSION}-${JDTLS_BUILD}.tar.gz"

@@ -19,7 +19,7 @@ const safeSnapshot = value => {
     ok: true, instance: text(value.instance), active: Math.max(0, Number(value.active) || 0),
     queued: Math.max(0, Number(value.queued) || 0), rssMiB: Math.max(0, Number(value.rssMiB) || 0),
     updatedAt: text(value.updatedAt), tasks: Array.isArray(value.tasks) ? value.tasks.slice(0, 50).map(t => ({
-      requestId: text(t.requestId), role: text(t.role), state: text(t.state), route: text(t.route), seconds: Math.max(0, Number(t.seconds) || 0)
+      requestId: text(t.requestId), role: text(t.role), displayName: text(t.displayName), displayNameZh: text(t.displayNameZh), state: text(t.state), route: text(t.route), seconds: Math.max(0, Number(t.seconds) || 0)
     })) : []
   };
 };

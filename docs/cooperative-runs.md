@@ -8,16 +8,18 @@ YHWH 可把一个目标编译为 2–4 个独立的 Pi 子任务。同一组任�
 {
   "cwd": "E:\\Projects\\Example",
   "parentRunId": "feature-20260925-01",
-  "runGoal": "完成两个互不依赖的模块",
+  "runGoal": "完成两个互不依赖的内部模块",
   "runAcceptance": ["两个模块分别验收通过"],
+  "writeTier": "T1",
+  "tierDeclaration": {"files":["src/engine.mjs","src/view.mjs"],"estimatedLines":40,"isTestOrConfigChange":false,"publicApiOrProtocol":false,"dependencyOrLockfile":false,"securityAuthOrCredentials":false,"migration":false,"irreversibleOrNoRollback":false,"uncertainFileScope":false},
   "units": [
-    {"id":"api","objective":"实现 API 模块","acceptance":["API 检查通过"],"context":[],"readScope":["src/shared.mjs"],"writeScope":["src/api.mjs"]},
-    {"id":"ui","objective":"实现 UI 模块","acceptance":["UI 检查通过"],"context":[],"readScope":["src/shared.mjs"],"writeScope":["src/ui.mjs"]}
+    {"id":"engine","objective":"实现内部计算模块","acceptance":["模块检查通过"],"context":[],"readScope":["src/shared.mjs"],"writeScope":["src/engine.mjs"]},
+    {"id":"view","objective":"实现内部视图模块","acceptance":["模块检查通过"],"context":[],"readScope":["src/shared.mjs"],"writeScope":["src/view.mjs"]}
   ]
 }
 ```
 
-`cwd` 必须是网关允许的绝对工作目录；文件范围使用精确的仓库相对路径。可为整个运行指定可选的 `thinking`：`low` 或 `medium`；默认是 `medium`。此规划器面向规模较小、固定 120 秒时限的运行，不接受 `high` 或 `max`。`low` 仅适用于低风险且任务明确细小的工作；此前的对比结果只能作为提示，不能证明 `medium` 必然能避免输出格式错误。选择不同的 `thinking` 值会产生不同的稳定请求 ID。先查看计划，再从有权访问本机网关的终端提交：
+`cwd` 必须是网关允许的绝对工作目录；文件范围使用精确的仓库相对路径。含写入的协作运行必须声明整组 `writeTier: T1` 和 `tierDeclaration`，其中 `files` 要恰好覆盖所有单元的写入文件；编译器为每个写入请求保留 T1，并缩小其声明文件范围。涉及公开接口、依赖、安全或迁移等 T2 风险时，本规划器会拒绝，改由有前评审的 linked handoff 执行。纯只读运行省略这两个字段。T1 完成后仍需独立后评审才能验收。可为整个运行指定可选的 `thinking`：`low` 或 `medium`；默认是 `medium`。此规划器面向规模较小、固定 120 秒时限的运行，不接受 `high` 或 `max`。`low` 仅适用于低风险且任务明确细小的工作；此前的对比结果只能作为提示，不能证明 `medium` 必然能避免输出格式错误。选择不同的 `thinking` 值会产生不同的稳定请求 ID。先查看计划，再从有权访问本机网关的终端提交：
 
 ```powershell
 node payload/pi-dispatch/scripts/gateway-client.mjs cooperative-plan .\spec.json

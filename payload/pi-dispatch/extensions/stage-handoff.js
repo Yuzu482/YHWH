@@ -43,7 +43,8 @@ export function validateHandoff(value, task) {
   return {version:2,stage:value.stage,inputs:value.inputs.map(input=>({...input})),runGoal:value.runGoal,runAcceptance:[...value.runAcceptance],phaseIndex:value.phaseIndex};
 }
 
-function runAnchor(handoff) {
+export function runAnchor(handoff) {
+  if (!handoff || typeof handoff.runGoal !== 'string' || !handoff.runGoal.trim() || !Array.isArray(handoff.runAcceptance) || handoff.runAcceptance.length === 0 || !handoff.runAcceptance.every(item => typeof item === 'string' && !!item.trim())) fail('Invalid run anchor inputs');
   return createHash('sha256').update(JSON.stringify({runGoal:handoff.runGoal,runAcceptance:handoff.runAcceptance})).digest('hex');
 }
 
@@ -59,7 +60,7 @@ export function prepareHandoff(task, input, cwd, ledger) {
   return ()=>{
     for (const ref of handoff.inputs) {
       const prior=ledger.getOutcome(ref.requestId);
-      if (prior.state==='pending') return false;
+      if (prior.state==='pending' || prior.state==='awaiting-host-verification') return false;
       const c=prior.contract;
       const expectedPhase=handoff.version===2 ? handoff.phaseIndex-(handoff.stage==='scouted' && handoff.phaseIndex>1 ? 1 : 0) : undefined;
       if (prior.state!=='completed' || !c || c.version!==2 || c.mode!=='linked' || c.parentRunId!==input.parentRunId || c.workspaceSha256!==workspaceDigest(cwd) || c.role!==ref.role || c.stage!==ref.stage || c.resultSha256!==ref.resultSha256 || (ref.role==='Geburah' && c.reviewDecision!=='approve') || (handoff.version===2 && (c.handoffVersion!==2 || c.runAnchorSha256!==runAnchor(handoff) || c.phaseIndex!==expectedPhase))) fail(`Predecessor contract does not match: ${ref.requestId}`);

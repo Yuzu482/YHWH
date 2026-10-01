@@ -44,7 +44,9 @@ export async function acceptHeadless(config, { live = false, cancel = false, sig
     finally {
       const resolved = path.resolve(fixture), parent = path.resolve(os.tmpdir());
       if (path.dirname(resolved) !== parent || !path.basename(resolved).startsWith('yhwh-cli-acceptance-')) throw Error('unsafe_fixture_cleanup');
-      fs.rmSync(resolved, { recursive: true, force: true });
+      // Windows may retain a transient lock after process-tree close. Keep
+      // cleanup bounded and still throw if the directory cannot be removed.
+      fs.rmSync(resolved, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }
   return { schemaVersion: 1, mode: live ? 'live-fixed-prompt' : 'offline', modelCalls: live ? 'unverified' : 0,

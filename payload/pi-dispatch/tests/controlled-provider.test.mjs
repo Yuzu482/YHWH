@@ -46,6 +46,7 @@ test('host config enables only explicit routes, preserves defaults, role/access 
  try {
   assert.throws(()=>resolveRoleModel('worker',undefined,'yhwh-worker-api'),/binding rejected/);
   writeFileSync(join(state,'provider-config.json'),JSON.stringify(base));
+  writeFileSync(join(state,'reviewer-transport.json'),JSON.stringify({schemaVersion:1,defaultTransport:'anthropic'}));
   assert.equal(resolveRoleModel('worker').provider,'openai-codex');assert.equal(resolveRoleModel('reviewer').provider,'anthropic');
   assert.equal(resolveRoleModel('worker',undefined,'yhwh-worker-api').model,'gpt-5.6-luna');
   assert.throws(()=>resolveRoleModel('reviewer',undefined,'yhwh-worker-api'),/binding rejected/);

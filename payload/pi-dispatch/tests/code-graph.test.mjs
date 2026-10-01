@@ -133,7 +133,8 @@ test('MCP code graph is allowed-root confined, read-only, lifecycle admitted, an
   const server=runtime.makeServer(),client=new Client({name:'graph-test',version:'1.0'}),[a,b]=InMemoryTransport.createLinkedPair();
   try {
     await server.connect(a);await client.connect(b);
-    const output=await client.callTool({name:'code_graph',arguments:{cwd:f.root,action:'impact',id:'base.js'}});
+    const {receipt:workflowReceipt}=JSON.parse((await client.callTool({name:'get_workflow',arguments:{topic:'code-graph'}})).content[0].text);
+    const output=await client.callTool({name:'code_graph',arguments:{cwd:f.root,action:'impact',id:'base.js',workflowReceipt}});
     assert.equal(output.isError,false);assert.equal(JSON.parse(output.content[0].text).items.length,2);
     assert.equal((await client.callTool({name:'code_graph',arguments:{cwd:f.root,action:'refresh'}})).isError,true);
     assert.equal((await client.callTool({name:'code_graph',arguments:{cwd:tmpdir()}})).isError,true);

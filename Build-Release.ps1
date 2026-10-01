@@ -10,6 +10,8 @@ New-Item -ItemType Directory -Force -Path $release | Out-Null
 
 & (Join-Path $root 'install\Test-PiKether.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Portable self-test failed.' }
+& (Join-Path $root 'install\Test-HostWorkflowSync.ps1') | Out-Null
+& (Join-Path $root 'install\Test-HindsightWrapper.ps1') | Out-Null
 & (Join-Path $root 'install\Test-WorkflowConfig.ps1')
 & (Join-Path $root 'install\Test-Headless.ps1')
 & (Join-Path $root 'install\Sync-HostWorkflow.ps1') -Check
@@ -60,15 +62,17 @@ if (Test-Path -LiteralPath $validator) {
   }
 }
 
+& (Join-Path $root 'install\Test-PluginVersion.ps1')
+
 $stageBase = Join-Path ([IO.Path]::GetTempPath()) ('pi-kether-build-' + [guid]::NewGuid().ToString('N'))
 $stage = Join-Path $stageBase 'pi-kether-portable'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 try {
   # Enumerate by allowlist and prune local state even when -SkipTests is used.
-  $allowed = @('install','payload','templates','docs','.readme-assets','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','THIRD_PARTY.en.md','LICENSE','NOTICE','licenses','.gitignore')
+  $allowed = @('install','payload','templates','docs','.readme-assets','.test','Workflow.ps1','Build-Release.ps1','Build-OneClick.ps1','Install-YHWH.ps1','Install.cmd','install.config.example.json','portable.manifest.json','README.md','README.en.md','VERIFICATION.md','SECURITY-HARDENING.md','THIRD_PARTY.md','THIRD_PARTY.en.md','LICENSE','NOTICE','licenses','.gitignore')
   # Use only paths recorded in the Git index; never recursively enumerate local trees.
   $gitInfo = New-Object System.Diagnostics.ProcessStartInfo
-  $gitInfo.FileName = 'git'
+  $gitInfo.FileName = (Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
   $gitInfo.Arguments = ' -c safe.directory="' + $root.Replace('"','\"') + '" ls-files -z'
   $gitInfo.WorkingDirectory = $root
   $gitInfo.UseShellExecute = $false
@@ -95,9 +99,11 @@ try {
     if ($relative.StartsWith('/') -or $relative -match '(^|/)\.\.?(/|$)') { throw "Unsafe tracked path: $relative" }
     $parts = $relative.Split('/')
     if (-not $allowedSet.ContainsKey($parts[0])) { continue }
+    $isBaselineFile = $relative -eq '.test/baseline-failures.json'
     $skip = $false
     foreach ($part in $parts) {
-      if ($part -match '^(node_modules|\.git|\.test|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { $skip = $true; break }
+      if ($part -match '^(node_modules|\.git|\.runtime|diagnostics|release)$|^\.env|^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|\.local\.|\.(log|bak|backup|pyc)$|^(?:.*token|.*key).*\.txt$') { $skip = $true; break }
+      if ($part -eq '.test' -and -not $isBaselineFile) { $skip = $true; break }
     }
     if ($skip) { continue }
     $source = Join-Path $root ($relative.Replace('/',[IO.Path]::DirectorySeparatorChar))
@@ -115,6 +121,8 @@ try {
     New-Item -ItemType Directory -Force -Path $parent | Out-Null
     Copy-Item -LiteralPath $source -Destination $destination
   }
+  & (Join-Path $root 'install\Stamp-PluginVersion.ps1') -SourceRepositoryRoot $root -StagingPackageRoot $stage | Out-Null
+  $provenanceData = Get-Content -LiteralPath (Join-Path $stage 'build-provenance.json') -Raw | ConvertFrom-Json
   $zip = Join-Path $release "pi-kether-portable-$version.zip"
   if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
   Compress-Archive -LiteralPath $stage -DestinationPath $zip -CompressionLevel Optimal
@@ -123,6 +131,8 @@ try {
   [ordered]@{
     name = 'pi-kether-portable'; version = $version; file = [IO.Path]::GetFileName($zip)
     sha256 = $hash; builtAt = (Get-Date).ToUniversalTime().ToString('o')
+    sourceCommit = $provenanceData.sourceCommit; shortHash = $provenanceData.shortHash
+    dirty = $provenanceData.dirty; pluginVersion = $provenanceData.pluginVersion
   } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $release 'release-manifest.json') -Encoding utf8NoBOM
   Write-Host "Release: $zip"
   Write-Host "SHA256: $hash"

@@ -16,6 +16,9 @@ test('task monitor deduplicates stable request IDs and rejects conflicting reuse
     return { response: { ok: true, provider: 'openai-codex', model: 'gpt-5.6-luna', toolsUsed: [] }, isError: false };
   });
   assert.equal(first.accepted, true);
+  assert.equal(first.task.role, 'worker');
+  assert.equal(first.task.displayName, 'Implementer');
+  assert.equal(first.task.displayNameZh, '实现开发');
   while (!release) await new Promise(resolvePromise => setImmediate(resolvePromise));
   const replay = monitor.submit(base, async () => { throw new Error('must not run'); });
   assert.equal(replay.replayed, true);

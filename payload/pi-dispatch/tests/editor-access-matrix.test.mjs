@@ -45,6 +45,7 @@ function expectedTools(access, editorAuthorized) {
     ...readTools,
     ...(access === 'workspace-write' ? ['edit', 'write'] : []),
     ...wslLspTools,
+    'yhwh_source_window',
     ...(editorAuthorized ? ['pi_editor_execute'] : []),
   ];
 }

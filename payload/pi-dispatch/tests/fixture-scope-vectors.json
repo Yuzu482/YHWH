@@ -1,0 +1,21 @@
+[
+  {"values":[],"writes":[],"accepted":true},
+  {"values":null,"writes":[],"accepted":false},
+  {"values":["samples/input.txt"],"writes":[],"accepted":true},
+  {"values":["samples/**"],"writes":[],"accepted":true},
+  {"values":["a/*"],"writes":[],"accepted":false},
+  {"values":["a/**/b"],"writes":[],"accepted":false},
+  {"values":["../a"],"writes":[],"accepted":false},
+  {"values":["a\\b"],"writes":[],"accepted":false},
+  {"values":[".env"],"writes":[],"accepted":false},
+  {"values":["a","A"],"writes":[],"accepted":false},
+  {"values":["a\u0085"],"writes":[],"accepted":false},
+  {"values":["a\ufeff"],"writes":[],"accepted":false},
+  {"values":["a\u007f"],"writes":[],"accepted":false},
+  {"values":["e\u0301"],"writes":[],"accepted":false},
+  {"values":["é"],"writes":[],"accepted":true},
+  {"values":["has space/a.txt"],"writes":[],"accepted":true},
+  {"values":["\ud800"],"writes":[],"accepted":false},
+  {"values":["a/**"],"writes":["a/b"],"accepted":false},
+  {"values":["a/b"],"writes":["a/**"],"accepted":false}
+]
