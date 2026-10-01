@@ -24,15 +24,24 @@ function resultText(result = 'ok') {
 }
 
 let largeDispatches = 0;
+const cancellationFixtures=new Map();
 const dispatchFn = async (request, signal, task) => {
   if (task.objective.startsWith('large')) largeDispatches += 1;
   if (task.objective.startsWith('delay')) {
     await new Promise((resolveDelay, rejectDelay) => {
-      const timer = setTimeout(resolveDelay, 250);
-      signal?.addEventListener('abort', () => {
-        clearTimeout(timer);
+      // Cancellation fixtures must remain pending until abort, not race a wall-clock success.
+      const timer = task.objective.startsWith('delay cancel') ? null : setTimeout(() => {
+        signal?.removeEventListener('abort', abort);
+        resolveDelay();
+      }, 250);
+      const abort = () => {
+        if(timer)clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
         rejectDelay(Object.assign(new Error('cancelled'), { name: 'AbortError' }));
-      }, { once: true });
+      };
+      const fixture=cancellationFixtures.get(task.objective);
+      if(fixture){fixture.release=()=>{signal?.removeEventListener('abort',abort);resolveDelay();};fixture.started();}
+      if(signal?.aborted)abort();else signal?.addEventListener('abort', abort, { once: true });
     });
   }
   return { ok: true, text: resultText(task.objective.startsWith('large') ? largeText : 'ok'), provider: request.provider, model: request.model };
@@ -111,9 +120,21 @@ try {
   let cancelled = 0;
   for (let i = 0; i < 40; i += 1) {
     const controller = new AbortController();
-    const pending = client.callTool({ name: 'dispatch_subagent', arguments: taskArguments(`delay cancel ${i}`) }, undefined, { signal: controller.signal });
-    setTimeout(() => controller.abort(), 5);
-    try { await pending; } catch { cancelled += 1; }
+    const objective=`delay cancel ${i}`;
+    let started;
+    const ready=new Promise(resolveReady=>{started=resolveReady;});
+    const fixture={started,release:null};cancellationFixtures.set(objective,fixture);
+    const pending = client.callTool({ name: 'dispatch_subagent', arguments: taskArguments(objective) }, undefined, { signal: controller.signal });
+    // Install a rejection handler before waiting for the actual synthetic dispatcher.
+    const settled=pending.then(()=>({cancelled:false}),()=>({cancelled:true}));
+    let deadline;
+    try {
+      await Promise.race([ready,settled.then(()=>{throw new Error('cancellation fixture ended before readiness');}),new Promise((_,reject)=>{deadline=setTimeout(()=>reject(new Error('cancellation fixture did not start')),30000);})]);
+      controller.abort();
+      if((await settled).cancelled)cancelled+=1;
+    } finally {
+      clearTimeout(deadline);fixture.release?.();cancellationFixtures.delete(objective);
+    }
   }
   for (let i = 0; i < 40; i += 1) await abruptDisconnect(i);
   // Allow aborted HTTP sockets to pass Node's keep-alive cleanup window before measuring retained state.
