@@ -29,7 +29,7 @@ export function validateFixtureScope(values = [], writes = []) {
   const overlaps = (a, b) => a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
   for (let i = 0; i < fixtures.length; i++) {
     if (fixtures.slice(0, i).some(p => overlaps(p, fixtures[i]))) throw new Error('Overlapping fixtureScope paths');
-    if (writes.some(p => overlaps(String(p).replaceAll('\\', '/').replace(/\/\*\*$/, '').normalize('NFC').trim().toLowerCase(), fixtures[i].normalize('NFC')))) throw new Error('fixtureScope overlaps writeScope');
+    if (writes.some(p => overlaps(String(p).trim().replaceAll('\\', '/').replace(/\/\*\*$/, '').normalize('NFC').toLowerCase(), fixtures[i].normalize('NFC')))) throw new Error('fixtureScope overlaps writeScope');
   }
   return [...values];
 }
@@ -61,6 +61,7 @@ export function validateKetherTask(value) {
   if (value.contractVersion !== undefined && value.contractVersion !== 2) throw new Error('Only contractVersion 2 is supported');
   const role = boundedText(value.role, 'role', 64);
   if (!/^[A-Za-z][A-Za-z0-9._ -]{0,63}$/.test(role)) throw new Error('role contains unsupported characters');
+  const writeScope = boundedList(value.writeScope, 'writeScope');
   return {
     contractVersion:2,
     ...(value.handoff!==undefined?{handoff:validateHandoff(value.handoff,value)}:{}),
@@ -68,8 +69,8 @@ export function validateKetherTask(value) {
     objective: boundedText(value.objective, 'objective'),
     context: boundedList(value.context, 'context'),
     readScope: boundedList(value.readScope, 'readScope'),
-    writeScope: boundedList(value.writeScope, 'writeScope'),
-    fixtureScope: validateFixtureScope(value.fixtureScope, value.writeScope ?? []),
+    writeScope,
+    fixtureScope: validateFixtureScope(value.fixtureScope, writeScope),
     forbidden: boundedList(value.forbidden, 'forbidden'),
     dependencies: boundedList(value.dependencies, 'dependencies'),
     acceptance: boundedList(value.acceptance, 'acceptance'),

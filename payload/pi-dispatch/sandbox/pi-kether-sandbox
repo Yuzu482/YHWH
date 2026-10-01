@@ -341,7 +341,6 @@ run_job() {
 
   if [[ "$access" == workspace-write ]]; then
     local patch="$jobdir/changes.patch"
-    timeout 35s python3 /opt/pi-kether/scripts/snapshot-scope.py --verify "$baseline" "$workspace" "$jobdir/write-scope.json" || exit 8
     timeout 35s python3 /opt/pi-kether/scripts/snapshot-scope.py --verify "$baseline" "$workspace" "$jobdir/write-scope.json" --manifest "$jobdir/scopes.json" || exit 8
     set +e
     diff -ruN "$baseline" "$workspace" >"$patch"

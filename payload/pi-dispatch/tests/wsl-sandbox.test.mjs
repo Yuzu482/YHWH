@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import {readFileSync} from 'node:fs';
-import {validateFixtureScope} from '../extensions/kether-envelope.js';
+import {validateFixtureScope,validateKetherTask} from '../extensions/kether-envelope.js';
 import { cleanupWslJob, validateSandboxPatch, wslSandboxArgs, buildSandboxScopeManifest } from '../scripts/wsl-sandbox.mjs';
 
 test('WSL patch proof binds real scoped diff headers to the host job and fails closed', () => {
@@ -40,6 +40,15 @@ test('Node caller sends fixtures separately from readonly source and writable pa
   assert.deepEqual(JSON.parse(Buffer.from(buildSandboxScopeManifest(input),'base64').toString('utf8')),{read:['src/**'],write:['new/file.js'],fixtures:['samples/**']});
   assert.throws(()=>buildSandboxScopeManifest({...input,fixtureScope:null}));
   assert.throws(()=>buildSandboxScopeManifest({...input,fixtureScope:['new/**']}));
+});
+test('fixture overlap uses the normalized write tree and every final verify includes the fixture manifest',()=>{
+  assert.throws(()=>validateKetherTask({role:'Chesed',objective:'test',writeScope:['a/** '],fixtureScope:['a/input']}),/overlaps/);
+  assert.throws(()=>validateFixtureScope(['a/input'],['a/** ']),/overlaps/);
+  const script=readFileSync(new URL('../sandbox/pi-kether-sandbox',import.meta.url),'utf8');
+  const calls=script.split('\n').filter(line=>line.includes('snapshot-scope.py --verify'));
+  assert.equal(calls.length,1);
+  assert.ok(calls.every(line=>line.includes('--manifest "$jobdir/scopes.json"')));
+  assert.ok(script.indexOf('"${workspace_bind[@]}"')<script.indexOf('"${fixture_bind[@]}"'));
 });
 test('fixture path grammar obeys the shared cross-language vectors and UTF-16 bounds', () => {
   const vectors=JSON.parse(readFileSync(new URL('./fixture-scope-vectors.json',import.meta.url),'utf8'));

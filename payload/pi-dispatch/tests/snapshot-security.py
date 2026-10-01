@@ -3,6 +3,38 @@ from unittest.mock import patch
 spec=importlib.util.spec_from_file_location('snapshot',pathlib.Path(__file__).parents[1]/'scripts'/'snapshot-scope.py')
 mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 class SnapshotTests(unittest.TestCase):
+    def test_case_alias_does_not_fabricate_an_empty_fixture(self):
+        with tempfile.TemporaryDirectory() as t:
+            src=pathlib.Path(t,'src');dst=pathlib.Path(t,'dst');src.mkdir();dst.mkdir()
+            (src/'Samples').mkdir();(src/'Samples'/'input').write_text('real sample')
+            original=mod.validate_fixture_paths
+            def case_insensitive_source(root,fixtures):
+                if root==str(src): return original(root,[('Samples',True)])
+                return original(root,fixtures)
+            # Simulate only the case-insensitive source lookup; the actual walker
+            # and destination validation run on real directories unchanged.
+            with patch.object(mod,'validate_fixture_paths',side_effect=case_insensitive_source):
+                with self.assertRaises(OSError):mod.snapshot(str(src),str(dst),{'read':[],'write':[],'fixtures':['samples/**']})
+            self.assertFalse((dst/'samples').exists())
+            mod.snapshot(str(src),str(dst),{'read':[],'write':[],'fixtures':['Samples/**']})
+            self.assertEqual((dst/'Samples'/'input').read_text(),'real sample')
+    def test_final_verifier_raises_on_scandir_errors(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=pathlib.Path(t)
+            with patch.object(mod.os,'scandir',side_effect=PermissionError('denied')):
+                with self.assertRaises(PermissionError):mod.verify_tree(str(root),str(root),[])
+    def test_final_verifier_counts_files_and_directories_separately(self):
+        with tempfile.TemporaryDirectory() as t:
+            a=pathlib.Path(t,'a');b=pathlib.Path(t,'b');a.mkdir();b.mkdir()
+            (a/'samples').mkdir();(a/'samples'/'empty').mkdir();(a/'samples'/'input').write_text('sample')
+            shutil.copytree(a,b,dirs_exist_ok=True)
+            with patch.object(mod,'MAX_FILES',1):
+                mod.verify_tree(str(a),str(b),[],[('samples',True)])
+                (b/'extra').write_text('extra')
+                with self.assertRaises(ValueError):mod.verify_tree(str(a),str(b),[],[('samples',True)])
+            (b/'extra').unlink()
+            with patch.object(mod,'MAX_CREATED_DIRS',1):
+                with self.assertRaises(ValueError):mod.verify_tree(str(a),str(b),[],[('samples',True)])
     def test_only_admitted_regular_files_are_copied(self):
         with tempfile.TemporaryDirectory() as t:
             src=pathlib.Path(t,'src');dst=pathlib.Path(t,'dst');src.mkdir();dst.mkdir()

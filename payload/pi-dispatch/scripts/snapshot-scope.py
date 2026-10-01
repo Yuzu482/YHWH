@@ -150,8 +150,9 @@ def snapshot(source, destination, manifest):
                 finally: os.close(fd)
     try:
         walk(fd)
-        for name,tree in fixtures:
-            if tree: created_dirs+=_make_dirs(dest_fd,name.split('/'),MAX_CREATED_DIRS-created_dirs)
+        # Require the exact-case roots admitted by the walker; never fabricate an
+        # empty fixture when a case-insensitive source accepted a different name.
+        validate_fixture_paths(destination,fixtures)
         for name,tree in compile_scope(manifest['write']):
             parts=name.split('/')
             _check_source_ancestors(fd,parts[:-1] if not tree else parts)
@@ -163,8 +164,9 @@ def verify_tree(baseline, workspace, writes, fixtures=()):
     scope=compile_scope(writes)
     def inventory(root):
         result={}
-        total=0
-        for base,dirs,files in os.walk(root,followlinks=False):
+        total=file_count=directory_count=0
+        def fail_scan(error): raise error
+        for base,dirs,files in os.walk(root,followlinks=False,onerror=fail_scan):
             for name in dirs+files:
                 path=pathlib.Path(base,name)
                 st=path.lstat()
@@ -172,13 +174,17 @@ def verify_tree(baseline, workspace, writes, fixtures=()):
                 if stat.S_ISLNK(st.st_mode) or not (stat.S_ISDIR(st.st_mode) or stat.S_ISREG(st.st_mode)):
                     raise ValueError('Unsafe final filesystem entry')
                 if stat.S_ISREG(st.st_mode):
+                    file_count+=1
                     total+=st.st_size
-                    if st.st_nlink!=1 or total>MAX_BYTES or len(result)>=MAX_FILES: raise ValueError('Final tree resource or link limit exceeded')
+                    if st.st_nlink!=1 or total>MAX_BYTES or file_count>MAX_FILES: raise ValueError('Final tree resource or link limit exceeded')
                     h=hashlib.sha256()
                     with open(path,'rb') as f:
                         for chunk in iter(lambda:f.read(65536),b''): h.update(chunk)
                     result[rel]=h.digest()
-                elif allowed(rel,fixtures): result[rel]=b'directory'
+                else:
+                    directory_count+=1
+                    if directory_count>MAX_CREATED_DIRS: raise ValueError('Final tree directory limit exceeded')
+                    if allowed(rel,fixtures): result[rel]=b'directory'
         return result
     before,after=inventory(baseline),inventory(workspace)
     for rel in before.keys()|after.keys():
