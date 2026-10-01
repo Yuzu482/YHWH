@@ -100,6 +100,36 @@ class SnapshotTests(unittest.TestCase):
             (b/'parent'/'samples'/'input').write_text('sample');(b/'parent').rename(b/'renamed')
             with self.assertRaises(ValueError):mod.verify_tree(str(a),str(b),manifest['write'],fixtures)
             self.assertEqual((a/'parent'/'samples'/'input').read_text(),'sample')
+    def test_fixture_tree_filters_credentials_and_rejects_unsafe_descendants(self):
+        with tempfile.TemporaryDirectory() as t:
+            src=pathlib.Path(t,'src');src.mkdir();samples=src/'samples';samples.mkdir();(samples/'input').write_text('benign')
+            for secret in ['.env','credentials.json','private.key']:(samples/secret).write_text('PRIVATE_SAMPLE')
+            dst=pathlib.Path(t,'dst');dst.mkdir();manifest={'read':[],'write':[],'fixtures':['samples/**']}
+            mod.snapshot(str(src),str(dst),manifest)
+            self.assertEqual([p.name for p in (dst/'samples').iterdir()],['input'])
+            for kind in ['symlink','hardlink','fifo']:
+                bad=samples/'unsafe'
+                if kind=='symlink':bad.symlink_to(samples/'input')
+                elif kind=='hardlink':os.link(samples/'input',bad)
+                else:os.mkfifo(bad)
+                target=pathlib.Path(t,kind);target.mkdir()
+                try:
+                    with self.assertRaises(ValueError):mod.snapshot(str(src),str(target),manifest)
+                finally:bad.unlink()
+    def test_fixture_grammar_matches_real_node_shared_vectors(self):
+        encoded=os.environ.get('YHWH_FIXTURE_VECTORS_B64')
+        if not encoded:self.skipTest('Host Node-produced grammar vectors required')
+        for item in json.loads(base64.b64decode(encoded).decode('utf-8')):
+            try:mod.fixture_scopes({'write':item['writes'],'fixtures':item['values']});accepted=True
+            except ValueError:accepted=False
+            self.assertEqual(accepted,item['accepted'],repr(item['values']))
+    def test_fixture_grammar_obeys_committed_vectors_and_utf16_bounds(self):
+        with open(pathlib.Path(__file__).with_name('fixture-scope-vectors.json'),encoding='utf-8') as f:vectors=json.load(f)
+        vectors+=[{'values':['😀'*2000],'writes':[],'accepted':True},{'values':['😀'*2001],'writes':[],'accepted':False}]
+        for item in vectors:
+            try:mod.fixture_scopes({'write':item['writes'],'fixtures':item['values']});accepted=True
+            except ValueError:accepted=False
+            self.assertEqual(accepted,item['accepted'],repr(item['values']))
     def test_native_readonly_binds_from_real_node_manifest(self):
         if not shutil.which('bwrap'): self.skipTest('Native bubblewrap unavailable')
         encoded=os.environ.get('YHWH_SCOPE_B64')

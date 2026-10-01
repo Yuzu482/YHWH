@@ -19,7 +19,7 @@ const ALLOWED_MODELS = new Map([
 export function validateFixtureScope(values = [], writes = []) {
   if (!Array.isArray(values) || values.length > 64) throw new Error('fixtureScope must be an array with at most 64 items');
   const fixtures = values.map(value => {
-    if (typeof value !== 'string' || !value || value.length > 4000 || value !== value.trim() || value !== value.normalize('NFC') || /[\\\u0000-\u001f\u007f:]/u.test(value)) throw new Error('Invalid fixtureScope path');
+    if (typeof value !== 'string' || !value || value.length > 4000 || value !== value.trim() || value !== value.normalize('NFC') || /[\\\u0000-\u001f\u007f-\u009f\ufeff:]/u.test(value) || Array.from(value).some(c=>c.codePointAt(0)>=0xd800&&c.codePointAt(0)<=0xdfff)) throw new Error('Invalid fixtureScope path');
     const name = value.endsWith('/**') ? value.slice(0, -3) : value;
     const parts = name.split('/');
     if (parts.length > 64 || parts.some(p => !p || p === '.' || p === '..' || /[*?\[\]{}~]/u.test(p) || /[. ]$/.test(p) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p))) throw new Error('Invalid fixtureScope path');

@@ -26,8 +26,8 @@ def fixture_scopes(manifest):
     if not isinstance(values,list) or len(values)>64: raise ValueError('Invalid fixture scope list')
     fixtures=[]
     for value in values:
-        if not isinstance(value,str) or not value or len(value)>4000 or value!=value.strip() or value!=unicodedata.normalize('NFC',value): raise ValueError('Invalid fixture path')
-        if any(ord(c)<32 or ord(c)==127 for c in value) or '\\' in value or ':' in value: raise ValueError('Invalid fixture path')
+        if not isinstance(value,str) or not value or len(value.encode('utf-16-le','surrogatepass'))//2>4000 or value!=value.strip() or value!=unicodedata.normalize('NFC',value): raise ValueError('Invalid fixture path')
+        if any(ord(c)<32 or 127<=ord(c)<=159 or ord(c)==0xfeff or 0xd800<=ord(c)<=0xdfff for c in value) or '\\' in value or ':' in value: raise ValueError('Invalid fixture path')
         name=value[:-3] if value.endswith('/**') else value
         parts=name.split('/')
         if len(parts)>64 or any(not p or p in ('.','..') or re.search(r'[*?\[\]{}~]',p) or p.endswith(('.',' ')) or re.match(r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)',p,re.I) for p in parts): raise ValueError('Invalid fixture path')
