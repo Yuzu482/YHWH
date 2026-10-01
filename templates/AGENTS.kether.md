@@ -21,6 +21,7 @@ Resolve these links relative to the installed AGENTS.md (in the Codex home direc
 
 | Trigger | Reference |
 | --- | --- |
+| Subprocesses, CLI arguments, exit codes, filesystem I/O, ports or platform behavior | [Runtime code contracts](agent-references/runtime-code.md) |
 | Any workspace-write task; tier selection or reclassification | [Task tiers](agent-references/task-tiers.md) |
 | T1/T2 implementation, worker failure or substantive patch integration | [Coordinator-only primary](agent-references/coordinator-only.md) |
 | T2 work, material scope changes, repair or acceptance disputes | [Kether governance](../.agents/skills/kether-governance/SKILL.md) |
