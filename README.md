@@ -26,7 +26,7 @@ YHWH 是面向 Windows 11 + WSL2 的便携式 Kether 治理规则与 Pi 执行�
 
 新增可选特性：Codex、Claude Code、Antigravity 官方 CLI 无头主代理入口，包含版本锁定、统一结果、运行预算和发布/本地文件比对。现有 Pi 路由保持不变，默认不启用客户端。见 [使用说明](docs/headless-cli.md#简体中文)。
 
-v0.14.0 发布：Luna 支持可切换的严格/关闭执行模式及角色预设，并提供确定性结果提交与类型化交接，便于协作完成小任务；新增 Electron 网关控制台源码，并修复 Windows 安装程序问题。已安装的服务仍需升级；此版本不作量化提速声明。根据用户此前的例外，公开发布门禁仍因固定版 pi-lsp-extension 1.3.0 缺少完整通知且其适用范围未获确认而受阻。详见[发布说明](docs/release-notes-0.14.0.md)。
+v0.15.0 汇总运行时质量与宿主验收改进：只读 fixture、新文件父目录、任务预检警告、hostEvidence 修复、原字节补丁策略、分级治理及 Claude CLI reviewer。发布包由 Git 提交生成插件版本；本地新版已通过零漂移和两条路线探针，此版本不作量化提速声明。沿用此前授权的发布例外，不捆绑第三方依赖，并保留固定版 pi-lsp-extension 1.3.0 的许可缺口说明。详见[发布说明](docs/release-notes-0.15.0.md)。
 
 开发背景、架构演进、关键决策及历史验证边界见 [架构开发历史](docs/architecture-history.md)；对应的脱敏记录见 [历史证据索引](docs/history-evidence.json)。
 
@@ -72,10 +72,10 @@ v0.14.0 发布：Luna 支持可切换的严格/关闭执行模式及角色预设
 
 ### 一键安装（Windows 11 x64）
 
-构建后的 `YHWH-OneClick-0.14.0.zip` 包含自包含脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
+构建后的 `YHWH-OneClick-0.15.0.zip` 包含自包含脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1
 ```
 
 默认导出通用 MCP 接入配置，不修改 Codex 全局设置。用 `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"` 选择宿主；包含 `codex` 时才执行原有 Codex 集成。接入文件还需按宿主提示导入，并加载主代理规则；已有配置不会被导出器覆盖。
@@ -90,14 +90,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps
 
 ```powershell
 # 只读预览，不下载、不改宿主
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -PlanOnly
 # 固定目录，免交互安装（WSL 必须已经就绪；账号登录另行完成）
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
 # 仅校验并解包，目标必须是尚不存在的绝对路径
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-维护者运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/` 同时生成便携 ZIP、自包含 PS1、SHA256 和双击安装包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.14.0.ps1`。
+维护者运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/` 同时生成便携 ZIP、自包含 PS1、SHA256 和双击安装包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.15.0.ps1`。
 
 本版本已做脚本和包级验证，尚未在全新 Windows 虚拟机完成联网全量安装。Windows 与 WSL 的 Pi 使用同一依赖锁文件，但 Ubuntu 软件源、WSL 系统组件和 .NET 安装脚本仍是外部可变依赖；这不是完全离线或逐字节可复现的系统镜像。
 
@@ -183,13 +183,15 @@ LSP 禁止加载项目 `.pi-lsp.json` 和自动发现 Lombok Java agent。工具
 
 YHWH 自有代码、文档与配置采用 [Apache-2.0](LICENSE)，版权说明见 [NOTICE](NOTICE)。第三方组件保留原许可证。[第三方清单](THIRD_PARTY.md)与 [Claude Code 可行性](docs/claude-code-feasibility.md)。
 
-自 0.6.0 起，reviewer 使用用户自备 API key，通过 Pi 原生 Anthropic API 调用；已移除订阅令牌读取、续期和 Claude Code 桥接。服务条款仍适用，实际 API 访问尚未验证。
+默认 reviewer 现在通过官方 Claude Code CLI 调用 Claude Sonnet，使用用户在官方客户端的登录，不读取或迁移订阅令牌。也可显式选择用户自备 API key 的 Anthropic API 路线；两者不自动回退。服务条款仍适用。
 
-## Claude reviewer API 配置（0.6）
+## Claude reviewer 配置
 
-安装后运行 `Configure-Claude-API.cmd`，或在源码目录运行 `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`。输入为隐藏输入，文件仅允许当前 Windows 用户访问；凭据保存在 `~/.local/state/pi-kether/anthropic-api-key.json`。不读取 Claude 订阅登录，不接受环境变量或自定义 API 地址作为回退。`check_claude_auth` 仅检查本地配置，实际密钥有效性、余额与模型可用性需另行授权心跳验证。Claude Code 主客户端仍由用户在官方客户端自行登录。
+默认 `claude-code-cli` 路线由用户先在官方 Claude Code 中登录；使用 `probe_model` 检查 CLI 可用性，不能用 `check_claude_auth` 判断这条路线。Reviewer 在宿主执行，不进入 worker 的 WSL 沙箱。
 
-旧版用户应等待任务结束后升级并重新配置 API key；旧 `pi-claude-code-provider` 路由和 `renew_claude_auth` 工具不再接受。本轮未更新当前运行服务。公开发布检查使用 `Build-Release.ps1 -PublicRelease`，目前会因 LSP 上游版权通知待确认而拒绝；普通构建仅生成本地预览。
+可选 API 路线：安装后运行 `Configure-Claude-API.cmd`，或在源码目录运行 `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`。输入隐藏，凭据按 Windows DPAPI CurrentUser 加密，保存在 `~/.local/state/pi-kether/anthropic-api-key.json`。`check_claude_auth` 只检查这份 API 配置，不证明实际余额或模型访问；实际验证需另行授权探针。
+
+旧版用户应等待任务结束后升级，再配置所选路线。旧 `pi-claude-code-provider` 路由和 `renew_claude_auth` 工具不再接受。`Build-Release.ps1 -PublicRelease` 仍因固定 LSP 版本的上游通知待确认而拒绝；本次公开包沿用已授权且明确披露的例外，不代表许可门禁通过，也不捆绑第三方依赖。
 
 ### Go 与 Rust 单文件适配
 

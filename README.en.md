@@ -28,7 +28,7 @@ New optional feature: official Codex, Claude Code and Antigravity headless prima
 
 **0.11 persistent code relationships.** `.yhwh/code-graph/index.json` initially covers files, classes, functions and syntax relationships in JS/TS (including JSX/TSX) and Python. Read-only `code_graph` searches relationships and reverse relative-import impact; the host CLI incrementally refreshes by source hash and offers explicit bounded watching. Unresolved calls, syntax errors and stale state are reported; this is not a complete semantic call graph. See [usage, Git management and limits](docs/code-graph.md#english). The maintainer's local Pi has been updated and verified through actual MCP and incremental refresh checks; this feature shipped in v0.11.0.
 
-v0.14.0 is released: Luna offers switchable strict/off enforcement and role presets, with deterministic result submission and typed handoffs for cooperative small tasks. This release also includes Electron gateway console source and Windows installer fixes. Already-installed services still need upgrading; no quantified speed claim is made. Under the user's earlier exception, the public release gate remains blocked because pinned pi-lsp-extension 1.3.0 lacks the complete notice and its applicability remains unconfirmed. See the [release notes](docs/release-notes-0.14.0.md).
+v0.15.0 consolidates runtime quality and host verification: read-only fixtures, scoped new-file parents, advisory task checks, the hostEvidence fix, raw-byte patch policy, tiered governance and the Claude CLI reviewer. Packaged plugin versions are generated from Git commits. The local runtime passed zero-drift checks and both route probes; no quantified speed claim is made. This distribution retains the previously authorized exception, bundles no third-party dependencies and discloses the pinned pi-lsp-extension 1.3.0 license gap. See the [release notes](docs/release-notes-0.15.0.md).
 
 See the [architecture development history (Chinese)](docs/architecture-history.md) for the background, evolution, key decisions and historical verification limits. The [history evidence index (Chinese)](docs/history-evidence.json) contains the corresponding sanitized records.
 
@@ -72,10 +72,10 @@ It provides:
 
 ### One-click installation (Windows 11 x64)
 
-The generated `YHWH-OneClick-0.14.0.zip` contains a self-contained script, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
+The generated `YHWH-OneClick-0.15.0.zip` contains a self-contained script, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1
 ```
 
 The default exports generic MCP configuration without changing Codex global settings. Select hosts with `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"`; including `codex` enables the original Codex integration. Import the generated connection profile and load the primary instructions in each host. The exporter never overwrites existing host configuration.
@@ -90,14 +90,14 @@ An existing Pi installation is protected by default. Once tasks have ended and i
 
 ```powershell
 # Read-only preview: no downloads or host changes
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -PlanOnly
 # Unattended installation with a fixed workspace (WSL must be ready; login is separate)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
 # Verify and extract only; destination must be a new absolute directory
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.14.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` to generate the portable ZIP, self-contained PS1, SHA256 file and double-click bundle under `release/`. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.14.0.ps1`.
+Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` to generate the portable ZIP, self-contained PS1, SHA256 file and double-click bundle under `release/`. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.15.0.ps1`.
 
 This version has script and package validation, but a full online installation in a fresh Windows VM has not been performed. Windows and WSL Pi use the same dependency lockfile; Ubuntu repositories, WSL system components and the .NET installer remain mutable external dependencies. This is not a completely offline or byte-for-byte reproducible system image.
 
@@ -183,13 +183,15 @@ Managed-file backups are saved under `~/.local/state/pi-kether/installer-backups
 
 Original YHWH code, documentation and configuration are licensed under [Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party components retain their own licenses. [Third-party inventory](THIRD_PARTY.en.md) and [Claude Code feasibility](docs/claude-code-feasibility.en.md).
 
-Since 0.6.0 the reviewer uses the native Anthropic API with a user-owned API key. Subscription credential reading/renewal and the Claude Code bridge are removed. Service terms still apply; live API access has not been verified.
+The default reviewer now invokes Claude Sonnet through the official Claude Code CLI and the user's official-client login, without reading or migrating subscription tokens. A user-owned Anthropic API key is an explicit alternative; neither route automatically falls back to the other. Service terms still apply.
 
-## Claude reviewer API setup (0.6)
+## Claude reviewer setup
 
-After installation run `Configure-Claude-API.cmd`, or from source run `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`. Input is hidden; the file allows only the current Windows user. Credentials are stored in `~/.local/state/pi-kether/anthropic-api-key.json`. Claude subscription login is never read; environment keys and custom endpoints are not fallback sources. `check_claude_auth` checks local configuration only. Actual key validity, balance and model availability require a separately authorized heartbeat. Claude Code primary clients still use their own official user login.
+For the default `claude-code-cli` route, sign in using official Claude Code first. Use `probe_model` to check CLI availability; `check_claude_auth` does not check this route. Reviewers run on the host, outside the worker WSL sandbox.
 
-Existing users should wait for tasks to finish before upgrading and configure an API key. The old `pi-claude-code-provider` route and `renew_claude_auth` tool are no longer accepted. This change did not update the running service. `Build-Release.ps1 -PublicRelease` currently rejects publication because the LSP upstream copyright notice awaits confirmation; ordinary builds create local previews only.
+Optional API route: after installation run `Configure-Claude-API.cmd`, or from source run `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`. Input is hidden; credentials are encrypted with Windows DPAPI CurrentUser and saved in `~/.local/state/pi-kether/anthropic-api-key.json`. `check_claude_auth` checks only this API configuration, not actual balance or model access; live verification requires a separately authorized probe.
+
+Existing users should wait for tasks to finish before upgrading and configure their selected route. The old `pi-claude-code-provider` route and `renew_claude_auth` tool are no longer accepted. `Build-Release.ps1 -PublicRelease` still rejects the pending upstream notice for the pinned LSP version. This public package uses the explicitly disclosed, previously authorized exception; it does not claim that the license gate passed and bundles no third-party dependencies.
 
 ### Go and Rust single-file support
 
