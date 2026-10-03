@@ -15,15 +15,17 @@
   "sources": [
     {
       "path": "Build-Release.ps1",
-      "sha256": "a03f6783e76fb32b8bece0d63c9bb78ad7dd727faab31ed966880a3fad86f510"
+      "sha256": "a1f850ffa3c5a2ee9b794c1bb1e2cb297555ac9829b97ef96e5deb578f7b8cfd"
     }
   ],
-  "sourceCommit": "ebe7a3a168f3c1af543b4aff2b1edf5d8b4df219",
-  "reviewedAt": "2026-09-20"
+  "sourceCommit": "b914f228dfc1726d337e7cbe8dca0be08eac9e25",
+  "reviewedAt": "2026-10-04"
 }
 ---
-发布构建执行安装自检、配置和凭据设置验证、无头 CLI 隔离复制与漂移检查、工作流目录一致性、许可证清单检查，以及未跳过时的 Node 测试和堆内存回归。真实模型、全新机器安装、编辑器写入、重启持久性和完整项目构建需要各自独立证据，不能由源码或协议测试推断。
+发布构建调用安装、宿主规则同步、配置与凭据设置、无头 CLI 隔离复制与漂移、工作流目录、版本及许可证验证；未设置 SkipTests 时执行 Node 测试和堆内存回归。真实模型、全新机器安装、编辑器写入、重启持久性和完整项目构建均需要各自的实测证据，不能由源码或协议测试推断。
 
-构建脚本按清单复制目录，排除本机状态、凭据、依赖目录及测试输出。YHWH 项目自身 .yhwh/memory 不在安装包顶层允许清单中；工具和规则可随 payload/templates 分发。既有发布附件不要在未明确授权时覆盖。构建、部署、Git 推送和发布不是同一个动作。
+打包从 Git 索引枚举已跟踪路径，再应用顶层允许清单及本机状态、凭据、依赖目录和测试输出排除规则；拒绝符号链接或 junction。未跟踪的新增实现不会自动进入发布包。YHWH 自身 .yhwh/memory 不在顶层允许清单内，工具和规则可随 payload/templates 分发。sourceCommit 记录 HEAD；脏工作文件指纹或本地升级成功均不能证明远端发布包包含同样内容。
 
-Release builds run installer/configuration/credential setup checks, isolated headless CLI copy and drift checks, workflow catalog consistency, license inventory validation and, unless skipped, Node tests plus heap regression. Model access, fresh-machine installation, editor writes, reboot persistence and full-project builds need separate evidence. Packaging follows an allowlist and excludes local state, credentials, dependency trees and test outputs. This repository's .yhwh/memory is outside the package's top-level allowlist; tooling and policy travel through payload/templates. Do not overwrite existing release assets without explicit authorization. Building, deploying, Git pushing and publishing are distinct actions.
+Release builds invoke installer, host policy synchronization, configuration/credential setup, isolated headless copy/drift, workflow catalog, version and licensing checks. Node tests and heap regression run unless SkipTests is selected. Model access, fresh-machine installation, editor writes, reboot persistence and complete project builds each require independent observed evidence.
+
+Packaging enumerates Git-index tracked paths, applies the top-level allowlist and local-state/credential/dependency/test-output exclusions, and rejects symlinks or junctions. Untracked implementation files are not automatically packaged. Project .yhwh/memory is outside the top-level allowlist; tooling and rules travel through payload/templates. Dirty-file fingerprints and a local upgrade do not prove equivalent remote release content. Building, deploying, Git pushing and publishing are separate authorized actions; existing release assets are not overwritten without authorization.
