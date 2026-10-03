@@ -11,6 +11,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {registerHostWorkflow,workflowInstructions,workflowTopic} from './host-workflow.mjs';
 import {createWorkflowReceipts} from './workflow-receipts.mjs';
 import {projectMemory,PROJECT_MEMORY_POLICY} from './project-memory.mjs';
+import {addGitDiffTaskContext} from './git-diff-task-context.mjs';
 import {codeGraph,CODE_GRAPH_POLICY} from './code-graph.mjs';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import * as z from 'zod/v4';
@@ -404,7 +405,9 @@ export function createGatewayRuntime(options) {
         try {
           const dispatchOptions = { editorBroker, upstreamResults:collectHandoffResults(invocation.task,ledger), resultFormat: operation === 'probe_model' ? 'plain' : 'json', onProgress:value=>{phaseTimings=value;lifecycle?.onProgress?.(value);} };
           if (operation === 'probe_model') Object.assign(dispatchOptions, { probe: true, probeToken: trustedProbeToken });
-          const result=await modules.get('dispatch')({ ...request, gatewayInstanceId, gatewayWindowsPid: process.pid }, runSignal, invocation.task, dispatchOptions);
+          const dispatchTask=await addGitDiffTaskContext({cwd,task:invocation.task,access:input.access,operation,roots,signal:runSignal});
+          runSignal.throwIfAborted();
+          const result=await modules.get('dispatch')({ ...request, gatewayInstanceId, gatewayWindowsPid: process.pid }, runSignal, dispatchTask, dispatchOptions);
           if(editorBroker){await editorBroker.close();result.editorExecution=editorBroker.report();if(!result.editorExecution.ok){result.ok=false;result.failure='EDITOR_OPERATION_FAILED_OR_UNCERTAIN';}}
           return result;
         } finally {await editorBroker?.close();}
