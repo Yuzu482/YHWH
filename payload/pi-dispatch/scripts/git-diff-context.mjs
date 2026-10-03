@@ -33,7 +33,7 @@ export async function collectGitDiffContext({cwd,roots=[],readScope=[],writeScop
   if(typeof cwd!=='string'||!isAbsolute(cwd))throw new Error();
   const raw=(await git({root:cwd},['rev-parse','--show-toplevel'])).trim();if(!raw)throw new Error();
   root=await inspect(()=>realpath(raw),signal);actualCwd=await inspect(()=>realpath(cwd),signal);
-  if(!within(root,actualCwd)||!roots.some(value=>within(resolve(value),root)))throw new Error();
+  if(!within(root,actualCwd))throw new Error();let approved=false;for(const value of roots){try{const physical=await inspect(()=>realpath(resolve(value)),signal);if(within(physical,root)){approved=true;break;}}catch(error){throwIfAborted(signal);}}if(!approved)throw new Error();
   read=scopes(readScope);write=scopes(writeScope);
   head=(await git({root},['rev-parse','--verify','HEAD'],[128])).trim();
   if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(head))throw new Error('unborn');
