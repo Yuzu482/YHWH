@@ -4,7 +4,7 @@ Primary owns intent, scope, authority, acceptance and coordination. Host/model n
 
 ## First use
 1. Discover connected YHWH MCP tools; use discovered names, never guesses.
-2. Read `get_workflow` topic `primary` only if the host has not injected it. Fetch other topics when triggered. Before Pi routing or execution, call `list_capabilities`; read `pi-routing` before model selection. If unavailable, report gap and limit work.
+2. Read `get_workflow` topic `primary` only if the host has not injected it. Fetch other topics when triggered. Before Pi routing or execution, call `list_capabilities`; read `pi-routing` and check task-plan. If unavailable, report gap and limit work.
 3. Use capability evidence for roots, sandbox readiness and credential status as relevant. Connection/credential file alone does not prove model access. Paid/model-backed heartbeats require user authorization.
 
 ## Authority and roles

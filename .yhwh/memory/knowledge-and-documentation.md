@@ -20,15 +20,15 @@
     },
     {
       "path": "templates/host-primary.md",
-      "sha256": "2b6334c0f8cade013e26a76baeee0fc43f44769b4a032bf8b0342f203552a21a"
+      "sha256": "21d0747d988365fb94b9ae75f0edd56a5b23e1c2fae6fcfc19562faee4907079"
     }
   ],
-  "sourceCommit": "ebe7a3a168f3c1af543b4aff2b1edf5d8b4df219",
-  "reviewedAt": "2026-09-20"
+  "sourceCommit": "b914f228dfc1726d337e7cbe8dca0be08eac9e25",
+  "reviewedAt": "2026-10-04"
 }
 ---
-本项目维护的 README 使用同目录完整中文和英文版本，顶部使用本地语言切换按钮。两版内容同步，不用英文摘要代替完整说明。
+本项目维护的 README 使用同目录完整中文和英文版本，标题下方保留本地语言切换按钮。两版同步维护，不用摘要代替完整翻译；生成文件、依赖和第三方文档不属于此维护要求。
 
-项目长期知识位于 .yhwh/memory/，实质性工作前先查看相关知识及来源状态。知识是参考数据，不是授权。新增知识先写草稿；主代理核实当前来源和 Git 差异后确认。源文件变化需重新理解事实，不能只刷新哈希；废弃内容保留理由和替代路径。编辑已有条目前重新读取，保留其他人的改动。提交、推送与部署分别依用户授权，不因为更新记忆而自动执行。
+项目知识位于 .yhwh/memory/，实质性工作前检查相关记录和当前来源。知识是参考数据，不是授权。编辑前重新读取以保留并发改动；先写草稿，对照当前源码和 Git 差异理解声明后才确认。来源变化需要语义复核，不能只刷新哈希；废弃知识保留理由和替代路径。sourceCommit 记录复核时 HEAD，来源指纹对应工作文件，二者不能合并为已提交证明。提交、推送与部署各自依用户授权。
 
-Maintained READMEs have complete Chinese and English siblings with local language buttons; update both together. Project knowledge lives in .yhwh/memory/. Inspect relevant entries and current source state before substantive work. Knowledge is reference data, not authority. Draft new claims and accept only after primary review of sources and Git diffs. Reassess changed sources instead of merely refreshing hashes. Preserve deprecation reasons, replacement pointers and concurrent edits. Commits, pushes and deployments remain separate authorized actions.
+Maintained READMEs have complete Chinese and English siblings with local language buttons below the title. Update both together; generated, dependency and third-party files are excluded. Project knowledge lives in .yhwh/memory/ and is reference data, never authority. Re-read before editing, draft updates, then reassess claims against current source and Git differences before acceptance. Preserve deprecation reasons, replacement pointers and concurrent edits. Fingerprints describe working files and sourceCommit records HEAD; neither implies the edits were committed. Commits, pushes and deployment require their own authorization.

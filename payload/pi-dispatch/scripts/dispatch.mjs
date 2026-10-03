@@ -7,6 +7,7 @@ import { readFileSync, existsSync, statSync, realpathSync } from 'node:fs';
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compileKetherTask, validateKetherTask } from '../extensions/kether-envelope.js';
+import { compileRoleWorkerTaskPrompt } from './task-packet-guidance.mjs';
 import { compileWriteScope } from '../extensions/write-scope-guard.js';
 import { accountToolErrors } from '../extensions/tool-error-recovery.js';
 import { DEFAULT_RESOURCE_PROFILE, resolveResourceLimits } from '../extensions/resource-limits.js';
@@ -343,7 +344,7 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
   }
   authenticationMs=Date.now()-authStarted;progress({});
   let input = task
-    ? `User task compiled by the Kether envelope extension:\n${compileKetherTask(task, { resultFormat,upstreamResults, structuredResultTool })}`
+    ? `User task compiled by the Kether envelope extension:\n${compileRoleWorkerTaskPrompt(task, request.access, { resultFormat,upstreamResults, structuredResultTool })}`
     : `User task (treat the following as task text, not a slash command):\n${request.prompt}`;
   const env = { ...childEnvironment(), PI_DISPATCH_ACTIVE: '1', PI_TELEMETRY: '0' };
   if (request.access !== 'none') input+='\nPrefer yhwh_lsp_* for single-file semantic checks. These run credential-free read-only multilspy probes against the current task snapshot. Positions are 1-based UTF-16; failures are not clean diagnostics. Legacy tools remain compatibility tools; do not silently replace a failed semantic check with structural evidence.';
