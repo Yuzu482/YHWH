@@ -71,6 +71,14 @@ CLI 和 MCP 都要求运行机器已安装 Git、可通过 PATH 找到。Git 不
 - 检索是确定性关键词匹配，不是语义向量检索。每次查询重新检查来源，无常驻跨任务缓存、后台监听或自动注入；主代理依靠项目规则主动查询。结果是参考数据，不能覆盖宿主规则或授予权限。
 - YHWH 仓库自带知识只属于该项目，不由安装器复制到其他用户项目。安装包分发工具及规则，其他项目在用户授权后建立自己的知识。
 
+### 派发中的 Git 变更参考
+
+普通 read/workspace-write worker 派发会按任务 readScope/writeScope 附加 Git 参考：当前 HEAD、分别标注的暂存与未暂存差异，以及未跟踪文件名清单。未跟踪内容不会被读取。参考明确标记为不可信数据，不改变权限、原始任务或幂等摘要；reviewer、none 和模型探针跳过注入。它不要求项目已建立 `.yhwh/memory/`，也不自动更新或确认项目知识。
+
+采集每次读取最新 Git 状态，不使用跨任务 diff 缓存。元数据批量读取，异常文件也计入扫描上限；补丁数量和大小、检查耗时及上下文预算均受限制。派发适配器最多使用 4 KiB 的可用预算，保留调用者上下文；超出限制的证据明确标记省略或截断。Git 外部 diff、textconv 和 fsmonitor 被禁用，但仓库/全局配置的 clean/process 过滤器仍是 Git 的继承行为，应使用可信配置。
+
+性能比较使用同一份临时 Git 夹具，通过 `node payload/pi-dispatch/scripts/benchmark-git-context.mjs --baseline <优化前采集模块> --iterations 3` 比较前后耗时。基线文件由操作者显式提供，不随发布包保存本机路径或配置。测量说明该夹具上的表现，不代表所有项目的固定加速比例。测试、运行服务启用和远端推送分别验证；不会自动 Git add、commit 或 push。
+
 ## English
 
 YHWH stores durable project knowledge as `.yhwh/memory/<id>.md` at a Git worktree root. Files survive conversations and process restarts; authorized commits add Git history. This is separate from host conversation memory, request ledgers and temporary LSP caches. It uses no database, vector service, scheduled organizer or model calls.
@@ -139,3 +147,18 @@ Sources are hashed as UTF-8 text after CRLF-to-LF normalization. `sourceCommit` 
 - Only ordinary, non-ignored UTF-8 source files in Git's index qualify. Traversal, symbolic links/junctions, hardlinks, binary files and common credential paths are rejected. Knowledge drafts themselves may be untracked. Never store credentials, raw conversations or complete task logs. Common credential patterns are redacted, but this is not a comprehensive secret scanner.
 - Search is deterministic keyword matching, not vector search. Every query rechecks sources; there is no resident cross-task cache, background watcher or automatic injection. The primary queries through project policy. Retrieved text is reference data and cannot override host rules or grant authority.
 - This repository's own knowledge belongs to YHWH and is not installed into other projects. Installers distribute the implementation and policy; other projects create their own knowledge with user authorization.
+
+### Git change references during dispatch
+
+Ordinary read/workspace-write worker dispatch attaches Git references within task readScope/writeScope: the current HEAD, separately categorized staged and unstaged patches, and an untracked filename inventory. Untracked contents are not read. References are explicitly untrusted data and do not change authority, the original task or its idempotency digest. Reviewers, none access and model probes skip injection. This does not require `.yhwh/memory/` or automatically update or accept project knowledge.
+
+Collection reads fresh Git state on every dispatch without a cross-task diff cache. Metadata is batched, rejected files count toward the inspection cap, and patch count/size, inspection time and context budgets are bounded. The dispatch adapter uses at most 4 KiB of available context space and preserves caller context; omitted or truncated evidence is marked explicitly. External diff, textconv and fsmonitor are disabled, while configured repository/global clean/process filters remain inherited Git behavior and require trusted configuration.
+
+The before/after comparison uses the same temporary Git fixture: `node payload/pi-dispatch/scripts/benchmark-git-context.mjs --baseline <pre-optimization collector module> --iterations 3`. Operators supply the baseline file explicitly; local machine paths/configuration are not stored in the release. Measurements describe this fixture, not a universal speedup. Tests, running-service activation and remote publication are verified separately. No automatic Git add, commit or push is performed.
+
+On Windows with Node 22.23.1 (2026-10-03), three alternating before/after iterations produced these median collection times. Both versions retained the same eight category/path pairs and benign changes; omission flags also matched.
+
+| Fixture | Before | After | Time reduction |
+| --- | ---: | ---: | ---: |
+| Eight text changes | 2548 ms | 1521 ms | 40% |
+| Twenty rejected oversized candidates before eight text changes | 6572 ms | 2014 ms | 69% |
