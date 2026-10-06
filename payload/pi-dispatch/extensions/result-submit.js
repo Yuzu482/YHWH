@@ -5,6 +5,7 @@ const MAX_RESULT_BYTES = 512 * 1024;
 const MAX_DEPTH = 12;
 const MAX_NODES = 4096;
 const MAX_STRING_LENGTH = 256 * 1024;
+import { validateRoleSubmission, canonicalRole } from './role-contract.js';
 
 function canonicalJson(root) {
   if (!root || typeof root !== 'object' || Array.isArray(root)) throw new Error('RESULT_PAYLOAD_NOT_OBJECT');
@@ -58,6 +59,7 @@ function canonicalJson(root) {
 
 export default function resultSubmit(pi) {
   let submitted = false;
+  pi.registerFlag?.('yhwh-result-role', { description: 'Trusted Kether result role', type: 'string' });
   pi.on?.('agent_start', () => { submitted = false; });
   pi.registerTool({
     name: 'yhwh_submit_result',
@@ -75,6 +77,14 @@ export default function resultSubmit(pi) {
         throw new Error('RESULT_ARGUMENT_INVALID');
       }
       const canonicalText = RESULT_PREFIX + canonicalJson(args.payload);
+      const role = pi.getFlag?.('yhwh-result-role');
+      if (role !== undefined) {
+        const validation = validateRoleSubmission(args.payload, canonicalRole(role));
+        if (!validation.ok) return {
+          content: [{ type: 'text', text: `Result rejected (${validation.code}): ${validation.message}` }],
+          details: { type: 'kether_result_rejection', code: 'RESULT_ROLE_SCHEMA_INVALID' },
+        };
+      }
       submitted = true;
       return {
         content: [{ type: 'text', text: canonicalText }],

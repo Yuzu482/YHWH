@@ -4,10 +4,20 @@ import {createHash} from 'node:crypto';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {roleResultSchema,validateRoleResult,requireRoleFields,resultDigest} from '../extensions/role-contract.js';
+import {roleResultSchema,validateRoleResult,validateRoleSubmission,requireRoleFields,resultDigest} from '../extensions/role-contract.js';
 import {prepareHandoff,completedContract,validateHandoff,collectHandoffResults,workspaceDigest} from '../extensions/stage-handoff.js';
-import {createRequestLedger} from '../extensions/request-ledger.js';
+import {createRequestLedger,requestDigest} from '../extensions/request-ledger.js';
+import {validateKetherTask} from '../extensions/kether-envelope.js';
 import {roleValue,handoff,ref} from './contract-fixtures.mjs';
+
+test('legacy contract-2 request and result digests remain stable without typed metadata',()=>{
+  const raw={contractVersion:2,role:'Chesed',objective:'Legacy digest fixture',acceptance:['host check'],readScope:['fixture.js'],writeScope:['fixture.js']};
+  const task=validateKetherTask(raw);
+  const input={requestId:'golden-1',parentRunId:'golden-parent',cwd:'C:/fixture',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',thinking:'medium',task};
+  const value={status:'completed',result:'Legacy digest fixture',evidence:['Observed fixture'],changedFiles:[],assumptions:[],uncertainty:[],errors:[],nextAction:'Return to primary',deliverable:{summary:'Processed fixture',changes:[],checks:[{name:'fixture check',outcome:'passed',evidence:'Observed fixture'}]}};
+  assert.equal(requestDigest('dispatch_subagent',input),'d286592e256bec9f7449ba7c98bb95524037b483066d405288e3cc2d08cacc4d');
+  assert.equal(resultDigest(value),'1541bf73a82f8f2f3ee6e27cb401b676db6c13416228211dd61532e1c08584fa');
+});
 
 test('all eight roles have distinct strict deliverables; field stripping and wrong types fail',()=>{
   for (const role of ['Yesod','Binah','Hod','Malkuth','Chochmah','Chesed','Netzach','Geburah']) {
@@ -19,11 +29,40 @@ test('all eight roles have distinct strict deliverables; field stripping and wro
   }
 });
 
+test('Geburah finding blocking marker is optional but strictly boolean and closed-shape',()=>{
+  const base=roleValue('Geburah');
+  base.deliverable.findings=[{severity:'low',description:'Fixture finding',evidence:'Observed'}];
+  const finding=base.deliverable.findings[0];
+  assert.equal(validateRoleResult(base,'Geburah').ok,true);
+  finding.blocking=false;assert.equal(validateRoleResult(base,'Geburah').ok,true);
+  finding.blocking='false';assert.equal(validateRoleResult(base,'Geburah').ok,false);
+  finding.blocking=false;finding.extra=true;assert.equal(validateRoleResult(base,'Geburah').ok,false);
+});
+
 test('completed cannot hide errors, missing evidence, unresolved clarification or unrun verification',()=>{
   for (const patch of [{evidence:[]},{errors:['test failed']},{result:''}]) assert.equal(validateRoleResult({...roleValue('Chesed'),...patch},'Chesed').ok,false);
   const b=roleValue('Binah');b.deliverable.clarificationNeeded=true;assert.equal(validateRoleResult(b,'Binah').ok,false);
   const n=roleValue('Netzach');n.deliverable.checks[0].outcome='unverified';assert.equal(validateRoleResult(n,'Netzach').ok,false);
   n.status='unverified';n.deliverable.verdict='unverified';assert.equal(validateRoleResult(n,'Netzach').ok,true);
+});
+
+test('Chesed typed execution limitation is closed-shape and only valid for completed unverified checks without errors',()=>{
+  const make=()=>{const value=roleValue('Chesed');value.deliverable.checks=[{name:'host tests',outcome:'unverified',evidence:'Worker cannot run host checks.',executionLimitation:{executor:'host',reason:'worker-execution-unavailable'}}];return value;};
+  assert.equal(validateRoleResult(make(),'Chesed').ok,true);
+  for(const limitation of [null,{}, {executor:'host'}, {executor:'worker',reason:'worker-execution-unavailable'}, {executor:'host',reason:'other'}, {executor:'host',reason:'worker-execution-unavailable',extra:true}, 'worker-execution-unavailable']){
+    const value=make();value.deliverable.checks[0].executionLimitation=limitation;
+    assert.equal(validateRoleResult(value,'Chesed').ok,false);
+  }
+  for(const mutate of [
+    value=>{value.status='failed';},
+    value=>{value.status='unverified';},
+    value=>{value.errors=['failure'];},
+    value=>{value.deliverable.checks[0].outcome='passed';},
+    value=>{value.deliverable.checks[0].outcome='failed';},
+  ]){const value=make();mutate(value);assert.equal(validateRoleResult(value,'Chesed').ok,false);}
+  const netzach=roleValue('Netzach');netzach.deliverable.checks[0].executionLimitation=make().deliverable.checks[0].executionLimitation;
+  assert.equal(validateRoleResult(netzach,'Netzach').ok,false);
+  assert.equal(validateRoleResult(roleValue('Chesed'),'Chesed').ok,true);
 });
 
 test('Netzach hostEvidence requires bounded typed references and trusted synchronous resolution',()=>{
@@ -35,6 +74,35 @@ test('Netzach hostEvidence requires bounded typed references and trusted synchro
   for(const ref of malformed){const n=make();n.deliverable.checks[0].hostEvidence=ref;assert.equal(validateRoleResult(n,'Netzach',{hostEvidenceResolver:resolve}).ok,false);}
   const other=roleValue('Chesed');other.deliverable.checks=[{...roleValue('Netzach').deliverable.checks[0],hostEvidence:make().deliverable.checks[0].hostEvidence}];
   assert.equal(validateRoleResult(other,'Chesed').ok,false);
+});
+
+test('submission defers only typed host-reference resolution, preserving semantic checks and strict acceptance',()=>{
+  const make=()=>{
+    const value=roleValue('Netzach');
+    value.deliverable.checks[0].evidence='';
+    value.deliverable.checks[0].hostEvidence={requestId:'fixture-host',artifactSha256:'a'.repeat(64),recordSha256:'b'.repeat(64),checkName:'fixture check'};
+    return value;
+  };
+  const value=make(), unchanged=structuredClone(value);
+  assert.deepEqual(validateRoleSubmission(value,'Netzach'),{ok:true,version:2,role:'Netzach',hostEvidencePending:1});
+  assert.deepEqual(value,unchanged);
+  assert.equal(validateRoleResult(value,'Netzach').ok,false);
+  assert.equal(validateRoleResult(value,'Netzach',{hostEvidenceResolver:()=>({ok:false,code:'HOST_EVIDENCE_UNRESOLVED'})}).ok,false);
+  assert.equal(validateRoleResult(value,'Netzach',{hostEvidenceResolver:()=>({ok:true})}).ok,true);
+  for(const mutate of [
+    v=>{v.errors=['failed'];}, v=>{v.evidence=[];}, v=>{v.result='';},
+    v=>{v.deliverable.verdict='unverified';}, v=>{v.deliverable.checks[0].outcome='unverified';},
+    v=>{delete v.deliverable.checks[0].hostEvidence;},
+    v=>{v.deliverable.checks[0].hostEvidence.recordSha256='bad';},
+    v=>{v.deliverable.checks[0].hostEvidence.extra=true;},
+    v=>{v.deliverable.checks[0].hostEvidence.requestId='!';},
+  ]) {const invalid=make();mutate(invalid);assert.equal(validateRoleSubmission(invalid,'Netzach').ok,false);}
+  const other=roleValue('Chesed');other.deliverable.checks[0].hostEvidence=make().deliverable.checks[0].hostEvidence;
+  assert.equal(validateRoleSubmission(other,'Chesed').ok,false);
+  for(const role of ['Yesod','Binah','Hod','Malkuth','Chochmah','Chesed','Netzach','Geburah']) {
+    assert.equal(validateRoleSubmission(roleValue(role),role).ok,true,role);
+    assert.equal(validateRoleSubmission({...roleValue(role),errors:['failed']},role).ok,false,role);
+  }
 });
 
 test('handoffs reject skipped stages, wrong roles, duplicate inputs and undeclared dependencies',()=>{

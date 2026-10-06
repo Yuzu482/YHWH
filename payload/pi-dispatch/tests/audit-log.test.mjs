@@ -109,6 +109,45 @@ test('audit usage normalizes token counters and logger persists JSONL', () => {
   }
 });
 
+test('host telemetry is bounded, redacted, and acceptance requires a bound host event', () => {
+  const hash = 'a'.repeat(64);
+  const telemetry = { parentRunId: 'run-1', workspaceSha256: hash, runAnchorSha256: 'b'.repeat(64), thinking: 'high', declaredTier: 'T1', baseTier: 'T0', tier: 'T1', riskProfile: 'standard', semanticRisks: { publicApiOrProtocol:false, dependencyOrLockfile:false, securityAuthOrCredentials:false, migration:false, irreversibleOrNoRollback:false }, counts: { files:2, addedLines:3, deletedLines:1, estimatedLines:4 }, modelExecution:true, submittedAt:'2026-10-02T12:00:00Z', startedAt:'2026-10-02T12:01:00Z', completedAt:'2026-10-02T12:02:00Z', reviewStage:'post-review', conditionalApproval:false };
+  const record = buildAuditRecord({ operation:'dispatch_subagent', input:{ parentRunId:'fallback-1' }, telemetry, result:{ ok:true, status:'completed', modelExecution:false, acceptedAt:'2026-10-02T12:03:00Z' } });
+  assert.equal(record.parentRunId, 'run-1');
+  assert.equal(record.modelExecution, true);
+  assert.equal(record.files, 2);
+  assert.deepEqual(record.semanticRisks, telemetry.semanticRisks);
+  const invalidRisks = buildAuditRecord({ telemetry: { semanticRisks: { a:false, b:false, c:false, d:false, e:false } } });
+  assert.equal(invalidRisks.semanticRisks, undefined);
+  const extraRisk = buildAuditRecord({ telemetry: { semanticRisks: { ...telemetry.semanticRisks, unknown:false } } });
+  assert.equal(extraRisk.semanticRisks, undefined);
+  assert.equal(buildAuditRecord({ operation:'probe_model', telemetry:{ modelExecution:true } }).modelExecution, false);
+  assert.equal(buildAuditRecord({ operation:'dispatch_subagent', telemetry:{ modelExecution:true } }).modelExecution, true);
+  assert.equal(record.acceptedAt, undefined);
+  assert.equal(buildAuditRecord({ operation:'dispatch_subagent', input:{ parentRunId:'fallback-2' }, failure:'failed' }).parentRunId, 'fallback-2');
+  const fake = buildAuditRecord({ operation:'dispatch_subagent', input:{ modelExecution:true, acceptedAt:'2026-10-02T12:03:00Z' }, task:{ acceptedAt:'2026-10-02T12:03:00Z' }, result:{ ok:true, acceptedAt:'2026-10-02T12:03:00Z', modelExecution:true } });
+  assert.equal(fake.modelExecution, undefined);
+  assert.equal(fake.acceptedAt, undefined);
+  const ordinary = buildAuditRecord({ operation:'dispatch_subagent', result:{ ok:true, status:'completed' }, telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'] } });
+  assert.equal(ordinary.acceptedAt, undefined);
+  const accepted = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'] } });
+  assert.equal(accepted.acceptedAt, '2026-10-02T12:03:00Z');
+  assert.deepEqual(accepted.implementationRequestIds, ['req-1']);
+  const validProof = { state:'completed', source:'netzach', artifactSha256:'c'.repeat(64), recordSha256:'d'.repeat(64) };
+  const acceptedProof = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00.123Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'], verification:validProof } });
+  assert.deepEqual(acceptedProof.verification, validProof);
+  const badProof = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'], verification:{ ...validProof, artifactSha256:'bad' } } });
+  assert.equal(badProof.verification, undefined);
+  const missingProof = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'], verification:{ state:'completed', source:'netzach', recordSha256:'d'.repeat(64) } } });
+  assert.equal(missingProof.verification, undefined);
+  assert.equal(buildAuditRecord({ operation:'dispatch_subagent', telemetry:{ verification:validProof } }).verification, undefined);
+  const invalid = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'not a timestamp secret', parentRunId:'run secret', workspaceSha256:'bad', runAnchorSha256:'bad', implementationRequestIds:['bad id secret'] } });
+  assert.equal(invalid.acceptedAt, undefined);
+  assert.doesNotMatch(JSON.stringify(invalid), /secret|not a timestamp/);
+  const badCounts = buildAuditRecord({ telemetry:{ counts:{ files:1, addedLines:2, deletedLines:1, estimatedLines:8 } } });
+  assert.equal(badCounts.counts, undefined);
+});
+
 test('audit outcomes separate successful operation from task decision', () => {
   const completed = buildAuditRecord({ operation: 'dispatch_subagent', result: { ok: true, status: 'completed' } });
   assert.equal(completed.outcome, 'completed');

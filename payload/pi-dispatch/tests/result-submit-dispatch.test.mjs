@@ -14,9 +14,11 @@ const raw = (...events) => ({ exitCode: 0, stderr: '', stdout: events.map(event 
 test('structured result tool is explicit, WSL-only, and role-ceiling bounded', () => {
   const args = buildPiArgs(request, 'wsl2', false, true);
   assert.ok(args.includes('/opt/pi-kether/extensions/result-submit.js'));
+  assert.deepEqual(args.slice(args.indexOf('--yhwh-result-role'), args.indexOf('--yhwh-result-role') + 2), ['--yhwh-result-role', 'Chesed']);
   assert.ok(args[args.indexOf('--tools') + 1].split(',').includes('yhwh_submit_result'));
   assert.throws(() => buildPiArgs(request, 'host', false, true), /Role presets require WSL2/);
   assert.throws(() => buildPiArgs({ ...request, access: 'none' }, 'wsl2', false, true), /requires WSL2|Role presets require WSL2/);
+  assert.throws(() => buildPiArgs({ ...request, rolePresetId: undefined }, 'wsl2', false, true), /requires a trusted role preset/);
   const legacy = buildPiArgs(request, 'wsl2');
   assert.ok(!legacy.includes('/opt/pi-kether/extensions/result-submit.js'));
   assert.ok(!legacy[legacy.indexOf('--tools') + 1].split(',').includes('yhwh_submit_result'));
@@ -39,6 +41,15 @@ test('summarize accepts one canonical marked tool event, never assistant text', 
   assert.deepEqual(spoof, { ok: false, code: 'RESULT_SUBMISSION_MISSING' });
   const otherTool = summarize(raw(resultEvent(details, 'some_other_tool'), assistant, end), { ...request, resultSubmissionRequired: true }).resultSubmission;
   assert.deepEqual(otherTool, { ok: false, code: 'RESULT_SUBMISSION_MISSING' });
+});
+
+test('summarize ignores deterministic role rejection only when one successful submission follows', () => {
+  const rejected = resultEvent({ type: 'kether_result_rejection', code: 'RESULT_ROLE_SCHEMA_INVALID' });
+  assert.deepEqual(summarize(raw(rejected, resultEvent(details), assistant, end), { ...request, resultSubmissionRequired: true }).resultSubmission, { ok: true, canonicalText });
+  assert.deepEqual(summarize(raw(rejected, assistant, end), { ...request, resultSubmissionRequired: true }).resultSubmission, { ok: false, code: 'RESULT_SUBMISSION_MISSING' });
+  assert.deepEqual(summarize(raw(rejected, resultEvent(details), resultEvent(details), assistant, end), { ...request, resultSubmissionRequired: true }).resultSubmission, { ok: false, code: 'RESULT_SUBMISSION_MULTIPLE' });
+  const malformed = resultEvent({ type: 'kether_result_rejection', code: 'OTHER' });
+  assert.deepEqual(summarize(raw(malformed, resultEvent(details), assistant, end), { ...request, resultSubmissionRequired: true }).resultSubmission, { ok: false, code: 'RESULT_SUBMISSION_MALFORMED' });
 });
 
 test('summarize fails closed on malformed or multiple result events without payload metadata', () => {

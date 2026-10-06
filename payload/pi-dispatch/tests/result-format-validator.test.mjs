@@ -87,6 +87,93 @@ test('qualifies only explicit host-unrun checks bound to the exact trusted patch
   }
 });
 
+test('typed Chesed execution limitation qualifies independently of prose but never bypasses qualification gates', () => {
+  const input=hostCandidateFixture();
+  input.value.deliverable.checks=[{name:'host tests',outcome:'unverified',evidence:'Host check pending.',executionLimitation:{executor:'host',reason:'worker-execution-unavailable'}}];
+  for(const forceHost of [false,true]){
+    assert.deepEqual(evaluateHostVerificationCandidate({...input,forceHost}),{eligible:true,requiredCheckNames:['host tests']});
+  }
+  const malformed=[null,{}, {executor:'host'}, {executor:'worker',reason:'worker-execution-unavailable'}, {executor:'host',reason:'other'}, {executor:'host',reason:'worker-execution-unavailable',extra:true}, 'worker-execution-unavailable'];
+  for(const limitation of malformed)for(const forceHost of [false,true]){
+    const changed=structuredClone(input);changed.value.deliverable.checks[0].executionLimitation=limitation;
+    assert.deepEqual(evaluateHostVerificationCandidate({...changed,forceHost}),{eligible:false,requiredCheckNames:[]});
+  }
+  for(const mutate of [
+    value=>{value.status='unverified';},
+    value=>{value.status='blocked';},
+    value=>{value.status='failed';},
+    value=>{value.errors=['test failed'];},
+    value=>{value.deliverable.checks[0].outcome='passed';},
+    value=>{value.deliverable.checks[0].outcome='failed';},
+  ])for(const forceHost of [false,true]){
+    const changed=structuredClone(input);mutate(changed.value);
+    assert.deepEqual(evaluateHostVerificationCandidate({...changed,forceHost}),{eligible:false,requiredCheckNames:[]});
+  }
+});
+
+test('recognizes concrete English and Chinese execution limitations without broadening other host handoffs', () => {
+  const positives = [
+    'Host-assigned; test command was not available in this environment.',
+    'Host-assigned check; worker cannot execute host test runner.',
+    'Host-assigned Node --test; not executable with available tools.',
+    '未执行：当前环境提供文件读写工具但无测试/命令执行工具；由 host 负责运行 node --test。',
+    'Host 测试执行不可用；Host 负责运行 node --test。',
+    'Host 检查未执行；Host 负责运行 node build.mjs 和 git diff --check。',
+    'Host test execution unavailable; host is assigned to run this check.',
+  ];
+  for (const evidence of positives) for (const status of ['completed', 'unverified', 'blocked']) for (const forceHost of [false, true]) {
+    const input = hostCandidateFixture();
+    input.value.status = status;
+    input.value.deliverable.checks[0].evidence = evidence;
+    const expected = forceHost ? ['npm test', 'static inspection'] : ['npm test'];
+    assert.deepEqual(evaluateHostVerificationCandidate({...input, forceHost}), {eligible: true, requiredCheckNames: expected}, `${status}/${forceHost}: ${evidence}`);
+  }
+
+  for (const evidence of [
+    '未执行：源码编辑工作', 'Host 未执行：源码编辑工作', 'Host 无法执行源码编辑工作',
+    '无法执行源码编辑', '未执行 implementation', 'Host will verify', 'check pending',
+  ]) {
+    const input = hostCandidateFixture();
+    input.value.deliverable.checks[0].evidence = evidence;
+    assert.deepEqual(evaluateHostVerificationCandidate(input), {eligible: false, requiredCheckNames: []}, evidence);
+  }
+
+  for (const mutate of [
+    x => { x.value.status = 'failed'; },
+    x => { x.value.errors = ['执行检查失败']; },
+    x => { x.value.deliverable.checks[0].outcome = 'failed'; },
+    x => { x.patchProof.trusted = false; },
+    x => { x.value.changedFiles = ['other.js']; },
+    x => { x.raw.patchValidation.patchSha256 = 'c'.repeat(64); },
+    x => { x.raw.routeMismatch = true; },
+    x => { x.raw.cleanupError = true; },
+    x => { x.raw.timeout = true; },
+  ]) {
+    const input = hostCandidateFixture();
+    input.value.deliverable.checks[0].evidence = positives[3];
+    mutate(input);
+    assert.deepEqual(evaluateHostVerificationCandidate(input), {eligible: false, requiredCheckNames: []});
+  }
+});
+
+test('forceHost qualifies fully passed worker checks only with the trusted patch proof', () => {
+  const input=hostCandidateFixture();
+  input.value.deliverable.checks[0]={name:'npm test',outcome:'passed',evidence:'Worker reports tests passed.'};
+  assert.deepEqual(evaluateHostVerificationCandidate(input),{eligible:false,requiredCheckNames:[]});
+  assert.deepEqual(evaluateHostVerificationCandidate({...input,forceHost:true}),{eligible:true,requiredCheckNames:['npm test','static inspection']});
+  const completedPassed={...input,forceHost:true,value:{...input.value,status:'completed'}};
+  assert.deepEqual(evaluateHostVerificationCandidate(completedPassed),{eligible:true,requiredCheckNames:['npm test','static inspection']});
+  const blockedPassed={...completedPassed,value:{...completedPassed.value,status:'blocked'}};
+  assert.deepEqual(evaluateHostVerificationCandidate(blockedPassed),{eligible:false,requiredCheckNames:[]});
+  const single={...input,forceHost:true,value:{...input.value,deliverable:{...input.value.deliverable,checks:[{name:'npm test',outcome:'passed',evidence:'claimed passed'}]}}};
+  assert.deepEqual(evaluateHostVerificationCandidate(single),{eligible:true,requiredCheckNames:['npm test']});
+  const missing={...input,forceHost:true,value:{...input.value,deliverable:{...input.value.deliverable,checks:[]}}};
+  assert.deepEqual(evaluateHostVerificationCandidate(missing),{eligible:false,requiredCheckNames:[]});
+  const failed={...input,forceHost:true,value:{...input.value,deliverable:{...input.value.deliverable,checks:[{name:'npm test',outcome:'failed',evidence:'failed'}]}}};
+  assert.deepEqual(evaluateHostVerificationCandidate(failed),{eligible:false,requiredCheckNames:[]});
+  assert.deepEqual(evaluateHostVerificationCandidate({...input,forceHost:true,patchProof:{...input.patchProof,patchSha256:'c'.repeat(64)}}),{eligible:false,requiredCheckNames:[]});
+});
+
 test('rejects mismatched request, patch, scope, changed files, route, and WSL cleanup', () => {
   const mutations = [
     x => { x.task.requestId = 'foreign'; },
@@ -100,6 +187,7 @@ test('rejects mismatched request, patch, scope, changed files, route, and WSL cl
     x => { x.value.changedFiles = ['src/other.js']; },
     x => { x.raw.patchValidation.changedFiles = ['src/other.js']; },
     x => { x.patchProof.changedFiles = ['src/other.js']; },
+    x => { x.raw.patch = ''; },
     x => { x.raw.patch += 'tampered'; },
     x => { x.raw.provider = 'other'; },
     x => { x.raw.requestedModel = 'other-model'; },

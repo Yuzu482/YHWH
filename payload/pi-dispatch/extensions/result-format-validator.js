@@ -4,8 +4,26 @@ export const RESULT_PREFIX = 'KETHER_RESULT_JSON=';
 export const RESULT_STATUSES = Object.freeze(['completed', 'failed', 'blocked', 'unverified']);
 
 const HOST_EXECUTION_REASON = /(?:\bnot\s+run\b|\bunrun\b|\bnot\s+executed\b|\bunavailable\b).*(?:host|execution|command|test|build|install|check|verification)|(?:host|execution|command|test|build|install|check|verification).*(?:\bnot\s+run\b|\bunrun\b|\bnot\s+executed\b|\bunavailable\b)|host\s+(?:is\s+)?assigned\s+to\s+(?:execute|run|verify)/i;
+const EXECUTION_LIMITATION = /(?:\bnot\s+available\b|\bcannot\s+execute\b|\bnot\s+executable\b|未执行|不可用|无法执行)/i;
+const EXECUTION_CONTEXT = /\b(?:test|command|build|install|check|verification|execution)\b|测试|命令|构建|检查|验证/i;
+
+function isHostExecutionReason(evidence) {
+  return HOST_EXECUTION_REASON.test(evidence) ||
+    (EXECUTION_LIMITATION.test(evidence) && EXECUTION_CONTEXT.test(evidence));
+}
 const FILE_TOOL_ERROR = /(?:\b(?:read|edit|write)\b.*\b(?:error|fail(?:ed|ure)?|reject(?:ed)?|denied)\b|\b(?:error|fail(?:ed|ure)?|reject(?:ed)?|denied)\b.*\b(?:read|edit|write)\b)/i;
 const SHA256 = /^[a-f0-9]{64}$/;
+const EXECUTION_LIMITATION_KEYS = ['executor', 'reason'];
+
+function hasValidExecutionLimitation(check, value) {
+  if (!Object.hasOwn(check, 'executionLimitation')) return true;
+  const limitation = check.executionLimitation;
+  return value.status === 'completed' && value.errors.length === 0 && check.outcome === 'unverified' &&
+    limitation !== null && typeof limitation === 'object' && !Array.isArray(limitation) &&
+    Object.keys(limitation).length === EXECUTION_LIMITATION_KEYS.length &&
+    EXECUTION_LIMITATION_KEYS.every(key => Object.hasOwn(limitation, key)) &&
+    limitation.executor === 'host' && limitation.reason === 'worker-execution-unavailable';
+}
 const UUID_V4 = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const MAX_HOST_CHECKS = 32;
 
@@ -31,11 +49,11 @@ function sameStringSet(left, right) {
  * that could not run in the worker environment. patchProof must be created by
  * the gateway only after trustedPatchProof succeeds; it is not task/model input.
  */
-export function evaluateHostVerificationCandidate({task, access, raw, value, patchProof} = {}) {
+export function evaluateHostVerificationCandidate({task, access, raw, value, patchProof, forceHost = false} = {}) {
   const denied = rejectedHostVerificationCandidate();
   if (!task || task.role !== 'Chesed' || access !== 'workspace-write' ||
       typeof task.requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(task.requestId)) return denied;
-  if (!raw || !value || !['completed', 'unverified', 'blocked'].includes(value.status)) return denied;
+  if (typeof forceHost !== 'boolean' || !raw || !value || !['completed', 'unverified', 'blocked'].includes(value.status)) return denied;
   if (typeof value.result !== 'string' || !value.result.trim() || !Array.isArray(value.evidence) ||
       value.evidence.length === 0 || value.evidence.some(item => typeof item !== 'string' || !item.trim()) ||
       !exactUniqueStrings(value.changedFiles) || !Array.isArray(value.errors) ||
@@ -48,16 +66,22 @@ export function evaluateHostVerificationCandidate({task, access, raw, value, pat
   const names = new Set();
   const requiredCheckNames = [];
   for (const check of checks) {
-    if (!check || typeof check.name !== 'string' || !check.name.trim() || check.name.length > 128 || names.has(check.name) ||
+    if (!check || typeof check !== 'object' || Array.isArray(check) ||
+        !hasValidExecutionLimitation(check, value) ||
+        typeof check.name !== 'string' || !check.name.trim() || check.name.length > 128 || names.has(check.name) ||
         typeof check.evidence !== 'string' || !check.evidence.trim()) return denied;
     names.add(check.name);
     if (check.outcome === 'failed' || !['passed', 'unverified'].includes(check.outcome)) return denied;
-    if (check.outcome === 'unverified') {
-      if (!HOST_EXECUTION_REASON.test(check.evidence)) return denied;
+    const typedHostLimitation = Object.hasOwn(check, 'executionLimitation');
+    if (forceHost) {
+      if (check.outcome === 'unverified' && !typedHostLimitation && !isHostExecutionReason(check.evidence)) return denied;
+      requiredCheckNames.push(check.name);
+    } else if (check.outcome === 'unverified') {
+      if (!typedHostLimitation && !isHostExecutionReason(check.evidence)) return denied;
       requiredCheckNames.push(check.name);
     }
   }
-  if (!requiredCheckNames.length) return denied;
+  if (!requiredCheckNames.length || (forceHost && requiredCheckNames.length !== checks.length) || (forceHost && value.status !== 'completed' && !checks.some(check => check.outcome === 'unverified' && isHostExecutionReason(check.evidence)))) return denied;
 
   const requestId = task.requestId;
   const validation = raw.patchValidation;

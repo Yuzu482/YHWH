@@ -1,12 +1,13 @@
 import {roleValue,handoff,ref} from './contract-fixtures.mjs';
 import {listenHttpFixture} from './http-fixture.mjs';
 import {resultDigest} from '../extensions/role-contract.js';
+import {reviewBlockers} from '../scripts/tier-review-policy.mjs';
 import {runAnchor,completedContract} from '../extensions/stage-handoff.js';
 import {createRequestLedger} from '../extensions/request-ledger.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, join, resolve } from 'node:path';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { request as httpRequest } from 'node:http';
@@ -101,7 +102,7 @@ test('durable host attestation anchors linked v2 evidence to the recorded Chesed
   const preTask={role:'Geburah',objective:'Seed synthetic pre-review predecessor',acceptance:['Synthetic fixture only'],readScope:['tests/gateway.test.mjs'],writeScope:[],reviewPacket:{version:1,stage:'pre-change',requirements:{status:'provided',content:['Synthetic fixture']},changes:{status:'provided',content:['Synthetic fixture']},context:{status:'provided',content:['Synthetic fixture']},verification:{status:'provided',content:['Synthetic fixture']}},handoff:{version:2,stage:'pre-review',inputs:[{requestId:'planned-fixture',role:'Chochmah',stage:'planned',resultSha256:'a'.repeat(64)}],runGoal:goal,runAcceptance:acceptance,phaseIndex:1}};
   const preValue=roleValue('Geburah');
   const ledger=createRequestLedger(ledgerDir);
-  ledger.recordOutcome(preId,{ok:true,contract:completedContract(preTask,{parentRunId},root,preValue),structuredResult:preValue});
+  ledger.recordOutcome(preId,{ok:true,contract:{...completedContract(preTask,{parentRunId},root,preValue),tierPolicyVersion:1},structuredResult:preValue});
   const preRecord=ledger.getOutcome(preId);
   const taskFor=(role,stage,inputs,extra={})=>({contractVersion:2,role,objective:goal,acceptance,readScope:['tests/gateway.test.mjs'],writeScope:role==='Chesed'?['tests/gateway.test.mjs']:[],handoff:{version:2,stage,inputs,runGoal:goal,runAcceptance:acceptance,phaseIndex:1},...extra});
   const preRef={requestId:preId,role:'Geburah',stage:'pre-review',resultSha256:preRecord.contract.resultSha256};
@@ -124,12 +125,17 @@ test('durable host attestation anchors linked v2 evidence to the recorded Chesed
     if(variant.recordSha256==='pending')variant.recordSha256=attestationDigest;
     const value=roleValue('Netzach');value.deliverable.checks=[{name:checkName,outcome:'passed',evidence:'Synthetic fixture text only; not production evidence.'}];
     value.deliverable.checks[0].hostEvidence={requestId:'linked-chesed',artifactSha256:proof.patchSha256,recordSha256:variant.recordSha256,checkName:variant.checkName};
-    evidenceResponses.push(value);return {ok:true,provider:request.provider,model:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value)};
+    const {default:registerResultSubmit}=await import('../extensions/result-submit.js');
+    let submissionTool;
+    registerResultSubmit({registerFlag:()=>{},getFlag:()=> 'Netzach',on:()=>{},registerTool:tool=>{submissionTool=tool;}});
+    const submitted=await submissionTool.execute('fixture-submit',{payload:value});
+    assert.equal(submitted.details.type,'kether_result_submission');
+    evidenceResponses.push(value);return {ok:true,provider:request.provider,model:request.model,text:submitted.details.canonicalText};
   };
   try {
     await withGateway(async({client})=>{
       const receipt=await receiptFor(client,'task-tiers');
-      const chesed=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,parentRunId,requestId:'linked-chesed',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',workflowReceipt:receipt,dependsOnRequestIds:[preId],...declaredT1(scope),task:taskFor('Chesed','implementing',[preRef])}}));
+      const chesed=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,parentRunId,requestId:'linked-chesed',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',workflowReceipt:receipt,dependsOnRequestIds:[preId],...declaredT1(scope),tier:'T2',tierDeclaration:{...declaredT1(scope).tierDeclaration,publicApiOrProtocol:true},task:taskFor('Chesed','implementing',[preRef])}}));
       assert.equal(chesed.status,'awaiting-host-verification',JSON.stringify(chesed));
       const recorded=parsed(await client.callTool({name:'record_host_verification',arguments:{requestId:'linked-chesed',artifactSha256:chesed.hostVerification.artifactSha256,commands:[{checkName,command:'synthetic fixture command',exitCode:0,outputSummary:'Synthetic fixture text only; no production command ran.'}],workflowReceipt:receipt}}));
       assert.equal(recorded.state,'completed');
@@ -193,33 +199,70 @@ async function receiptFor(client,topic){
   return parsed(await client.callTool({name:'get_workflow',arguments:{topic}})).receipt;
 }
 
+const gatewayLedgerDirs=new WeakMap();
+function gatewayLedgerDir(client){return gatewayLedgerDirs.get(client);}
+async function completePendingFixture({client,ledgerDir},requestId,pendingResponse){
+  const workflowReceipt=await receiptFor(client,'task-tiers');
+  const commands=pendingResponse.hostVerification.requiredCheckNames.map(checkName=>({
+    checkName,command:'synthetic fixture command (not executed)',exitCode:0,
+    outputSummary:'Synthetic fixture evidence only; no host command was executed.',
+  }));
+  const recorded=parsed(await client.callTool({name:'record_host_verification',arguments:{
+    requestId,artifactSha256:pendingResponse.hostVerification.artifactSha256,workflowReceipt,commands,
+  }}));
+  assert.equal(recorded.state,'completed');
+  return createRequestLedger(ledgerDir).getEffectiveResult(requestId);
+}
+
 function declaredT1(files = ['package.json']) {
   return { tier: 'T1', tierDeclaration: {
-    files, estimatedLines: 1, isTestOrConfigChange: true,
     publicApiOrProtocol: false, dependencyOrLockfile: false, securityAuthOrCredentials: false,
-    migration: false, irreversibleOrNoRollback: false, uncertainFileScope: false,
+    migration: false, irreversibleOrNoRollback: false,
   } };
 }
 
+function syntheticPatchResponse(request, task, jobId = '33333333-3333-4333-8333-333333333333', content = 'synthetic fixture') {
+  const scope = task.writeScope;
+  const patch = scope.map(path => `--- /var/lib/pi-kether/jobs/${jobId}/baseline/${path}\n+++ /var/lib/pi-kether/jobs/${jobId}/workspace/${path}\n@@ -0,0 +1 @@\n+${content}\n`).join('');
+  const canonical = compileWriteScope(scope).map(item => `${item.tree ? 'tree' : 'file'}:${item.path}`).sort().join('\\n');
+  const value = roleValue(task.role, task.objective); value.changedFiles = [...scope];
+  return {ok:true,requestId:request.gatewayRequestId,requestedProvider:request.provider,requestedModel:request.model,provider:request.provider,model:request.model,exitCode:0,cleanup:{ok:true},text:'KETHER_RESULT_JSON='+JSON.stringify(value),patch,patchValidation:{ok:true,requestId:request.gatewayRequestId,jobId,changedFiles:[...scope],patchSha256:createHash('sha256').update(patch,'utf8').digest('hex'),scopeSha256:createHash('sha256').update(canonical,'utf8').digest('hex')}};
+}
+
 test('topic gate blocks omitted and mismatched receipts before write dispatch or submission',async()=>{
+  const ledgerDir=mkdtempSync(join(tmpdir(),'pi-topic-tier-ledger-'));
+  const parentRunId='topic-tier-fixture-run';
+  const runGoal='Scoped fixture change';
+  const runAcceptance=['Return result'];
+  const preId='topic-tier-fixture-pre-review';
+  const preTask={role:'Geburah',objective:'Seed synthetic pre-review predecessor',acceptance:['Synthetic fixture only'],readScope:['tests/gateway.test.mjs'],writeScope:[],reviewPacket:{version:1,stage:'pre-change',requirements:{status:'provided',content:['Synthetic fixture']},changes:{status:'provided',content:['Synthetic fixture']},context:{status:'provided',content:['Synthetic fixture']},verification:{status:'provided',content:['Synthetic fixture']}},handoff:{version:2,stage:'pre-review',inputs:[{requestId:'topic-tier-planned',role:'Chochmah',stage:'planned',resultSha256:'a'.repeat(64)}],runGoal,runAcceptance,phaseIndex:1}};
+  const preValue=roleValue('Geburah');
+  const ledger=createRequestLedger(ledgerDir);
+  ledger.recordOutcome(preId,{ok:true,contract:{...completedContract(preTask,{parentRunId},root,preValue),tierPolicyVersion:1},structuredResult:preValue});
+  const preRecord=ledger.getOutcome(preId);
+  const preRef={requestId:preId,role:'Geburah',stage:'pre-review',resultSha256:preRecord.contract.resultSha256};
   let calls=0;const records=[];
-  await withGateway(async({client})=>{
-    const task={role:'worker',objective:'Scoped fixture change',acceptance:['Return result'],readScope:['package.json'],writeScope:['package.json']};
-    const base={cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'workflow-write',...declaredT1(),task};
-    const omitted=parsed(await client.callTool({name:'dispatch_subagent',arguments:base}));
-    assert.equal(omitted.code,'WORKFLOW_TOPIC_REQUIRED');assert.match(omitted.error,/get_workflow.*task-tiers/);
-    const wrong=await receiptFor(client,'pi-routing');
-    assert.equal(parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,workflowReceipt:wrong}})).code,'WORKFLOW_TOPIC_REQUIRED');
-    assert.equal(parsed(await client.callTool({name:'submit_subagent',arguments:{...base,workflowReceipt:wrong}})).code,'WORKFLOW_TOPIC_REQUIRED');
-    assert.equal(calls,0);
-    const correct=await receiptFor(client,'task-tiers');
-    const accepted=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,workflowReceipt:correct}}));
-    assert.equal(accepted.ok,true);assert.equal(calls,1);
-    assert.ok(records.some(record=>record.operation==='workflow_topic_required'&&record.topic==='task-tiers'));
-    assert.ok(records.some(record=>record.operation==='get_workflow'&&record.topic==='task-tiers'));
-    assert.ok(records.some(record=>record.operation==='workflow_topic_admitted'&&record.topic==='task-tiers'));
-    assert.equal(records.some(record=>JSON.stringify(record).includes(correct)),false);
-  },{dispatchFn:async(request,_signal,task)=>{calls++;return {ok:true,provider:request.provider,model:request.model,text:formattedTaskResult(task)};},auditLogger:{enabled:true,record:value=>records.push(value)}});
+  try {
+    await withGateway(async({client})=>{
+      const handoff={version:2,stage:'implementing',inputs:[preRef],runGoal,runAcceptance,phaseIndex:1};
+      const task={role:'worker',objective:runGoal,acceptance:runAcceptance,readScope:['package.json'],writeScope:['package.json'],handoff};
+      const tierDeclaration={publicApiOrProtocol:true,dependencyOrLockfile:false,securityAuthOrCredentials:false,migration:false,irreversibleOrNoRollback:false};
+      const base={cwd:root,parentRunId,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'workflow-write',tier:'T2',tierDeclaration,dependsOnRequestIds:[preId],task};
+      const omitted=parsed(await client.callTool({name:'dispatch_subagent',arguments:base}));
+      assert.equal(omitted.code,'WORKFLOW_TOPIC_REQUIRED');assert.match(omitted.error,/get_workflow.*task-tiers/);
+      const wrong=await receiptFor(client,'pi-routing');
+      assert.equal(parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,workflowReceipt:wrong}})).code,'WORKFLOW_TOPIC_REQUIRED');
+      assert.equal(parsed(await client.callTool({name:'submit_subagent',arguments:{...base,workflowReceipt:wrong}})).code,'WORKFLOW_TOPIC_REQUIRED');
+      assert.equal(calls,0);
+      const correct=await receiptFor(client,'task-tiers');
+      const accepted=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,workflowReceipt:correct}}));
+      assert.equal(accepted.ok,true);assert.equal(calls,1);
+      assert.ok(records.some(record=>record.operation==='workflow_topic_required'&&record.topic==='task-tiers'));
+      assert.ok(records.some(record=>record.operation==='get_workflow'&&record.topic==='task-tiers'));
+      assert.ok(records.some(record=>record.operation==='workflow_topic_admitted'&&record.topic==='task-tiers'));
+      assert.equal(records.some(record=>JSON.stringify(record).includes(correct)),false);
+    },{requestLedgerDir:ledgerDir,dispatchFn:async(request,_signal,task)=>{calls++;return syntheticPatchResponse(request,task);},auditLogger:{enabled:true,record:value=>records.push(value)}});
+  } finally { rmSync(ledgerDir,{recursive:true,force:true}); }
 });
 
 test('gateway tier gate rejects missing, understated and standalone T2 writes before dispatch', async () => {
@@ -232,7 +275,7 @@ test('gateway tier gate rejects missing, understated and standalone T2 writes be
     assert.equal(missing.code, 'WORKFLOW_TIER_REQUIRED');
     const asyncMissing = parsed(await client.callTool({ name: 'submit_subagent', arguments: { ...base, requestId: 'tier-async-missing' } }));
     assert.equal(asyncMissing.code, 'WORKFLOW_TIER_REQUIRED');
-    const understated = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: { ...base, requestId: 'tier-understated', ...declaredT1(), tier: 'T0' } }));
+    const understated = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: { ...base, requestId: 'tier-understated', ...declaredT1(), tier: 'T0', tierDeclaration:{...declaredT1().tierDeclaration,publicApiOrProtocol:true} } }));
     assert.equal(understated.code, 'WORKFLOW_TIER_INVALID');
     const standaloneT2 = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: {
       ...base, requestId: 'tier-standalone-t2', ...declaredT1(), tier: 'T2',
@@ -241,33 +284,56 @@ test('gateway tier gate rejects missing, understated and standalone T2 writes be
     assert.equal(standaloneT2.code, 'WORKFLOW_TIER_PRE_REVIEW_REQUIRED');
     assert.equal(calls, 0);
     const admitted = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: { ...base, requestId: 'tier-valid-t1', ...declaredT1() } }));
-    assert.equal(admitted.ok, true);
-    assert.equal(admitted.tier, 'T1');
-    assert.equal(admitted.reviewPending, true);
-    assert.equal(admitted.contract.tier, 'T1');
+    assert.equal(admitted.status, 'awaiting-host-verification');
+    assert.equal(admitted.ok, false);
+    assert.equal(admitted.contract, undefined);
+    const completed = await completePendingFixture({client,ledgerDir:gatewayLedgerDir(client)}, 'tier-valid-t1', admitted);
+    assert.equal(completed.state, 'completed');
+    assert.equal(completed.tier, 'T1');
+    assert.equal(completed.reviewPending, true);
+    assert.equal(completed.contract.tier, 'T1');
     assert.equal(calls, 1);
+    const oversizedTask={...task,writeScope:['src/a.js','src/b.js','src/c.js','src/d.js']};
+    const oversizedArgs={...base,requestId:'tier-oversized',tier:'T0',tierDeclaration:declaredT1().tierDeclaration,task:oversizedTask};
+    const oversized=parsed(await client.callTool({name:'dispatch_subagent',arguments:oversizedArgs}));
+    assert.equal(oversized.ok,false);
+    assert.equal(oversized.code,'PI_TIER_EXCEEDED');
+    assert.equal(oversized.requiredTier,'T1');
+    assert.equal(oversized.files,4);
+    assert.equal(oversized.contract,undefined);
+    const replay=parsed(await client.callTool({name:'dispatch_subagent',arguments:oversizedArgs}));
+    assert.equal(replay.code,'PI_TIER_EXCEEDED');
+    assert.equal(replay.contract,undefined);
+    assert.equal(calls,2);
   }, { dispatchFn: async (request, _signal, task) => {
     calls++;
-    return { ok: true, provider: request.provider, model: request.model, text: formattedTaskResult(task) };
+    if(task.writeScope.length>3)return syntheticPatchResponse(request,task);
+    const jobId='33333333-3333-4333-8333-333333333333';
+    const scope=task.writeScope;
+    const patch=scope.map(path=>`--- /var/lib/pi-kether/jobs/${jobId}/baseline/${path}\n+++ /var/lib/pi-kether/jobs/${jobId}/workspace/${path}\n@@ -0,0 +1 @@\n+safe\n`).join('');
+    const canonical=compileWriteScope(scope).map(item=>`${item.tree?'tree':'file'}:${item.path}`).sort().join('\\n');
+    const value=roleValue(task.role,task.objective); value.changedFiles=[...scope];
+    const patchValidation={ok:true,requestId:request.gatewayRequestId,jobId,changedFiles:[...scope],patchSha256:createHash('sha256').update(patch,'utf8').digest('hex'),scopeSha256:createHash('sha256').update(canonical,'utf8').digest('hex')};
+    return {ok:true,requestId:request.gatewayRequestId,requestedProvider:request.provider,requestedModel:request.model,provider:request.provider,model:request.model,exitCode:0,cleanup:{ok:true},text:'KETHER_RESULT_JSON='+JSON.stringify(value),patch,patchValidation};
   } });
 });
 
-test('gateway rejects a T0 worker patch that exceeds 20 changed lines', async () => {
-  const oversizedPatch = `diff -ruN a/package.json b/package.json\n--- a/package.json\n+++ b/package.json\n@@ -0,0 +1,21 @@\n${Array.from({ length: 21 }, (_, i) => `+line-${i}`).join('\n')}\n`;
-  await withGateway(async ({ client }) => {
-    const workflowReceipt = await receiptFor(client, 'task-tiers');
-    const result = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: {
-      cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', requestId: 'tier-t0-overflow', workflowReceipt,
-      tier: 'T0', tierDeclaration: { ...declaredT1().tierDeclaration, estimatedLines: 20, isTestOrConfigChange: false },
-      task: { role: 'worker', objective: 'One bounded file change', acceptance: ['Return result'], readScope: ['package.json'], writeScope: ['package.json'] },
-    } }));
-    assert.equal(result.ok, false);
-    assert.equal(result.code, 'WORKFLOW_TIER_EXCEEDED');
-    assert.equal(result.contract, undefined);
-  }, { dispatchFn: async (request, _signal, task) => ({ ok: true, provider: request.provider, model: request.model, text: formattedTaskResult(task), patch: oversizedPatch }) });
+test('gateway rejects removed caller-authored file and size tier fields', async () => {
+  let calls=0;
+  await withGateway(async({client})=>{
+    const workflowReceipt=await receiptFor(client,'task-tiers');
+    const result=await client.callTool({name:'dispatch_subagent',arguments:{
+      cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'tier-old-fields',workflowReceipt,
+      tier:'T0',tierDeclaration:{...declaredT1().tierDeclaration,files:['package.json'],estimatedLines:1},
+      task:{role:'worker',objective:'Reject old declaration shape',acceptance:['Return result'],readScope:['package.json'],writeScope:['package.json']},
+    }});
+    assert.equal(result.isError,true);
+    assert.match(result.content.filter(x=>x.type==='text').map(x=>x.text).join('\\n'),/MCP error|Invalid arguments|Unrecognized|unrecognized/);
+    assert.equal(calls,0);
+  },{dispatchFn:async()=>{calls++;return {};}});
 });
 
-test('gateway CLI fetches the write topic before submitting a scoped request',async()=>{
+test('gateway CLI dispatches explicit T1 without a compulsory receipt and exits successfully while pending',async()=>{
   const directory=mkdtempSync(join(tmpdir(),'yhwh-cli-write-'));
   try{
     await withGateway(async({port})=>{
@@ -276,8 +342,12 @@ test('gateway CLI fetches the write topic before submitting a scoped request',as
       writeFileSync(config,JSON.stringify({host:'127.0.0.1',port,tokenFile}));
       writeFileSync(requestFile,JSON.stringify({cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'cli-write-receipt',...declaredT1(),task:{role:'worker',objective:'Prepare scoped fixture change',acceptance:['Return result'],readScope:['package.json'],writeScope:['package.json']}}));
       const {stdout}=await execFileAsync(process.execPath,[resolve(root,'scripts/gateway-client.mjs'),'dispatch',requestFile],{env:{...process.env,PI_GATEWAY_CONFIG:config},timeout:15000,windowsHide:true});
-      assert.equal(JSON.parse(stdout).ok,true);
-    });
+      const submitted=JSON.parse(stdout);
+      assert.equal(submitted.status,'awaiting-host-verification');
+      assert.equal(submitted.ok,false);
+      assert.equal(submitted.contract,undefined);
+      assert.deepEqual(submitted.hostVerification.requiredCheckNames,['fixture check']);
+    },{dispatchFn:async(request,_signal,task)=>syntheticPatchResponse(request,task)});
   }finally{rmSync(directory,{recursive:true,force:true});}
 });
 
@@ -298,6 +368,22 @@ test('typed failed/unverified outputs and type errors cannot produce successful 
     if(mode==='wrong-type')value.evidence='not an array';else value.status=mode;
     return {ok:true,provider:request.provider,model:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value),contract:{version:2,stage:'implementing'}};
   }});
+});
+
+test('gateway role validation keeps timeout as primary cause when a complete-looking result is malformed',async()=>{
+ await withGateway(async({client})=>{
+  const response=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',requestId:'timeout-role-validation',resourceProfile:'standard',task:{role:'Chesed',objective:'Timeout cause',acceptance:['Preserve the cause']}}}));
+  assert.equal(response.ok,false);assert.equal(response.failureCode,'EXECUTION_TIMEOUT');assert.match(response.failure,/EXECUTION_TIMEOUT/);
+  assert.equal(response.roleValidation.ok,false);assert.ok(response.secondaryValidation.some(value=>value.startsWith('role_schema_invalid:')));assert.equal(response.contract,undefined);
+ },{dispatchFn:async(request,_signal,task)=>{const value=roleValue(task.role,task.objective);value.deliverable.checks='invalid checks';return {ok:false,failureCode:'EXECUTION_TIMEOUT',failure:'EXECUTION_TIMEOUT',exitCode:124,provider:request.provider,model:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value)};}});
+});
+
+test('valid completed role output cannot override an execution timeout',async()=>{
+ await withGateway(async({client})=>{
+  const response=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',requestId:'timeout-valid-role',resourceProfile:'standard',task:{role:'Chesed',objective:'Timeout cause',acceptance:['Preserve the cause']}}}));
+  assert.equal(response.ok,false);assert.equal(response.failureCode,'EXECUTION_TIMEOUT');assert.match(response.failure,/EXECUTION_TIMEOUT/);
+  assert.equal(response.roleValidation.ok,true);assert.equal(response.contract,undefined);
+ },{dispatchFn:async(request,_signal,task)=>({ok:false,failureCode:'EXECUTION_TIMEOUT',failure:'EXECUTION_TIMEOUT',exitCode:124,provider:request.provider,model:request.model,text:formattedTaskResult(task)})});
 });
 
 test('editor authorization is explicit, ledger-protected, closed and not inherited by ordinary tasks',async()=>{
@@ -334,13 +420,157 @@ test('MCP stage chain injects ledger evidence and blocks cross-run/hash/review b
     const replay=await run('typed-worker','Chesed','implementing',[reviewRef]);assert.equal(replay.idempotency.status,'replayed');assert.equal(invoked.length,4);
     const conflict=await run('typed-worker','Chesed','implementing',[reviewRef],{priority:8});assert.equal(conflict.ok,false);assert.equal(invoked.length,4);
     rejectReview=true;
-    const rejected=await run('typed-review-reject','Geburah','pre-review',[planRef],{provider:'anthropic',model:'claude-sonnet-5'});assert.equal(rejected.ok,false);
-    const blocked=await run('typed-blocked','Chesed','implementing',[ref('typed-review-reject','Geburah','pre-review')]);assert.equal(blocked.ok,false);assert.match(blocked.error,/dependency failed/);assert.equal(invoked.length,5);
+    const rejected=await run('typed-review-reject','Geburah','pre-review',[planRef],{provider:'anthropic',model:'claude-sonnet-5'});assert.equal(rejected.ok,false);assert.equal(rejected.code,'PI_REVIEW_ATTEMPTS_INVALID');assert.match(rejected.error,/anchor|alias|parent/i);
+    const blocked=await run('typed-blocked','Chesed','implementing',[ref('typed-review-reject','Geburah','pre-review')]);assert.equal(blocked.ok,false);assert.match(blocked.error,/dependency failed/);assert.equal(invoked.length,4); // Four launches were scout, plan, review, and worker; the changed-anchor review was rejected before model dispatch.
+    const freshObjective='One stable failed-pre-review fixture goal';
+    const freshAcceptance=['Observe one failed review'];
+    const fresh=async(id,role,stage,inputs=[])=>parsed(await client.callTool({name:'dispatch_subagent',arguments:{...common,parentRunId:'typed-fresh-run',requestId:id,provider:role==='Geburah'?'anthropic':common.provider,model:role==='Geburah'?'claude-sonnet-5':common.model,dependsOnRequestIds:inputs.map(input=>input.requestId),task:{role,objective:freshObjective,acceptance:freshAcceptance,handoff:handoff(stage,inputs),...(role==='Geburah'?{reviewPacket:packet}:{})}}}));
+    const freshScout=await fresh('typed-fresh-scout','Malkuth','scouted');assert.equal(freshScout.ok,true);
+    const freshScoutRef=ref('typed-fresh-scout','Malkuth','scouted',freshScout.contract.resultSha256);
+    const freshPlan=await fresh('typed-fresh-plan','Chochmah','planned',[freshScoutRef]);assert.equal(freshPlan.ok,true);
+    const freshPlanRef=ref('typed-fresh-plan','Chochmah','planned',freshPlan.contract.resultSha256);
+    const freshReview=await fresh('typed-fresh-review','Geburah','pre-review',[freshPlanRef]);assert.equal(freshReview.ok,false);assert.equal(freshReview.reviewValidation.decision,'request-changes');
+    const freshBlocked=await fresh('typed-fresh-worker','Chesed','implementing',[ref('typed-fresh-review','Geburah','pre-review')]);assert.equal(freshBlocked.ok,false);assert.match(freshBlocked.error,/dependency failed/);assert.equal(invoked.length,7);
   },{dispatchFn:async(request,_signal,task,options)=>{
     invoked.push({role:task.role,upstream:options.upstreamResults});
     const value=roleValue(task.role,task.objective);if(task.role==='Geburah'&&rejectReview)value.reviewDecision='request-changes';
     return {ok:true,provider:request.provider,model:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value)};
   }});
+});
+
+test('T1 review extension requires a blocker-matched correction and current host proof', async () => {
+  const ledgerDir = mkdtempSync(join(tmpdir(), 'pi-t1-elastic-ledger-'));
+  const objective = 'Verify a scoped T1 fixture correction';
+  const acceptance = ['Preserve host-gated review quota'];
+  const changedPath = 'tests/gateway.test.mjs';
+  const reviewId1 = 't1-elastic-review-one';
+  let implementationCalls = 0, reviewCalls = 0, corruptProofFor = null;
+  const artifactArgs = n => ({ cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write',
+    requestId: `t1-elastic-artifact-${n}`, ...declaredT1([changedPath]), task: { role: 'Chesed', objective, acceptance,
+      readScope: [changedPath], writeScope: [changedPath] } });
+  const reviewArgs = (requestId, artifact, progress, extraContext = []) => ({ cwd: root, provider: 'anthropic', model: 'claude-sonnet-5',
+    access: 'none', tier: 'T1', reviewOfRequestId: artifact.requestId, requestId, task: { role: 'Geburah', objective, acceptance,
+      context: [...extraContext, ...(progress ? [`REVIEW_PROGRESS_JSON=${JSON.stringify(progress)}`] : [])],
+      reviewPacket: { version: 1, stage: 'post-change', requirements: { status: 'provided', content: ['T1 requirements'] },
+        changes: { status: 'provided', content: [artifact.patch] }, context: { status: 'provided', content: ['T1 review context'] },
+        verification: { status: 'provided', content: ['Host verified fixture check'] } } } });
+  const passHost = async (client, response, id, exitCode = 0) => {
+    const recorded = parsed(await client.callTool({ name: 'record_host_verification', arguments: {
+      requestId: id, artifactSha256: response.hostVerification.artifactSha256,
+      commands: [{ checkName: 'fixture check', command: 'synthetic fixture only', exitCode, outputSummary: 'Synthetic integration evidence only.' }],
+      workflowReceipt: await receiptFor(client, 'task-tiers'),
+    } }));
+    return recorded;
+  };
+  try {
+    await withGateway(async ({ client }) => {
+      const makeArtifact = async n => {
+        const result = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: { ...artifactArgs(n), workflowReceipt: await receiptFor(client, 'task-tiers') } }));
+        assert.equal(result.status, 'awaiting-host-verification', JSON.stringify(result));
+        result.requestId = `t1-elastic-artifact-${n}`;
+        return result;
+      };
+      const firstArtifact = await makeArtifact(1);
+      assert.equal((await passHost(client, firstArtifact, firstArtifact.requestId)).state, 'completed');
+      corruptProofFor = firstArtifact.requestId;
+      const mismatchedProof = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: reviewArgs('t1-elastic-mismatched-proof', firstArtifact) }));
+      assert.equal(mismatchedProof.code, 'PI_T1_REVIEW_REFERENCE_REQUIRED');
+      assert.equal(mismatchedProof.modelExecutionStarted, false);
+      assert.equal(reviewCalls, 0);
+      corruptProofFor = null;
+      const first = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: reviewArgs(reviewId1, firstArtifact) }));
+      assert.equal(first.reviewQuota.used, 1);
+      assert.equal(first.reviewQuota.blockerPaths.includes(changedPath), true);
+      const progress = { version: 1, previousReviewRequestId: reviewId1,
+        closures: [{ key: first.reviewQuota.blockerKeys[0], paths: [changedPath], evidence: 'The revised patch corrects the cited tests/gateway.test.mjs blocker.' }] };
+      const malformed = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: reviewArgs('t1-elastic-malformed', firstArtifact,
+        progress, ['REVIEW_PROGRESS_JSON={']) }));
+      assert.equal(malformed.code, 'PI_REVIEW_ATTEMPTS_INVALID');
+      const irrelevant = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: reviewArgs('t1-elastic-irrelevant', firstArtifact,
+        { ...progress, closures: [] }, ['Unrelated plan paragraph only; no cited correction.']) }));
+      assert.equal(irrelevant.code, 'PI_REVIEW_LIMIT_EXCEEDED');
+      assert.equal(reviewCalls, 1);
+      const failedArtifact = await makeArtifact(2);
+      const pendingReview = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: reviewArgs('t1-elastic-pending-review', failedArtifact, progress) }));
+      assert.equal(pendingReview.code, 'PI_LEGACY_REVIEW_STATE_UNKNOWN');
+      assert.equal(pendingReview.modelExecutionStarted, false);
+      const failedHost = await passHost(client, failedArtifact, failedArtifact.requestId, 1);
+      assert.notEqual(failedHost.state, 'completed');
+      const failedHostReview = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: reviewArgs('t1-elastic-failed-host-review', failedArtifact, progress) }));
+      assert.equal(failedHostReview.code, 'PI_LEGACY_REVIEW_STATE_UNKNOWN');
+      assert.equal(failedHostReview.modelExecutionStarted, false);
+      assert.equal(reviewCalls, 1);
+      const repairedArtifact = await makeArtifact(3);
+      assert.equal((await passHost(client, repairedArtifact, repairedArtifact.requestId)).state, 'completed');
+      const second = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: reviewArgs('t1-elastic-review-two', repairedArtifact, progress) }));
+      assert.equal(second.reviewQuota.used, 2);
+      assert.equal(second.reviewQuota.extensionUsed, true);
+      const denied = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: reviewArgs('t1-elastic-review-three', repairedArtifact, progress) }));
+      assert.equal(denied.code, 'PI_REVIEW_LIMIT_EXCEEDED');
+      assert.equal(denied.modelExecutionStarted, false);
+      assert.equal(reviewCalls, 2);
+    }, { requestLedgerDir: ledgerDir, moduleFactories: { ledger: () => {
+      const real = createRequestLedger(ledgerDir);
+      return new Proxy(real, { get(target, property) {
+        if (property === 'getEffectiveResult') return requestId => {
+          const result = target.getEffectiveResult(requestId);
+          return requestId === corruptProofFor && result ? { ...result, verifiedArtifactSha256: 'f'.repeat(64) } : result;
+        };
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      } });
+    } }, dispatchFn: async (request, _signal, task, options) => {
+      if (task.role === 'Chesed') {
+        implementationCalls++;
+        return syntheticPatchResponse(request, task, `33333333-3333-4333-8333-${String(implementationCalls).padStart(12, '0')}`, `synthetic fixture revision ${implementationCalls}`);
+      }
+      reviewCalls++; options.onModelStart();
+      const value = roleValue(task.role, task.objective); value.reviewDecision = 'request-changes';
+      value.deliverable.findings = [{ severity: 'medium', description: `Blocker in ${changedPath}`, evidence: changedPath, blocking: true }];
+      return { ok: true, provider: request.provider, model: request.model, text: `KETHER_RESULT_JSON=${JSON.stringify(value)}`, modelExecutionStarted: true };
+    } });
+  } finally { rmSync(ledgerDir, { recursive: true, force: true }); }
+});
+
+test('MCP pre-review progress admits one shared extension only for cited shrinking blockers',async()=>{
+  let calls=0;
+  const changes={first:['tests/a.js initial','tests/b.js initial'],second:['tests/a.js corrected','tests/b.js initial'],third:['tests/a.js corrected','tests/b.js corrected']};
+  const packet=revision=>({version:1,stage:'pre-change',requirements:{status:'provided',content:['Requirement']},changes:{status:'provided',content:changes[revision]},context:{status:'provided',content:['Context']},verification:{status:'provided',content:['Verification']}});
+  const objective='Review only cited fixture changes';
+  await withGateway(async({client})=>{
+    const invoke = async (requestId, revision, progress) => parsed(await client.callTool({
+      name: 'dispatch_subagent', arguments: {
+        cwd: root, provider: 'anthropic', model: 'claude-sonnet-5', access: 'none', requestId,
+        task: { role: 'Geburah', objective, acceptance: ['Return a review decision'], reviewPacket: packet(revision),
+          ...(progress ? { context: [`REVIEW_PROGRESS_JSON=${JSON.stringify(progress)}`] } : {}) },
+      },
+    }));
+    const first=await invoke('progress-review-first','first');assert.equal(first.ok,false);assert.equal(first.reviewQuota.used,1);
+    const second=await invoke('progress-review-second','second');assert.equal(second.ok,false);assert.equal(second.reviewQuota.used,2);
+    const remaining={reviewDecision:'request-changes',findings:[{severity:'medium',description:'Remaining blocker in tests/b.js',evidence:'tests/b.js',blocking:true}],missingMaterials:[]};
+    const key=reviewBlockers(remaining)[0].key;
+    const progress={version:1,previousReviewRequestId:'progress-review-second',closures:[{key,paths:['tests/b.js'],evidence:'The revised material corrects the cited tests/b.js blocker.'}]};
+    const third=await invoke('progress-review-third','third',progress);assert.equal(third.ok,false);assert.equal(third.reviewQuota.used,3);assert.equal(third.reviewQuota.extensionUsed,true);assert.equal(third.reviewQuota.extensionEligible,false);
+    const denied=await invoke('progress-review-fourth','third',progress);assert.equal(denied.ok,false);assert.equal(denied.code,'PI_REVIEW_LIMIT_EXCEEDED');assert.equal(denied.modelExecutionStarted,false);assert.equal(calls,3);
+  },{dispatchFn:async(request,_signal,task,options)=>{
+    calls++;options.onModelStart();const value=roleValue(task.role,task.objective);value.reviewDecision='request-changes';value.deliverable.findings=calls===1?[
+      {severity:'medium',description:'Blocker in tests/a.js',evidence:'tests/a.js',blocking:true},{severity:'medium',description:'Blocker in tests/b.js',evidence:'tests/b.js',blocking:true},
+    ]:[{severity:'medium',description:'Remaining blocker in tests/b.js',evidence:'tests/b.js',blocking:true}];
+    return{ok:true,provider:request.provider,model:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value),modelExecutionStarted:true};
+  }});
+});
+
+test('review gateway rejects a changed anchor under an already-bound parent alias',async()=>{
+  let calls=0;
+  const packet={version:1,stage:'pre-change',...Object.fromEntries(['requirements','changes','context','verification'].map(key=>[key,{status:'provided',content:[`Alias fixture ${key}`]}]))};
+  await withGateway(async({client})=>{
+    const invoke=async(requestId,objective)=>parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,parentRunId:'review-alias-parent',provider:'anthropic',model:'claude-sonnet-5',access:'none',requestId,task:{role:'Geburah',objective,acceptance:['Review the alias fixture'],reviewPacket:packet}}}));
+    assert.equal((await invoke('review-alias-first','First anchor')).ok,true);
+    const conflict=await invoke('review-alias-conflict','Changed anchor');
+    assert.equal(conflict.code,'PI_REVIEW_ATTEMPTS_INVALID');
+    assert.match(conflict.error,/anchor|alias|parent/i);
+    assert.equal(calls,1);
+  },{dispatchFn:async(request,_signal,task)=>{calls++;return{ok:true,provider:request.provider,model:request.model,text:formattedTaskResult(task)};}});
 });
 
 test('gateway admits the bounded Claude CLI reviewer route and trusted recovery probe without WSL', async () => {
@@ -394,7 +624,8 @@ async function withGateway(run, options = {}) {
   });
   try {
     await client.connect(transport);
-    await run({ client, port });
+    gatewayLedgerDirs.set(client, options.requestLedgerDir ?? ledgerDir);
+    await run({ client, port, ledgerDir: options.requestLedgerDir ?? ledgerDir });
   } finally {
     await client.close();
     await new Promise(resolvePromise => http.close(resolvePromise));
@@ -437,6 +668,72 @@ test('gateway rejects incomplete governance contracts before model execution', a
   },{dispatchFn:async()=>{dispatched++;throw new Error('Must not execute');}});
 });
 
+test('explicit review tier rejects T0 and T1 pre-change before model launch',async()=>{
+ let calls=0;
+ await withGateway(async({client})=>{
+  for(const [id,tier,stage] of [['review-t0-pre','T0','pre-change'],['review-t0-post','T0','post-change'],['review-t1-pre','T1','pre-change']]){
+   const reviewPacket={version:1,stage,...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['fixture '+k]}]))};
+   const response=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'anthropic',model:'claude-sonnet-5',access:'none',tier,requestId:id,task:{role:'Geburah',objective:'Tier stage guard',acceptance:['Review'],reviewPacket}}}));
+   assert.equal(response.code,'PI_REVIEW_STAGE_INVALID');assert.equal(response.modelExecutionStarted,false);
+  }
+  assert.equal(calls,0);
+ },{dispatchFn:async()=>{calls++;throw new Error('must not launch');}});
+});
+
+test('durable review quota launches only two base reviews and reports pre-launch exhaustion', async () => {
+  let calls = 0;
+  const packet = change => ({ version: 1, stage: 'pre-change', requirements: { status: 'provided', content: ['Requirement'] }, changes: { status: 'provided', content: [`Plan revision ${change}`] }, context: { status: 'provided', content: ['Context'] }, verification: { status: 'provided', content: ['Verification'] } });
+  await withGateway(async ({ client }) => {
+    const invoke = async (requestId, change) => parsed(await client.callTool({ name: 'dispatch_subagent', arguments: {
+      cwd: root, provider: 'anthropic', model: 'claude-sonnet-5', access: 'none', requestId,
+      task: { role: 'Geburah', objective: 'Persistent quota fixture goal', acceptance: ['Return a review decision'], reviewPacket: packet(change) },
+    } }));
+    assert.equal((await invoke('quota-review-a', 'one')).ok, true);
+    assert.equal((await invoke('quota-review-b', 'two')).ok, true);
+    const denied = await invoke('quota-review-c', 'three');
+    assert.equal(denied.ok, false);
+    assert.equal(denied.code, 'PI_REVIEW_LIMIT_EXCEEDED');
+    assert.equal(denied.modelExecutionStarted, false);
+    assert.equal(denied.used, 2);
+    assert.equal(denied.remainingBase, 0);
+    assert.equal(calls, 2);
+  }, { dispatchFn: async (request, _signal, task, options) => {
+    calls++;
+    options.onModelStart();
+    return { ok: true, provider: request.provider, model: request.model, text: formattedTaskResult(task) };
+  } });
+});
+
+test('review gateway preserves full request IDs and distinguishes confirmed zero launch from unknown execution',async()=>{
+ const audit=[];let mode='zero',calls=0;
+ const packet={version:1,stage:'pre-change',...Object.fromEntries(['requirements','changes','context','verification'].map(key=>[key,{status:'provided',content:[`Long-ID fixture ${key}`]}]))};
+ const task={role:'Geburah',objective:'Full length review identity',acceptance:['Return an approval decision'],reviewPacket:packet};
+ await withGateway(async({client})=>{
+  const invoke=async requestId=>parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'anthropic',model:'claude-sonnet-5',access:'none',timeoutSeconds:5,requestId,task}}));
+  const zero=await invoke('review-zero-launch');assert.equal(zero.modelExecutionStarted,false);assert.equal(zero.code,undefined);
+  mode='unknown';const unknown=await invoke('review-unknown-launch');assert.equal(unknown.modelExecutionStarted,null);
+  mode='started';const longId='r'.repeat(128);const complete=await invoke(longId);assert.equal(complete.ok,true);assert.equal(complete.requestId,longId);assert.equal(complete.reviewQuota.available,true);assert.equal(complete.reviewQuota.extensionEligible,false);assert.equal(complete.reviewQuota.extensionEligibilityReason,'review complete');
+  assert.equal(calls,3);
+ },{auditLogger:{enabled:true,record:value=>audit.push(value)},dispatchFn:async(request,_signal,reviewTask,options)=>{
+  calls++;
+  if(mode==='zero')throw Object.assign(new Error('launcher confirmed no process'),{modelExecutionStarted:false});
+  if(mode==='unknown')throw new Error('launcher outcome unavailable');
+  options.onModelStart();return {ok:true,provider:request.provider,model:request.model,text:formattedTaskResult(reviewTask),modelExecutionStarted:true};
+ }});
+ assert.ok(audit.some(record=>record.requestId==='review-zero-launch'&&record.modelExecution===false));
+ assert.ok(audit.some(record=>record.requestId==='review-unknown-launch'&&record.modelExecution===null));
+});
+
+test('invalid reviewer role output cannot persist approval, but actual model use consumes quota',async()=>{
+ let calls=0;
+ const packet=change=>({version:1,stage:'pre-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:[`${change} ${k}`]}]))});
+ await withGateway(async({client})=>{
+  const invoke=(id,change)=>client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'anthropic',model:'claude-sonnet-5',access:'none',requestId:id,task:{role:'Geburah',objective:'Invalid reviewer role result quota',acceptance:['Return review'],reviewPacket:packet(change)}}}).then(parsed);
+  const invalid=await invoke('invalid-role-review','same');assert.equal(invalid.reviewValidation.approved,true);assert.equal(invalid.roleValidation.ok,false);assert.equal(invalid.ok,false);assert.equal(invalid.reviewQuota.used,1);
+  const valid=await invoke('valid-after-invalid-role','same');assert.equal(valid.reviewValidation.approved,true);assert.equal(valid.ok,true);assert.equal(valid.reviewQuota.used,2);assert.equal(calls,2);
+ },{dispatchFn:async(request,_signal,task,options)=>{calls++;const value=roleValue(task.role,task.objective);if(calls===1)value.deliverable.recommendations=7;options.onModelStart();return{ok:true,provider:request.provider,model:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value),modelExecutionStarted:true};}});
+});
+
 test('review material gate blocks before dispatch and rejects non-approval outcomes',async()=>{
  let calls=0;
  const reviewPacket={version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['Synthetic evidence for '+k]}]))};
@@ -455,6 +752,20 @@ test('review material gate blocks before dispatch and rejects non-approval outco
   Object.assign(value,{reviewDecision:'request-changes',missingMaterials:[]});
   return {ok:true,provider:request.provider,model:request.model,requestedProvider:request.provider,requestedModel:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value),toolsUsed:[]};
  }});
+});
+
+test('authenticated wait_subagent wakes on one execution without replay and returns compact redacted metadata',async()=>{
+ let release,calls=0;
+ await withGateway(async({client})=>{
+  const input={cwd:root,provider:'openai-codex',model:'gpt-6-luna',requestId:'wait-mcp',parentRunId:'wait-mcp',access:'none',resourceProfile:'small',task:{role:'Malkuth',objective:'wait for task',acceptance:['Report result']}};
+  assert.equal(parsed(await client.callTool({name:'submit_subagent',arguments:input})).ok,true);
+  while(!release)await new Promise(resolve=>setImmediate(resolve));
+  const waiting=client.callTool({name:'wait_subagent',arguments:{requestId:input.requestId,timeoutMs:5000}},undefined,{timeout:6000,maxTotalTimeout:6000});
+  release();
+  const result=parsed(await waiting);
+  assert.equal(result.ready,true);assert.equal(result.state,'completed');assert.equal(result.gatewayInstanceId.length>0,true);
+  assert.equal(Object.hasOwn(result,'result'),false);assert.equal(calls,1);
+ },{dispatchFn:async(request,_signal,task)=>{calls++;await new Promise(resolve=>{release=resolve;});return {ok:true,provider:request.provider,model:request.model,text:formattedTaskResult(task)};}});
 });
 
 test('async monitor exposes waiting reason and independent deadlines',async()=>{
@@ -477,15 +788,38 @@ test('gateway requires bearer auth and exposes only governed MCP tools', async (
     assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/readyz`)).json(), { ok: true, service: 'pi-kether-gateway' });
     const tools = await client.listTools();
     assert.deepEqual(tools.tools.map(tool => tool.name).sort(), [
-      'cancel_subagent', 'check_claude_auth', 'code_graph', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'get_workflow', 'list_capabilities',
-      'list_host_verification_pending', 'list_subagents', 'lsp_request', 'probe_model', 'project_memory', 'record_host_verification', 'render_subagent_monitor', 'submit_subagent',
+      'cancel_subagent', 'check_claude_auth', 'code_graph', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'get_task_handoff', 'get_workflow', 'list_capabilities',
+      'list_host_verification_pending', 'list_subagents', 'lsp_request', 'probe_model', 'project_memory', 'record_host_verification', 'render_subagent_monitor', 'submit_subagent', 'wait_subagent', 'wait_task_handoff',
     ]);
     const caps = parsed(await client.callTool({ name: 'list_capabilities', arguments: {} }));
     assert.equal(caps.writeEnabled, true);
     assert.equal(caps.resourceLimits.enforced, true);
     assert.equal(caps.resourceLimits.defaultProfile, 'standard');
     assert.equal(caps.resourceLimits.profiles.standard.memoryMiB, 3072);
+    assert.ok(caps.governance.requiredConnectorTools.includes('wait_subagent'));
+    assert.equal(caps.resourceLimits.callerMayOnlyTightenTimeout,false);
+    assert.equal(caps.governance?.timeouts?.completionWait?.maxTimeoutMs,55000);
+    assert.deepEqual(caps.governance.workflowTiers.reviewQuota,{version:2,T1:{basePerStage:1,stageCap:2,totalCap:2,timeMs:600000},T2:{basePerStage:2,stageCap:3,totalCap:5,timeMs:1200000,sharedExtensions:1}});
+    assert.equal(caps.governance.workflowTiers.version,2);
   });
+});
+
+test('T0 all-passed worker checks remain pending until bound host proof',async()=>{
+  await withGateway(async({client})=>{
+    const receipt=await receiptFor(client,'task-tiers');
+    const task={role:'Chesed',objective:'Synthetic T0 host gate',acceptance:['Require actual host checks'],readScope:['package.json'],writeScope:['package.json']};
+    const value=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'t0-all-passed-pending',tier:'T0',tierDeclaration:declaredT1().tierDeclaration,workflowReceipt:receipt,task}}));
+    assert.equal(value.status,'awaiting-host-verification');
+    assert.equal(value.ok,false);
+    assert.equal(value.contract,undefined);
+    assert.deepEqual(value.hostVerification.requiredCheckNames,['worker-check']);
+  },{dispatchFn:async(request,_signal,task)=>{
+    const response=syntheticPatchResponse(request,task);
+    const value=JSON.parse(response.text.slice('KETHER_RESULT_JSON='.length));
+    value.deliverable.checks=[{name:'worker-check',outcome:'passed',evidence:'Worker reported a pass.'}];
+    response.text='KETHER_RESULT_JSON='+JSON.stringify(value);
+    return response;
+  }});
 });
 
 test('host verification is ledger-gated, durably completes the patch, and exposes a distinct waiting state', async () => {
@@ -528,6 +862,64 @@ test('host verification is ledger-gated, durably completes the patch, and expose
     const proof={ok:true,requestId:request.gatewayRequestId,jobId,changedFiles:['package.json'],patchSha256:createHash('sha256').update(patchText,'utf8').digest('hex'),scopeSha256:createHash('sha256').update(canonical,'utf8').digest('hex')};
     return {ok:true,requestId:request.gatewayRequestId,provider:request.provider,model:request.model,requestedProvider:request.provider,requestedModel:request.model,exitCode:0,cleanup:{ok:true},text:'KETHER_RESULT_JSON='+JSON.stringify(value),patch:patchText,patchValidation:proof};
   }});
+});
+
+test('personal-profile T2 dispatch round-trips tier metadata through host attestation and ledger restart', async () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'pi-personal-workspace-'));
+  const ledgerDir = mkdtempSync(join(tmpdir(), 'pi-personal-ledger-'));
+  const requestId = 'personal-tier-roundtrip';
+  const metadataKeys = ['tier','reviewPending','files','addedLines','deletedLines','estimatedLines','baseTier','riskProfile','semanticRisks','reviewRequirement'];
+  try {
+    await withGateway(async ({ client }) => {
+      const workflowReceipt = await receiptFor(client, 'task-tiers');
+      const task = {
+        role: 'Chesed', objective: 'Exercise personal profile downgrade through durable host verification',
+        acceptance: ['Preserve tier metadata after host verification'], readScope: ['package.json'], writeScope: ['package.json'],
+      };
+      const pending = parsed(await client.callTool({name:'dispatch_subagent',arguments:{
+        cwd:workspace,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId,
+        writeScope:['package.json'],tier:'T2',tierDeclaration:{publicApiOrProtocol:false,dependencyOrLockfile:false,securityAuthOrCredentials:false,migration:true,irreversibleOrNoRollback:false},
+        workflowReceipt,task,
+      }}));
+      assert.equal(pending.status, 'awaiting-host-verification', JSON.stringify(pending));
+      assert.equal(pending.baseTier, 'T2');
+      assert.equal(pending.tier, 'T1');
+      assert.equal(pending.riskProfile, 'personal');
+      assert.equal(pending.files, 1);
+      assert.equal(pending.addedLines, 1);
+      assert.equal(pending.deletedLines, 0);
+      assert.equal(pending.estimatedLines, 1);
+      assert.equal(pending.semanticRisks.migration, true);
+      assert.deepEqual(pending.structuredResult.deliverable.checks, [{name:'profile-check',outcome:'unverified',evidence:'host execution unavailable; host must run command'}]);
+
+      const freshReceipt = await receiptFor(client, 'task-tiers');
+      const recorded = parsed(await client.callTool({name:'record_host_verification',arguments:{
+        requestId,artifactSha256:pending.hostVerification.artifactSha256,
+        commands:[{checkName:'profile-check',command:'synthetic personal-profile regression',exitCode:0,outputSummary:'Synthetic evidence only; no host command was executed.'}],
+        workflowReceipt:freshReceipt,
+      }}));
+      assert.equal(recorded.state, 'completed');
+    }, {
+      roots:[workspace], riskProfiles:[{cwd:workspace,riskProfile:'personal'}], requestLedgerDir:ledgerDir,
+      dispatchFn:async(request,_signal,task)=>{
+        const response=syntheticPatchResponse(request,task);
+        const value=JSON.parse(response.text.slice('KETHER_RESULT_JSON='.length));
+        value.deliverable.checks=[{name:'profile-check',outcome:'unverified',evidence:'host execution unavailable; host must run command'}];
+        response.text='KETHER_RESULT_JSON='+JSON.stringify(value);
+        return response;
+      },
+    });
+
+    const reopened = createRequestLedger(ledgerDir);
+    const effective = reopened.getEffectiveResult(requestId);
+    assert.equal(reopened.getOutcome(requestId).state, 'completed');
+    assert.equal(effective.state, 'completed');
+    assert.deepEqual(Object.fromEntries(metadataKeys.map(key=>[key,effective.contract[key]])),
+      Object.fromEntries(metadataKeys.map(key=>[key,key==='semanticRisks'?{publicApiOrProtocol:false,dependencyOrLockfile:false,securityAuthOrCredentials:false,migration:true,irreversibleOrNoRollback:false}:key==='tier'?'T1':key==='reviewPending'?true:key==='files'||key==='addedLines'||key==='estimatedLines'?1:key==='deletedLines'?0:key==='baseTier'?'T2':key==='riskProfile'?'personal':'independent post-review required'])));
+  } finally {
+    rmSync(workspace, {recursive:true,force:true});
+    rmSync(ledgerDir, {recursive:true,force:true});
+  }
 });
 
 test('monitor resource and render tool expose a structured inline card payload', async () => {
@@ -600,6 +992,23 @@ test('asynchronous subagent submission exposes running, completed, list, and can
   }, { dispatchFn });
 });
 
+test('risk profiles resolve canonical cwd ancestors and reject duplicate, malformed, and escaping entries', () => {
+  const temp=mkdtempSync(join(tmpdir(),'pi-profile-roots-'));
+  const outside=mkdtempSync(join(tmpdir(),'pi-profile-outside-'));
+  try {
+    const rootDir=join(temp,'root'), child=join(rootDir,'team'), deeper=join(child,'critical'), sibling=join(temp,'root-team');
+    mkdirSync(deeper,{recursive:true}); mkdirSync(sibling);
+    const symlink=join(rootDir,'escape-link');
+    try { symlinkSync(outside,symlink,'junction'); } catch { /* Unsupported platform privilege: real escape path is still tested below. */ }
+    const runtime=createGatewayRuntime({roots:[rootDir],riskProfiles:[{cwd:rootDir,riskProfile:'critical'},{cwd:child,riskProfile:'personal'},{cwd:deeper,riskProfile:'critical'}],sandboxStatus:verifiedSandbox});
+    assert.equal(runtime.capabilities().riskProfiles.length,3);
+    assert.throws(()=>createGatewayRuntime({roots:[rootDir],riskProfiles:[{cwd:child,riskProfile:'personal'},{cwd:child,riskProfile:'critical'}],sandboxStatus:verifiedSandbox}),/Duplicate canonical/);
+    for(const entry of [{cwd:sibling,riskProfile:'critical'},{cwd:join(rootDir,'missing'),riskProfile:'critical'},{cwd:rootDir,riskProfile:'unknown'},{cwd:rootDir,riskProfile:'critical',extra:true}]) assert.throws(()=>createGatewayRuntime({roots:[rootDir],riskProfiles:[entry],sandboxStatus:verifiedSandbox}));
+    if (process.platform!=='win32') assert.throws(()=>createGatewayRuntime({roots:[rootDir],riskProfiles:[{cwd:outside,riskProfile:'critical'}],sandboxStatus:verifiedSandbox}));
+    if (process.platform!=='win32') assert.throws(()=>createGatewayRuntime({roots:[rootDir],riskProfiles:[{cwd:symlink,riskProfile:'critical'}],sandboxStatus:verifiedSandbox}));
+  } finally { rmSync(temp,{recursive:true,force:true}); rmSync(outside,{recursive:true,force:true}); }
+});
+
 test('verified WSL sandbox enables workspace-write capability', () => {
   const runtime = createGatewayRuntime({
     roots: [root],
@@ -660,11 +1069,15 @@ test('gateway preserves Tifereth trace ids and reports the enforced resource pro
     assert.equal(readResult.resourceLimits.timeoutSeconds, 5);
     assert.equal(readResult.formatValidation.ok, true);
     assert.equal(readResult.structuredResult.status, 'completed');
+    const extended=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...common,requestId:'standard-600',timeoutSeconds:600,access:'read'}}));
+    assert.equal(extended.resourceLimits.timeoutSeconds,600);assert.equal(extended.resourceLimits.defaultRunSeconds,300);assert.equal(extended.resourceLimits.maxRunSeconds,900);assert.equal(extended.resourceLimits.memoryBytes,3*1024**3);
+    const overLimit=await client.callTool({name:'dispatch_subagent',arguments:{...common,requestId:'standard-901',timeoutSeconds:901,access:'read'}});
+    assert.equal(overLimit.isError,true);
     const workflowReceipt=await receiptFor(client,'task-tiers');
     const writeResult = await client.callTool({ name: 'dispatch_subagent', arguments: { ...common, access: 'workspace-write', workflowReceipt, ...declaredT1(), task: { ...task, writeScope: ['package.json'] } } });
     assert.equal(writeResult.isError, false);
     assert.equal(parsed(writeResult).writeScopeEnforced, true);
-  });
+  },{dispatchFn:async(request,_signal,task)=>request.access==='workspace-write' ? syntheticPatchResponse(request,task) : {ok:true,provider:request.provider,model:request.model,text:formattedTaskResult(task)}});
 });
 
 test('workspace-write requires requestId and replays one durable result without redispatch', async () => {
@@ -672,7 +1085,7 @@ test('workspace-write requires requestId and replays one durable result without 
   const records = [];
   const dispatchFn = async (request, _signal, task) => {
     dispatchCount++;
-    return { ok: true, text: formattedTaskResult(task), provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0, patch: 'safe patch' };
+    return syntheticPatchResponse(request,task);
   };
   await withGateway(async ({ client }) => {
     const task = { role: 'worker', acceptance: ['Return the requested observable result.'], objective: 'Prepare one scoped change.', readScope: ['package.json'], writeScope: ['package.json'] };
@@ -724,7 +1137,7 @@ test('overlapping write scopes are serialized across different requestIds', asyn
     maxActive = Math.max(maxActive, active);
     if (task.objective === 'first write') await new Promise(resolvePromise => { releaseFirst = resolvePromise; });
     active--;
-    return { ok: true, text: formattedTaskResult(task), provider: request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, toolsUsed: [], toolErrors: 0, patch: 'safe patch' };
+    return syntheticPatchResponse(request,task);
   };
   await withGateway(async ({ client }) => {
     const workflowReceipt=await receiptFor(client,'task-tiers');
@@ -736,7 +1149,10 @@ test('overlapping write scopes are serialized across different requestIds', asyn
     assert.equal(maxActive, 1);
     releaseFirst();
     const results = await Promise.all([first, second]);
-    assert.equal(results.every(result => parsed(result).ok), true);
+    const pending=results.map(parsed);
+    assert.ok(pending.every(result=>result.status==='awaiting-host-verification'));
+    const completed=await Promise.all(pending.map((response,index)=>completePendingFixture({client,ledgerDir:gatewayLedgerDir(client)},index===0?'lock-one':'lock-two',response)));
+    assert.ok(completed.every(result=>result.state==='completed'));
     assert.equal(maxActive, 1);
   }, { dispatchFn });
 });
@@ -751,28 +1167,67 @@ test('MCP dispatch recovers tool errors only with a completed result and trusted
     const workflowReceipt = await receiptFor(client, 'task-tiers');
     const base = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', workflowReceipt, ...declaredT1(scope), task: { role: 'Chesed', objective: 'Recover a tool error', acceptance: ['Return evidence'], readScope: scope, writeScope: scope } };
     const recovered = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: { ...base, requestId: 'artifact-recovery' } }));
-    assert.equal(recovered.ok, true);
-    assert.equal(recovered.artifactRecovery, true);
-    assert.equal(recovered.unrecoveredErrors, 0);
-    assert.equal(recovered.recoveredErrors, 1);
-    for (const id of ['artifact-transient-denied-attempt', 'artifact-outside', 'artifact-missing', 'artifact-invalid-result', 'artifact-blocked-result', 'artifact-malformed', 'artifact-no-proof', 'artifact-transport', 'artifact-nonzeroexit', 'artifact-agent-error', 'artifact-provider-mismatch', 'artifact-cleanup']) {
+    assert.equal(recovered.status, 'awaiting-host-verification');
+    assert.equal(recovered.ok, false);
+    const effective=await completePendingFixture({client,ledgerDir:gatewayLedgerDir(client)},'artifact-recovery',recovered);
+    assert.equal(effective.state,'completed');
+    assert.equal(effective.artifactRecovery, true);
+    assert.equal(effective.unrecoveredErrors, 0);
+    assert.equal(effective.recoveredErrors, 1);
+    for (const id of ['artifact-transient-denied-attempt', 'artifact-outside', 'artifact-missing', 'artifact-invalid-result', 'artifact-blocked-result', 'artifact-failed-result', 'artifact-unverified-result', 'artifact-status-failed', 'artifact-status-blocked', 'artifact-status-unverified', 'artifact-malformed', 'artifact-no-proof', 'artifact-transport', 'artifact-nonzeroexit', 'artifact-agent-error', 'artifact-provider-mismatch', 'artifact-cleanup']) {
       variant = id;
       const response = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: { ...base, requestId: id } }));
-      assert.equal(response.ok, id === 'artifact-transient-denied-attempt', id);
+      assert.equal(response.ok, false, id);
       if (id === 'artifact-transient-denied-attempt') {
-        assert.equal(response.artifactRecovery, true);
+        assert.equal(response.ok,false);
+        assert.equal(response.status,'awaiting-host-verification');
         assert.equal(response.toolErrors, 1);
-        assert.equal(response.recoveredErrors, 1);
-        assert.equal(response.unrecoveredErrors, 0);
-      } else assert.equal(response.artifactRecovery, undefined, id);
+        const effective = await completePendingFixture({client,ledgerDir:gatewayLedgerDir(client)},id,response);
+        assert.equal(effective.state,'completed');
+        assert.equal(effective.ok,true);
+        assert.equal(effective.artifactRecovery,true);
+        assert.equal(effective.recoveredErrors,1);
+        assert.equal(effective.unrecoveredErrors,0);
+      } else {
+        assert.equal(response.artifactRecovery, undefined, id);
+        assert.equal(response.ok,false,id);
+        assert.equal(response.contract,undefined,id);
+        assert.notEqual(response.status,'awaiting-host-verification',id);
+        if (id.startsWith('artifact-status-')) {
+          const status=id.slice('artifact-status-'.length);
+          assert.equal(response.status,status);
+          assert.equal(response.failure,`agent_status:${status}`);
+          assert.equal(response.hostVerification,undefined);
+        }
+        if (['artifact-transport','artifact-nonzeroexit','artifact-agent-error','artifact-cleanup','artifact-failed-result','artifact-unverified-result'].includes(id)) {
+          assert.equal(response.failure,id);
+          assert.notEqual(response.failure,'PI_HOST_VERIFICATION_REQUIRED');
+          assert.equal(response.hostVerification,undefined);
+          if (id === 'artifact-failed-result') assert.equal(response.status, 'failed');
+          if (id === 'artifact-unverified-result') assert.equal(response.status, 'unverified');
+        }
+      }
     }
   }, { dispatchFn: async (request, _signal, task) => {
     const invalid = variant === 'artifact-invalid-result' || variant === 'artifact-blocked-result';
-    const independentFailure = ['artifact-transport', 'artifact-nonzeroexit', 'artifact-agent-error', 'artifact-provider-mismatch', 'artifact-cleanup'].includes(variant);
+    const independentFailure = ['artifact-transport', 'artifact-nonzeroexit', 'artifact-agent-error', 'artifact-provider-mismatch', 'artifact-cleanup', 'artifact-failed-result', 'artifact-unverified-result'].includes(variant);
     const candidatePatch = variant === 'artifact-missing' ? undefined : variant === 'artifact-outside' ? patch.replaceAll('/package.json', '/outside.js') : variant === 'artifact-malformed' ? 'not a unified patch' : patch;
     const canonicalScope = compileWriteScope(task.writeScope).map(item => `${item.tree ? 'tree' : 'file'}:${item.path}`).sort().join('\\n');
     const proof = { ok: true, requestId: request.gatewayRequestId, jobId, changedFiles: variant === 'artifact-outside' ? ['outside.js'] : ['package.json'], patchSha256: createHash('sha256').update(candidatePatch ?? '', 'utf8').digest('hex'), scopeSha256: createHash('sha256').update(canonicalScope, 'utf8').digest('hex') };
-    return { ok: false, failure: independentFailure ? variant : 'Tool execution failed', provider: variant === 'artifact-provider-mismatch' ? 'other' : request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, text: 'KETHER_RESULT_JSON=' + JSON.stringify(invalid ? (variant === 'artifact-blocked-result' ? { ...roleValue(task.role, task.objective), status: 'blocked' } : { status: 'completed' }) : roleValue(task.role, task.objective)), toolErrors: 1, fileToolErrors: 1, unrecoveredErrors: 1, unrecoveredFileToolErrors: 1, recoverableToolFailure: !independentFailure, recoverableFileToolFailure: !independentFailure, ...(variant === 'artifact-transport' ? { transportError: true } : {}), ...(variant === 'artifact-nonzeroexit' ? { exitCode: 1 } : {}), ...(variant === 'artifact-agent-error' ? { agentError: true } : {}), ...(variant === 'artifact-cleanup' ? { cleanupError: true } : {}), patch: candidatePatch, patchValidation: variant === 'artifact-no-proof' ? undefined : proof };
+    const recoveredValue = invalid ? (variant === 'artifact-blocked-result' ? { ...roleValue(task.role, task.objective), status: 'blocked' } : { status: 'completed' }) : roleValue(task.role, task.objective);
+    if (variant.startsWith('artifact-status-')) {
+      recoveredValue.status=variant.slice('artifact-status-'.length);
+      recoveredValue.errors=[variant];
+      recoveredValue.changedFiles=[...task.writeScope];
+      return {ok:true,failure:null,provider:request.provider,model:request.model,exitCode:0,cleanup:{ok:true},text:'KETHER_RESULT_JSON='+JSON.stringify(recoveredValue),patch:candidatePatch,patchValidation:proof};
+    }
+    if (['artifact-failed-result', 'artifact-unverified-result'].includes(variant)) {
+      recoveredValue.status = variant === 'artifact-failed-result' ? 'failed' : 'unverified';
+      recoveredValue.errors = [variant];
+      recoveredValue.changedFiles = [...task.writeScope];
+    }
+    if (!invalid && !independentFailure && ['valid', 'artifact-transient-denied-attempt'].includes(variant)) recoveredValue.changedFiles = [...task.writeScope];
+    return { ok: false, failure: independentFailure ? variant : 'Tool execution failed', provider: variant === 'artifact-provider-mismatch' ? 'other' : request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, text: 'KETHER_RESULT_JSON=' + JSON.stringify(recoveredValue), toolErrors: 1, fileToolErrors: 1, unrecoveredErrors: 1, unrecoveredFileToolErrors: 1, recoverableToolFailure: !independentFailure, recoverableFileToolFailure: !independentFailure, ...(['valid', 'artifact-transient-denied-attempt', 'artifact-failed-result', 'artifact-unverified-result'].includes(variant) ? { exitCode: 0, cleanup: { ok: true } } : {}), ...(variant === 'artifact-transport' ? { transportError: true } : {}), ...(variant === 'artifact-nonzeroexit' ? { exitCode: 1 } : {}), ...(variant === 'artifact-agent-error' ? { agentError: true } : {}), ...(variant === 'artifact-cleanup' ? { cleanupError: true } : {}), patch: candidatePatch, patchValidation: variant === 'artifact-no-proof' ? undefined : proof };
   } });
 });
 

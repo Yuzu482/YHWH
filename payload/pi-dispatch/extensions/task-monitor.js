@@ -25,7 +25,7 @@ function toolSummary(result) {
 }
 
 function publicRecord(record, now = Date.now()) {
-  const result = record.result;
+  const result = record.result ?? record.resultSummary;
   return {
     requestId: record.requestId,
     parentRunId: record.parentRunId,
@@ -58,9 +58,9 @@ function publicRecord(record, now = Date.now()) {
     outcome: TERMINAL.has(record.state) ? {
       ok: result?.ok === true,
       ...(record.state==='awaiting-host-verification'?{hostVerification:result?.hostVerification??null}:{}),
-      tools: toolSummary(result),
-      tokens: summarizeUsage(result?.usage),
-      patch: summarizePatch(result?.patch),
+      tools: record.resultSummary?.toolSummary ?? toolSummary(result),
+      tokens: record.resultSummary?.tokens ?? summarizeUsage(result?.usage),
+      patch: record.resultSummary?.patchSummary ?? summarizePatch(result?.patch),
       formatValid: result?.formatValidation?.ok,
       reviewDecision:result?.reviewValidation?.decision??result?.reviewDecision,
       missingMaterials:result?.reviewValidation?.missingMaterials??result?.missingMaterials,
@@ -69,19 +69,45 @@ function publicRecord(record, now = Date.now()) {
   };
 }
 
-export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createHeartbeat = createTaskHeartbeat } = {}) {
+export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createHeartbeat = createTaskHeartbeat, maxResultBytes = 134217728, terminalTtlMs = 3600000, maintenanceIntervalMs = 60000, persistResult, loadResult } = {}) {
   if (!gatewayInstanceId) throw new Error('gatewayInstanceId is required');
   if (!Number.isInteger(maxEntries) || maxEntries < 16 || maxEntries > 4096) throw new Error('maxEntries must be an integer from 16 to 4096');
+  for (const [name,value] of Object.entries({maxResultBytes,terminalTtlMs,maintenanceIntervalMs})) if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${name} must be a non-negative safe integer`);
+  if (persistResult !== undefined && typeof persistResult !== 'function' || loadResult !== undefined && typeof loadResult !== 'function') throw new Error('result cache callbacks must be functions');
   const records = new Map();
-
-  function trim() {
-    if (records.size <= maxEntries) return;
-    const terminal = [...records.values()].filter(record => TERMINAL.has(record.state)).sort((a, b) => Date.parse(a.finishedAt) - Date.parse(b.finishedAt));
+  const waiters = new Map();
+  let waiterCount = 0;
+  let closed = false;
+  let resultBytes = 0;
+  const encodedSize = value => Buffer.byteLength(JSON.stringify(value) ?? 'null');
+  const setResult = (record, value) => { resultBytes -= record.resultBytes || 0; record.result=value; record.resultBytes=value==null?0:encodedSize(value); resultBytes += record.resultBytes; };
+  function wakeWaiters(record) {
+    const snapshot = { ok: true, ready: true, requestId: record.requestId, state: record.state, gatewayInstanceId };
+    const pending = waiters.get(record.requestId);
+    if (!pending) return;
+    waiters.delete(record.requestId);
+    for (const waiter of pending) waiter.finish(snapshot);
+  }
+  function persistTerminal(record) {
+    if (typeof persistResult !== 'function' || record.persisted || record.result == null) return;
+    try { record.persisted = persistResult(record.requestId,{state:record.state,result:record.result}) === true; } catch { record.persisted=false; }
+  }
+  function trim(now = Date.now()) {
+    const terminal = [...records.values()].filter(record => TERMINAL.has(record.state)).sort((a,b)=>Date.parse(a.finishedAt||0)-Date.parse(b.finishedAt||0));
     for (const record of terminal) {
-      if (records.size <= maxEntries) break;
-      records.delete(record.requestId);
+      const expired = now - Date.parse(record.finishedAt || now) >= terminalTtlMs;
+      const overCount = records.size > maxEntries;
+      if (!expired && !(resultBytes > maxResultBytes && record.result != null) && !(overCount && records.has(record.requestId))) continue;
+      if (!record.persisted && typeof persistResult === 'function') {
+        try { record.persisted = persistResult(record.requestId,{state:record.state,result:record.result}) === true; } catch { record.persisted=false; }
+      }
+      if (!record.persisted && record.result != null) continue;
+      if (record.result != null) setResult(record,null);
+      if (expired || overCount) records.delete(record.requestId);
     }
   }
+  const maintenanceTimer = maintenanceIntervalMs ? setInterval(()=>trim(),maintenanceIntervalMs) : null;
+  maintenanceTimer?.unref?.();
 
   function submit(input, runner) {
     const requestId = input.requestId;
@@ -119,6 +145,7 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
       finishedAt: null,
       failureReason: null,
       result: null,
+      resultBytes:0, persisted:false,
       phaseTimings:null,
       controller,
       heartbeat,
@@ -141,33 +168,38 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
         if(record.state==='queued') {record.waitReasons=[...value.waitReasons];record.queueDeadlineAt=value.queueDeadlineAt;record.timeoutSeconds=value.executionTimeoutMs/1000;}
       },value=>{record.heartbeat.progress();record.phaseTimings=value;});
     }).then(envelope => {
-      record.result = envelope?.response ?? envelope;
+      const result = envelope?.response ?? envelope;
       record.finishedAt = new Date().toISOString();
       record.heartbeat.stop();
       if (record.state === 'cancelling' || controller.signal.aborted) {
         record.state = 'cancelled';
         record.failureReason = 'cancelled by Tifereth';
-      } else if (record.result?.status === 'awaiting-host-verification') {
+      } else if (result?.status === 'awaiting-host-verification') {
         record.state = 'awaiting-host-verification';
         record.failureReason = null;
-      } else if (record.result?.status==='blocked' || record.result?.reviewValidation?.decision==='insufficient-materials') {
-        record.state='blocked';record.failureReason=redactSensitiveText(record.result.error??record.result.failure);
-      } else if (record.result?.ok === true && envelope?.isError !== true) {
+      } else if (result?.status==='blocked' || result?.reviewValidation?.decision==='insufficient-materials') {
+        record.state='blocked';record.failureReason=redactSensitiveText(result.error??result.failure);
+      } else if (result?.ok === true && envelope?.isError !== true) {
         record.state = 'completed';
       } else {
         record.state = 'failed';
-        record.failureReason = redactSensitiveText(record.result?.error ?? record.result?.failure ?? 'execution failed');
+        record.failureReason = redactSensitiveText(result?.error ?? result?.failure ?? 'execution failed');
       }
+      record.resultSummary = result && typeof result === 'object' ? {provider:result.provider,model:result.model,timings:result.timings,phaseTimings:result.phaseTimings,ok:result.ok,status:result.status,hostVerification:result.hostVerification,formatValidation:result.formatValidation,reviewValidation:result.reviewValidation,reviewDecision:result.reviewDecision,missingMaterials:result.missingMaterials,toolSummary:toolSummary(result),tokens:summarizeUsage(result.usage),patchSummary:summarizePatch(result.patch)} : result;
+      setResult(record,result); persistTerminal(record);
+      wakeWaiters(record);
       trim();
-      return envelope;
+      record.promise=null; record.controller=null;
+      return undefined;
     }).catch(error => {
       record.finishedAt = new Date().toISOString();
       record.heartbeat.stop();
       record.state = record.state === 'cancelling' || controller.signal.aborted ? 'cancelled' : 'failed';
       record.failureReason = redactSensitiveText(record.state === 'cancelled' ? 'cancelled by Tifereth' : error?.message ?? 'execution failed');
-      trim();
-      record.result={ok:false,requestId,error:record.failureReason,phaseTimings:record.phaseTimings};
-      return { response: record.result, isError: true };
+      const result={ok:false,requestId,error:record.failureReason,...(error?.code==='EXECUTION_TIMEOUT'?{failureCode:'EXECUTION_TIMEOUT'}:{}),phaseTimings:record.phaseTimings};
+      record.resultSummary={ok:false,error:record.failureReason,...(error?.code==='EXECUTION_TIMEOUT'?{failureCode:'EXECUTION_TIMEOUT'}:{}),phaseTimings:record.phaseTimings}; setResult(record,result); persistTerminal(record); wakeWaiters(record); trim();
+      record.promise=null; record.controller=null;
+      return undefined;
     });
 
     return { accepted: true, replayed: false, task: publicRecord(record) };
@@ -175,25 +207,77 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
 
   function get(requestId) {
     const record = records.get(requestId);
-    return record ? publicRecord(record) : null;
+    return record ? publicRecord(record.result==null&&record.resultSummary?{...record,result:record.resultSummary}:record) : null;
   }
 
   function getResult(requestId,page={}) {
     const record=records.get(requestId);
-    if(!record)return {ok:false,ready:false,code:'RESULT_NOT_FOUND',requestId,gatewayInstanceId};
+    if(!record) {
+      if(typeof loadResult==='function') {
+        try {
+          const stored=loadResult(requestId);
+          if(stored?.state==='indeterminate') return {ok:false,ready:false,code:'RESULT_INDETERMINATE',requestId,gatewayInstanceId};
+          if(stored && TERMINAL.has(stored.state) && stored.result!=null) return {ok:true,ready:true,requestId,state:stored.state,gatewayInstanceId,...exportResult(stored.result,page)};
+        } catch {}
+      }
+      return {ok:false,ready:false,code:'RESULT_NOT_FOUND',requestId,gatewayInstanceId};
+    }
     if(!TERMINAL.has(record.state))return {ok:true,ready:false,requestId,state:record.state};
-    return {ok:true,ready:true,requestId,state:record.state,gatewayInstanceId,...exportResult(record.result??{ok:false,error:record.failureReason},page)};
+    let result=record.result;
+    if(typeof loadResult==='function') {
+      try {
+        const stored=loadResult(requestId);
+        if(stored?.state==='indeterminate') return {ok:false,ready:false,code:'RESULT_INDETERMINATE',requestId,gatewayInstanceId};
+        if(stored && TERMINAL.has(stored.state)) {
+          if(stored.state!==record.state) return {ok:false,ready:false,code:'RESULT_INDETERMINATE',requestId,gatewayInstanceId};
+          if(stored.result!=null) result=stored.result;
+        }
+      } catch {}
+    }
+    if(result==null) return {ok:false,ready:false,code:'RESULT_NOT_FOUND',requestId,gatewayInstanceId};
+    return {ok:true,ready:true,requestId,state:record.state,gatewayInstanceId,...exportResult(result,page)};
+  }
+
+  function wait(requestId, { timeoutMs = 55000, signal } = {}) {
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 55000) throw new Error('timeoutMs must be an integer from 0 to 55000');
+    const envelope = value => ({ ...value, requestId, gatewayInstanceId });
+    if (closed) return Promise.resolve(envelope({ok:false,ready:false,code:'MONITOR_CLOSED'}));
+    let record = records.get(requestId);
+    if (record && TERMINAL.has(record.state)) return Promise.resolve(envelope({ok:true,ready:true,state:record.state}));
+    if (!record && typeof loadResult === 'function') {
+      try {
+        const stored=loadResult(requestId);
+        if(stored?.state==='indeterminate') return Promise.resolve(envelope({ok:false,ready:false,code:'RESULT_INDETERMINATE'}));
+        if(stored && TERMINAL.has(stored.state)) return Promise.resolve(envelope({ok:true,ready:true,state:stored.state}));
+      } catch {}
+    }
+    if (!record) return Promise.resolve(envelope({ok:false,ready:false,code:'RESULT_NOT_FOUND'}));
+    if (timeoutMs === 0) return Promise.resolve(envelope({ok:true,ready:false,state:record?.state}));
+    if (waiterCount >= 128) return Promise.resolve(envelope({ok:false,ready:false,code:'WAIT_LIMIT'}));
+    if (signal?.aborted) return Promise.resolve(envelope({ok:false,ready:false,code:'WAIT_ABORTED'}));
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = value => { if (settled) return; settled=true; clearTimeout(timer); signal?.removeEventListener('abort',abort); const list=waiters.get(requestId); if(list){list.delete(waiter);if(!list.size)waiters.delete(requestId);} waiterCount--; resolve(value); };
+      const abort = () => finish(envelope({ok:false,ready:false,code:'WAIT_ABORTED'}));
+      const timer=setTimeout(()=>finish(envelope({ok:true,ready:false,state:records.get(requestId)?.state})),timeoutMs);
+      const waiter={finish};
+      if(!waiters.has(requestId))waiters.set(requestId,new Set());
+      waiters.get(requestId).add(waiter); waiterCount++;
+      signal?.addEventListener('abort',abort,{once:true});
+      const latest=records.get(requestId);
+      if(latest && TERMINAL.has(latest.state)) wakeWaiters(latest);
+    });
   }
 
   function resolveHostVerification(requestId, result) {
     const record=records.get(requestId);
     if (!record || record.state!=='awaiting-host-verification' || !result || !['completed','failed'].includes(result.state)) return false;
-    record.result=result;
     record.state=result.state;
+    record.persisted=false;
     record.finishedAt=new Date().toISOString();
     record.failureReason=result.state==='failed' ? redactSensitiveText(result.failure??'host verification failed') : null;
     record.heartbeat.stop();
-    trim();
+    record.resultSummary=result && typeof result==='object'?{provider:result.provider,model:result.model,timings:result.timings,phaseTimings:result.phaseTimings,ok:result.ok,status:result.status,hostVerification:result.hostVerification,formatValidation:result.formatValidation,reviewValidation:result.reviewValidation,reviewDecision:result.reviewDecision,missingMaterials:result.missingMaterials,toolSummary:toolSummary(result),tokens:summarizeUsage(result.usage),patchSummary:summarizePatch(result.patch)}:result; setResult(record,result); persistTerminal(record); wakeWaiters(record); trim();
     return true;
   }
 
@@ -217,5 +301,16 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
     return { accepted: true, reason: 'cancellation_requested', task: publicRecord(record) };
   }
 
-  return { submit, get, getResult, resolveHostVerification, list, cancel, get size() { return records.size; } };
+  function close() {
+    if (closed) return;
+    closed=true;
+    for (const [requestId, pending] of waiters) for (const waiter of [...pending]) waiter.finish({ok:false,ready:false,requestId,code:'MONITOR_CLOSED'});
+    if(maintenanceTimer) clearInterval(maintenanceTimer);
+    for (const record of records.values()) {
+      if (!TERMINAL.has(record.state) || record.result==null) continue;
+      persistTerminal(record);
+      if (record.persisted) setResult(record,null);
+    }
+  }
+  return { submit, get, getResult, wait, resolveHostVerification, list, cancel, close, get size() { return records.size; } };
 }

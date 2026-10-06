@@ -6,6 +6,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {redactSensitiveText} from '../extensions/audit-log.js';
+import {searchProjectMemoryIndex} from './project-memory-index.mjs';
 
 const exec = promisify(execFile);
 const DIRECTORY = '.yhwh/memory';
@@ -28,7 +29,7 @@ const fail = message => { throw new Error(message); };
 const inside = (root, path) => { const rel = relative(root, path); return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); };
 
 // Shared, bounded read-only primitives. The graph writer has a separate fixed destination.
-export const projectFiles = Object.freeze({context, git, checkedPath, readText, sourcePath, safePath, digest});
+export const projectFiles = Object.freeze({context, git, checkedPath, readText, sourcePath, safePath, digest, records, fingerprints});
 
 function safePath(value) {
   if (typeof value !== 'string' || value.length > 500 || !value || /[\\:\x00-\x1f\x7f]/.test(value) || isAbsolute(value)
@@ -242,10 +243,11 @@ export async function projectMemory(input) {
   if (action === 'search') {
     if (!query.trim()) fail('search requires a non-empty query');
     const terms = query.toLocaleLowerCase('en').trim().split(/\s+/);
-    const ranked = entries.filter(e => includeInactive || e.usable).map(e => {
+    const indexed = await searchProjectMemoryIndex({ctx, entries, query, includeInactive});
+    const ranked = (indexed ?? entries.filter(e => includeInactive || e.usable).map(e => {
       const heading = `${e.title} ${e.tags.join(' ')}`.toLocaleLowerCase('en'), body = e.body.toLocaleLowerCase('en');
       return {entry:e,score:terms.reduce((sum,t) => sum + (heading.includes(t) ? 4 : body.includes(t) ? 1 : 0),0)};
-    }).filter(r => r.score > 0).sort((a,b) => b.score - a.score || a.entry.id.localeCompare(b.entry.id));
+    })).filter(r => r.score > 0).sort((a,b) => b.score - a.score || a.entry.id.localeCompare(b.entry.id));
     return {...result,matches:ranked.length,entries:ranked.slice(0,limit).map(({entry,score}) => ({...brief(entry),score,excerpt:entry.body.slice(0,800)}))};
   }
   if (action === 'review') {

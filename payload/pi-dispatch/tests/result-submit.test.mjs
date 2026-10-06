@@ -1,14 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import resultSubmit from '../extensions/result-submit.js';
+import { roleValue } from './contract-fixtures.mjs';
+import { validateRoleResult } from '../extensions/role-contract.js';
 
-function setup() {
+function setup(role) {
   const handlers = {};
   let tool;
+  let ready = false;
+  const flags = new Set();
   resultSubmit({
+    getFlag(name) { return ready && name === 'yhwh-result-role' && flags.has(name) ? role : undefined; },
+    registerFlag(name) { flags.add(name); },
     on(name, handler) { handlers[name] = handler; },
     registerTool(value) { tool = value; },
   });
+  ready = true;
   return { handlers, tool };
 }
 
@@ -28,6 +35,38 @@ test('rejects a second successful submission in the same turn and resets on next
   await assert.rejects(invoke(tool, { ok: false }), /RESULT_ALREADY_SUBMITTED/);
   handlers.agent_start();
   assert.equal((await invoke(tool, { ok: false })).details.canonicalText, 'KETHER_RESULT_JSON={"ok":false}');
+});
+
+test('role rejection is repairable and does not consume the success latch', async () => {
+  const { tool } = setup('Chesed');
+  const invalid = roleValue('Chesed');
+  invalid.errors = ['failed'];
+  const rejected = await invoke(tool, invalid);
+  assert.deepEqual(rejected.details, { type: 'kether_result_rejection', code: 'RESULT_ROLE_SCHEMA_INVALID' });
+  assert.equal(Object.hasOwn(rejected.details, 'canonicalText'), false);
+  const valid = { ...invalid, status: 'failed', errors: [], uncertainty: ['Host test unavailable'], deliverable: { ...invalid.deliverable, checks: [{ name: 'tests', outcome: 'unverified', evidence: 'Host test unavailable', executionLimitation: { executor: 'host', reason: 'worker-execution-unavailable' } }] } };
+  const failedRejected = await invoke(tool, valid);
+  assert.equal(failedRejected.details.type, 'kether_result_rejection');
+  const corrected = { ...valid, status: 'completed' };
+  const accepted = await invoke(tool, corrected);
+  assert.equal(accepted.details.type, 'kether_result_submission');
+  await assert.rejects(invoke(tool, valid), /RESULT_ALREADY_SUBMITTED/);
+});
+
+test('Netzach submits typed host references unchanged for authoritative gateway resolution', async () => {
+  const { tool } = setup('Netzach');
+  const value = roleValue('Netzach');
+  const check = value.deliverable.checks[0];
+  check.evidence = '';
+  check.hostEvidence = { requestId:'fixture-host', artifactSha256:'a'.repeat(64), recordSha256:'b'.repeat(64), checkName:'fixture check' };
+  const invalid = structuredClone(value);
+  invalid.deliverable.checks[0].hostEvidence.recordSha256 = 'invalid';
+  assert.equal((await invoke(tool, invalid)).details.type, 'kether_result_rejection');
+  const accepted = await invoke(tool, value);
+  assert.equal(accepted.details.type, 'kether_result_submission');
+  assert.deepEqual(JSON.parse(accepted.details.canonicalText.slice('KETHER_RESULT_JSON='.length)), value);
+  assert.equal(validateRoleResult(value, 'Netzach').ok, false);
+  assert.equal(validateRoleResult(value, 'Netzach', { hostEvidenceResolver:()=>({ok:false,code:'HOST_EVIDENCE_UNRESOLVED'}) }).ok, false);
 });
 
 test('rejects malformed and non-JSON-safe payloads deterministically', async () => {

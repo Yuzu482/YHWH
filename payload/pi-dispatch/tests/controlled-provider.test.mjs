@@ -54,13 +54,16 @@ test('host config enables only explicit routes, preserves defaults, role/access 
   const req={target:'model',cwd:process.cwd(),provider:'yhwh-reviewer-api',model:'claude-sonnet-5',access:'none',thinking:'max',prompt:'fixture'};
   assert.throws(()=>validateRequest(req),/YHWH_WORKER_ENFORCEMENT_REJECTED/);
   const reviewTask={role:'reviewer',objective:'Review supplied material',acceptance:['Return findings'],reviewPacket:{version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['fixture']}]))}};
-  const request=validateKetherInvocation({cwd:process.cwd(),provider:req.provider,model:req.model,access:'none',task:reviewTask}).request;assert.equal(request.providerConfigDigest,configDigest(base));
-  const launch=buildPiArgs(request,'wsl2');assert.ok(launch.includes('--no-tools'));assert.ok(launch.includes('/opt/pi-kether/extensions/controlled-provider.js'));
+  assert.throws(()=>validateKetherInvocation({cwd:process.cwd(),provider:req.provider,model:req.model,access:'none',task:reviewTask}),{code:'REVIEW_TIER_THINKING_INVALID'});
+  const launch=buildPiArgs({...req,providerConfigDigest:configDigest(base)},'wsl2');assert.ok(launch.includes('--no-tools'));assert.ok(launch.includes('/opt/pi-kether/extensions/controlled-provider.js'));assert.ok(launch.includes(configDigest(base)));
   assert.throws(()=>validateRequest({...req,access:'read'}),/YHWH_WORKER_ENFORCEMENT_REJECTED/);
-  assert.throws(()=>validateKetherInvocation({cwd:process.cwd(),provider:req.provider,model:req.model,access:'none',thinking:'high',task:reviewTask}),/no downgrade/);
+  for(const thinking of ['medium','high','xhigh']) assert.throws(()=>validateKetherInvocation({cwd:process.cwd(),provider:req.provider,model:req.model,access:'none',thinking,task:reviewTask}),/Controlled API requires max thinking; no downgrade/);
   assert.throws(()=>validateRequest({...req,baseUrl:'https://evil.test'}),/Unknown/);
   const reviewPacket={version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:['fixture']}]))};
-  assert.equal(validateKetherInvocation({cwd:process.cwd(),provider:'yhwh-reviewer-api',task:{role:'reviewer',objective:'review',acceptance:['findings'],reviewPacket}}).request.provider,'yhwh-reviewer-api');
+  for(const thinking of ['medium','high','xhigh','max']) {
+   const reviewer={cwd:process.cwd(),provider:'yhwh-reviewer-api',...(thinking==='max'?{}:{thinking}),task:{role:'reviewer',objective:'review',acceptance:['findings'],reviewPacket}};
+   assert.throws(()=>validateKetherInvocation(reviewer),thinking==='max'?{code:'REVIEW_TIER_THINKING_INVALID'}:/Controlled API requires max thinking; no downgrade/);
+  }
  } finally {if(previous===undefined)delete process.env.USERPROFILE;else process.env.USERPROFILE=previous;}
 });
 test('ambient aggregator tokens removed and SDK models preserve max without reporting free usage',()=>{
