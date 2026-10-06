@@ -7,7 +7,7 @@ import {createRequestLedger} from '../extensions/request-ledger.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, join, resolve } from 'node:path';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { request as httpRequest } from 'node:http';
@@ -368,6 +368,42 @@ test('typed failed/unverified outputs and type errors cannot produce successful 
     if(mode==='wrong-type')value.evidence='not an array';else value.status=mode;
     return {ok:true,provider:request.provider,model:request.model,text:'KETHER_RESULT_JSON='+JSON.stringify(value),contract:{version:2,stage:'implementing'}};
   }});
+});
+
+test('reviewer packet is rejected before fake CLI when material is empty and omitted returnFields normalize',async()=>{
+ let launches=0;
+ await withGateway(async({client})=>{
+  const packet={version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(name=>[name,{status:'provided',content:[`${name}: concrete fixture material`]}]))};
+  const invalid=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',requestId:'review-empty-material',resourceProfile:'standard',task:{role:'Geburah',objective:'Review fixture',reviewPacket:{...packet,changes:{status:'provided',content:['  ']}}}}}));
+  assert.equal(invalid.ok,false);assert.equal(invalid.code,'PI_REVIEW_PACKET_INVALID');assert.equal(invalid.modelExecutionStarted,false);assert.equal(launches,0);
+  const response=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'claude-code-cli',model:'claude-sonnet-5',access:'none',requestId:'review-default-fields',resourceProfile:'standard',task:{role:'Geburah',objective:'Review fixture',acceptance:['Return an evidence-based decision'],reviewPacket:packet}}}));
+  assert.equal(response.ok,true,JSON.stringify(response));
+  const justified={...packet,changes:{status:'not-applicable',reason:'No changes in this design review',content:[]},verification:{status:'not-applicable',reason:'No execution applies before implementation',content:[]}};
+  const accepted=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'claude-code-cli',model:'claude-sonnet-5',access:'none',requestId:'review-justified-omissions',resourceProfile:'standard',task:{role:'Geburah',objective:'Review justified omissions',acceptance:['Return an evidence-based decision'],reviewPacket:justified}}}));
+  assert.equal(accepted.ok,true,JSON.stringify(accepted));
+  assert.equal(launches,2);
+ },{dispatchFn:async(request,_signal,task)=>{
+  launches++;
+  assert.ok(task.returnFields.includes('reviewDecision'));
+  assert.ok(task.returnFields.includes('status'));
+  return {ok:true,provider:request.provider,model:request.model,requestedProvider:request.provider,requestedModel:request.model,text:formattedTaskResult(task)};
+ }});
+});
+
+test('invalid new linked review packets reject before monitor, ledger, quota or CLI claims',async()=>{
+ let launches=0;
+ await withGateway(async({client,ledgerDir})=>{
+  const packet={version:1,stage:'pre-change',...Object.fromEntries(['requirements','changes','context','verification'].map(name=>[name,{status:'provided',content:['Concrete fixture material']}]))};
+  for(const tool of ['dispatch_subagent','submit_subagent']) for(const [index,reviewPacket] of [undefined,{}, {...packet,changes:{status:'provided',content:[' ']}}].entries()) {
+   const requestId=`invalid-new-${tool}-${index}`;
+   const input={cwd:root,provider:'claude-code-cli',model:'claude-sonnet-5',access:'none',requestId,parentRunId:'invalid-review-fixture',resourceProfile:'standard',task:{role:'Geburah',objective:'Validate material only',acceptance:['Reject without executing'],reviewPacket,handoff:handoff('pre-review',[])}};
+   const result=parsed(await client.callTool({name:tool,arguments:input}));
+   assert.equal(result.code,'PI_REVIEW_PACKET_INVALID');assert.equal(result.status,'blocked');assert.equal(result.modelExecutionStarted,false);
+   assert.equal(existsSync(join(ledgerDir,createHash('sha256').update(requestId).digest('hex'))),false);
+   assert.equal(createRequestLedger(ledgerDir).getOutcome(requestId).state,'pending');
+   assert.equal(launches,0);
+  }
+ },{dispatchFn:async()=>{launches++;throw new Error('must not launch');}});
 });
 
 test('gateway role validation keeps timeout as primary cause when a complete-looking result is malformed',async()=>{
@@ -741,7 +777,7 @@ test('review material gate blocks before dispatch and rejects non-approval outco
  const base={cwd:root,provider:'anthropic',model:'claude-sonnet-5',access:'none',resourceProfile:'small',task};
  await withGateway(async({client})=>{
   const missing=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,task:{...task,reviewPacket:undefined}}}));
-  assert.equal(missing.status,'blocked');assert.equal(missing.code,'REVIEW_MATERIALS_MISSING');assert.equal(calls,0);
+  assert.equal(missing.status,'blocked');assert.equal(missing.code,'PI_REVIEW_PACKET_INVALID');assert.equal(missing.modelExecutionStarted,false);assert.equal(calls,0);
   const rejected=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,requestId:'review-rejected'}}));
   assert.equal(rejected.ok,false);assert.equal(rejected.reviewValidation.decision,'request-changes');assert.equal(calls,1);
   const dependent=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'none',resourceProfile:'small',queueTimeoutSeconds:1,dependsOnRequestIds:['review-rejected'],task:{role:'worker',objective:'Must not run after failed review',acceptance:['Blocked']}}}));
@@ -1157,12 +1193,12 @@ test('overlapping write scopes are serialized across different requestIds', asyn
   }, { dispatchFn });
 });
 
-test('MCP dispatch recovers tool errors only with a completed result and trusted in-scope patch proof', async () => {
+test('T1 host pending accepts recovered errors but rejects actual unrecovered errors and invalid artifacts', async () => {
   const jobId = '11111111-1111-4111-8111-111111111111';
   const patch = `--- /var/lib/pi-kether/jobs/${jobId}/baseline/package.json\n+++ /var/lib/pi-kether/jobs/${jobId}/workspace/package.json\n@@ -0,0 +1 @@\n+safe\n`;
   const scope = ['package.json'];
   const canonical = compileWriteScope(scope).map(item => `${item.tree ? 'tree' : 'file'}:${item.path}`).sort().join('\\n');
-  let variant = 'valid';
+  let variant = 'recovered';
   await withGateway(async ({ client }) => {
     const workflowReceipt = await receiptFor(client, 'task-tiers');
     const base = { cwd: root, provider: 'openai-codex', model: 'gpt-6-luna', access: 'workspace-write', workflowReceipt, ...declaredT1(scope), task: { role: 'Chesed', objective: 'Recover a tool error', acceptance: ['Return evidence'], readScope: scope, writeScope: scope } };
@@ -1171,24 +1207,15 @@ test('MCP dispatch recovers tool errors only with a completed result and trusted
     assert.equal(recovered.ok, false);
     const effective=await completePendingFixture({client,ledgerDir:gatewayLedgerDir(client)},'artifact-recovery',recovered);
     assert.equal(effective.state,'completed');
-    assert.equal(effective.artifactRecovery, true);
+    assert.equal(effective.artifactRecovery, undefined);
     assert.equal(effective.unrecoveredErrors, 0);
     assert.equal(effective.recoveredErrors, 1);
-    for (const id of ['artifact-transient-denied-attempt', 'artifact-outside', 'artifact-missing', 'artifact-invalid-result', 'artifact-blocked-result', 'artifact-failed-result', 'artifact-unverified-result', 'artifact-status-failed', 'artifact-status-blocked', 'artifact-status-unverified', 'artifact-malformed', 'artifact-no-proof', 'artifact-transport', 'artifact-nonzeroexit', 'artifact-agent-error', 'artifact-provider-mismatch', 'artifact-cleanup']) {
+    for (const id of ['valid', 'artifact-transient-denied-attempt', 'artifact-outside', 'artifact-missing', 'artifact-invalid-result', 'artifact-blocked-result', 'artifact-failed-result', 'artifact-unverified-result', 'artifact-status-failed', 'artifact-status-blocked', 'artifact-status-unverified', 'artifact-malformed', 'artifact-no-proof', 'artifact-transport', 'artifact-nonzeroexit', 'artifact-agent-error', 'artifact-provider-mismatch', 'artifact-cleanup']) {
       variant = id;
       const response = parsed(await client.callTool({ name: 'dispatch_subagent', arguments: { ...base, requestId: id } }));
       assert.equal(response.ok, false, id);
-      if (id === 'artifact-transient-denied-attempt') {
-        assert.equal(response.ok,false);
-        assert.equal(response.status,'awaiting-host-verification');
-        assert.equal(response.toolErrors, 1);
-        const effective = await completePendingFixture({client,ledgerDir:gatewayLedgerDir(client)},id,response);
-        assert.equal(effective.state,'completed');
-        assert.equal(effective.ok,true);
-        assert.equal(effective.artifactRecovery,true);
-        assert.equal(effective.recoveredErrors,1);
-        assert.equal(effective.unrecoveredErrors,0);
-      } else {
+      {
+        if (['valid','artifact-transient-denied-attempt'].includes(id)) assert.equal(response.unrecoveredErrors,1,id);
         assert.equal(response.artifactRecovery, undefined, id);
         assert.equal(response.ok,false,id);
         assert.equal(response.contract,undefined,id);
@@ -1226,7 +1253,8 @@ test('MCP dispatch recovers tool errors only with a completed result and trusted
       recoveredValue.errors = [variant];
       recoveredValue.changedFiles = [...task.writeScope];
     }
-    if (!invalid && !independentFailure && ['valid', 'artifact-transient-denied-attempt'].includes(variant)) recoveredValue.changedFiles = [...task.writeScope];
+    if (!invalid && !independentFailure && ['recovered', 'valid', 'artifact-transient-denied-attempt'].includes(variant)) recoveredValue.changedFiles = [...task.writeScope];
+    if (variant === 'recovered') return {ok:true,failure:null,provider:request.provider,model:request.model,requestedProvider:request.provider,requestedModel:request.model,exitCode:0,cleanup:{ok:true},toolErrors:1,unrecoveredErrors:0,recoveredErrors:1,text:'KETHER_RESULT_JSON='+JSON.stringify(recoveredValue),patch:candidatePatch,patchValidation:proof};
     return { ok: false, failure: independentFailure ? variant : 'Tool execution failed', provider: variant === 'artifact-provider-mismatch' ? 'other' : request.provider, model: request.model, requestedProvider: request.provider, requestedModel: request.model, text: 'KETHER_RESULT_JSON=' + JSON.stringify(recoveredValue), toolErrors: 1, fileToolErrors: 1, unrecoveredErrors: 1, unrecoveredFileToolErrors: 1, recoverableToolFailure: !independentFailure, recoverableFileToolFailure: !independentFailure, ...(['valid', 'artifact-transient-denied-attempt', 'artifact-failed-result', 'artifact-unverified-result'].includes(variant) ? { exitCode: 0, cleanup: { ok: true } } : {}), ...(variant === 'artifact-transport' ? { transportError: true } : {}), ...(variant === 'artifact-nonzeroexit' ? { exitCode: 1 } : {}), ...(variant === 'artifact-agent-error' ? { agentError: true } : {}), ...(variant === 'artifact-cleanup' ? { cleanupError: true } : {}), patch: candidatePatch, patchValidation: variant === 'artifact-no-proof' ? undefined : proof };
   } });
 });

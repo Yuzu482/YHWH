@@ -60,7 +60,7 @@ export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeou
   let modelExecutionStarted = false;
   const output = fields => ({ ...clean(fields), modelExecutionStarted });
   if (signal?.aborted) return clean({ status: 'failed', reason: 'cancelled' });
-  if (!['medium','high','xhigh'].includes(thinking) || typeof packet !== 'string' || !packet.length || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
+  if (!['medium','high','xhigh'].includes(thinking) || typeof packet !== 'string' || !packet.trim() || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
       !Number.isSafeInteger(preflightBudgetMs) || preflightBudgetMs < 1 ||
       !existsFile(nodePath) || !existsFile(cliScript) || !/\.[cm]?js$/i.test(cliScript))
     return clean({ status: 'failed', reason: 'invalid_configuration' });

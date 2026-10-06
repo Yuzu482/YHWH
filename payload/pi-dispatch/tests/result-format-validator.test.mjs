@@ -85,6 +85,8 @@ test('qualifies only explicit host-unrun checks bound to the exact trusted patch
     input.value.status = status;
     assert.deepEqual(evaluateHostVerificationCandidate(input), {eligible: true, requiredCheckNames: ['npm test']});
   }
+  const blocked=hostCandidateFixture();blocked.value.status='blocked';
+  assert.deepEqual(evaluateHostVerificationCandidate({...blocked,forceHost:true}),{eligible:false,requiredCheckNames:[]});
 });
 
 test('typed Chesed execution limitation qualifies independently of prose but never bypasses qualification gates', () => {
@@ -96,8 +98,11 @@ test('typed Chesed execution limitation qualifies independently of prose but nev
   const malformed=[null,{}, {executor:'host'}, {executor:'worker',reason:'worker-execution-unavailable'}, {executor:'host',reason:'other'}, {executor:'host',reason:'worker-execution-unavailable',extra:true}, 'worker-execution-unavailable'];
   for(const limitation of malformed)for(const forceHost of [false,true]){
     const changed=structuredClone(input);changed.value.deliverable.checks[0].executionLimitation=limitation;
-    assert.deepEqual(evaluateHostVerificationCandidate({...changed,forceHost}),{eligible:false,requiredCheckNames:[]});
+    const expected=forceHost?{eligible:true,requiredCheckNames:['host tests']}:{eligible:false,requiredCheckNames:[]};
+    assert.deepEqual(evaluateHostVerificationCandidate({...changed,forceHost}),expected);
   }
+  const tooLarge=structuredClone(input);tooLarge.value.deliverable.checks[0].executionLimitation={detail:'x'.repeat(4097)};
+  assert.deepEqual(evaluateHostVerificationCandidate({...tooLarge,forceHost:true}),{eligible:false,requiredCheckNames:[]});
   for(const mutate of [
     value=>{value.status='unverified';},
     value=>{value.status='blocked';},
@@ -107,7 +112,8 @@ test('typed Chesed execution limitation qualifies independently of prose but nev
     value=>{value.deliverable.checks[0].outcome='failed';},
   ])for(const forceHost of [false,true]){
     const changed=structuredClone(input);mutate(changed.value);
-    assert.deepEqual(evaluateHostVerificationCandidate({...changed,forceHost}),{eligible:false,requiredCheckNames:[]});
+    const allowed=forceHost&&['completed','unverified'].includes(changed.value.status)&&changed.value.errors.length===0&&['passed','unverified'].includes(changed.value.deliverable.checks[0].outcome);
+    assert.deepEqual(evaluateHostVerificationCandidate({...changed,forceHost}),allowed?{eligible:true,requiredCheckNames:['host tests']}:{eligible:false,requiredCheckNames:[]});
   }
 });
 
@@ -126,7 +132,8 @@ test('recognizes concrete English and Chinese execution limitations without broa
     input.value.status = status;
     input.value.deliverable.checks[0].evidence = evidence;
     const expected = forceHost ? ['npm test', 'static inspection'] : ['npm test'];
-    assert.deepEqual(evaluateHostVerificationCandidate({...input, forceHost}), {eligible: true, requiredCheckNames: expected}, `${status}/${forceHost}: ${evidence}`);
+    const allowed=!forceHost||status!=='blocked';
+    assert.deepEqual(evaluateHostVerificationCandidate({...input, forceHost}), {eligible: allowed, requiredCheckNames: allowed?expected:[]}, `${status}/${forceHost}: ${evidence}`);
   }
 
   for (const evidence of [
@@ -153,6 +160,25 @@ test('recognizes concrete English and Chinese execution limitations without broa
     input.value.deliverable.checks[0].evidence = positives[3];
     mutate(input);
     assert.deepEqual(evaluateHostVerificationCandidate(input), {eligible: false, requiredCheckNames: []});
+  }
+});
+
+test('forced T0/T1 host-pending is artifact-driven while malformed limitation metadata is informational only for T2',()=>{
+  for(const status of ['completed','unverified']){
+    const input=hostCandidateFixture();input.value.status=status;
+    input.value.deliverable.checks=[{name:'worker check',outcome:'unverified',evidence:'No explanation wording required.'}];
+    assert.deepEqual(evaluateHostVerificationCandidate({...input,forceHost:true}),{eligible:true,requiredCheckNames:['worker check']});
+  }
+  for(const metadata of [null,'not-canonical']){
+    const input=hostCandidateFixture();input.value.deliverable.checks=[{name:'worker check',outcome:'unverified',evidence:'not explicit host language',executionLimitation:metadata}];
+    assert.deepEqual(evaluateHostVerificationCandidate(input),{eligible:false,requiredCheckNames:[]});
+    assert.deepEqual(evaluateHostVerificationCandidate({...input,forceHost:true}),{eligible:true,requiredCheckNames:['worker check']});
+  }
+  const recovered=hostCandidateFixture();recovered.raw.toolErrors=1;recovered.raw.unrecoveredErrors=0;
+  assert.deepEqual(evaluateHostVerificationCandidate({...recovered,forceHost:true}),{eligible:true,requiredCheckNames:['npm test','static inspection']});
+  for(const raw of [{toolErrors:1},{toolErrors:1,unrecoveredErrors:1}]){
+    const failed=hostCandidateFixture();Object.assign(failed.raw,raw);
+    assert.deepEqual(evaluateHostVerificationCandidate({...failed,forceHost:true}),{eligible:false,requiredCheckNames:[]});
   }
 });
 
@@ -230,7 +256,7 @@ test('rejects unrelated failure, bad checks, malformed evidence, and unbound hos
   }
 });
 
-test('allows a specifically attested recoverable file-tool failure but rejects other failures', () => {
+test('allows a specifically attested recoverable file-tool failure only for non-forced T2 admission', () => {
   const input = hostCandidateFixture();
   input.raw.ok = false;
   input.raw.failure = 'Tool execution failed';
@@ -242,6 +268,7 @@ test('allows a specifically attested recoverable file-tool failure but rejects o
   input.raw.unrecoveredFileToolErrors = 1;
   input.value.errors = ['write tool failed for a transient file operation'];
   assert.deepEqual(evaluateHostVerificationCandidate(input), {eligible: true, requiredCheckNames: ['npm test']});
+  assert.deepEqual(evaluateHostVerificationCandidate({...input,forceHost:true}), {eligible:false,requiredCheckNames:[]});
 
   for (const mutate of [
     x => { x.raw.recoverableFileToolFailure = false; },

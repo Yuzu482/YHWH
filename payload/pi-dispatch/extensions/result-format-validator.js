@@ -15,14 +15,19 @@ const FILE_TOOL_ERROR = /(?:\b(?:read|edit|write)\b.*\b(?:error|fail(?:ed|ure)?|
 const SHA256 = /^[a-f0-9]{64}$/;
 const EXECUTION_LIMITATION_KEYS = ['executor', 'reason'];
 
-function hasValidExecutionLimitation(check, value) {
+function hasValidExecutionLimitation(check) {
   if (!Object.hasOwn(check, 'executionLimitation')) return true;
-  const limitation = check.executionLimitation;
-  return value.status === 'completed' && value.errors.length === 0 && check.outcome === 'unverified' &&
-    limitation !== null && typeof limitation === 'object' && !Array.isArray(limitation) &&
-    Object.keys(limitation).length === EXECUTION_LIMITATION_KEYS.length &&
-    EXECUTION_LIMITATION_KEYS.every(key => Object.hasOwn(limitation, key)) &&
-    limitation.executor === 'host' && limitation.reason === 'worker-execution-unavailable';
+  let bytes, depth=0;
+  try { const metadata=check.executionLimitation; bytes=Buffer.byteLength(JSON.stringify(metadata),'utf8'); const visit=(node,d)=>{depth=Math.max(depth,d);if(node&&typeof node==='object')for(const child of Object.values(node))visit(child,d+1);};visit(metadata,0); }
+  catch { return false; }
+  return bytes<=4096 && depth<=8;
+}
+
+function hasCanonicalHostLimitation(check, value) {
+  const metadata=check?.executionLimitation;
+  return value.status==='completed' && value.errors.length===0 && check.outcome==='unverified' &&
+    !!metadata && typeof metadata==='object' && !Array.isArray(metadata) &&
+    Object.keys(metadata).length===2 && metadata.executor==='host' && metadata.reason==='worker-execution-unavailable';
 }
 const UUID_V4 = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const MAX_HOST_CHECKS = 32;
@@ -53,7 +58,7 @@ export function evaluateHostVerificationCandidate({task, access, raw, value, pat
   const denied = rejectedHostVerificationCandidate();
   if (!task || task.role !== 'Chesed' || access !== 'workspace-write' ||
       typeof task.requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(task.requestId)) return denied;
-  if (typeof forceHost !== 'boolean' || !raw || !value || !['completed', 'unverified', 'blocked'].includes(value.status)) return denied;
+  if (typeof forceHost !== 'boolean' || !raw || !value || !(forceHost ? ['completed', 'unverified'].includes(value.status) : ['completed', 'unverified', 'blocked'].includes(value.status))) return denied;
   if (typeof value.result !== 'string' || !value.result.trim() || !Array.isArray(value.evidence) ||
       value.evidence.length === 0 || value.evidence.some(item => typeof item !== 'string' || !item.trim()) ||
       !exactUniqueStrings(value.changedFiles) || !Array.isArray(value.errors) ||
@@ -67,21 +72,23 @@ export function evaluateHostVerificationCandidate({task, access, raw, value, pat
   const requiredCheckNames = [];
   for (const check of checks) {
     if (!check || typeof check !== 'object' || Array.isArray(check) ||
-        !hasValidExecutionLimitation(check, value) ||
+        !hasValidExecutionLimitation(check) ||
         typeof check.name !== 'string' || !check.name.trim() || check.name.length > 128 || names.has(check.name) ||
         typeof check.evidence !== 'string' || !check.evidence.trim()) return denied;
     names.add(check.name);
     if (check.outcome === 'failed' || !['passed', 'unverified'].includes(check.outcome)) return denied;
-    const typedHostLimitation = Object.hasOwn(check, 'executionLimitation');
+    const typedHostLimitation = hasCanonicalHostLimitation(check, value);
+    // Optional metadata is informational for compact host verification. Preserve
+    // the stricter typed-proof conditions of the non-forced T2 handoff.
+    if (!forceHost && Object.hasOwn(check,'executionLimitation') && !typedHostLimitation) return denied;
     if (forceHost) {
-      if (check.outcome === 'unverified' && !typedHostLimitation && !isHostExecutionReason(check.evidence)) return denied;
       requiredCheckNames.push(check.name);
     } else if (check.outcome === 'unverified') {
       if (!typedHostLimitation && !isHostExecutionReason(check.evidence)) return denied;
       requiredCheckNames.push(check.name);
     }
   }
-  if (!requiredCheckNames.length || (forceHost && requiredCheckNames.length !== checks.length) || (forceHost && value.status !== 'completed' && !checks.some(check => check.outcome === 'unverified' && isHostExecutionReason(check.evidence)))) return denied;
+  if (!requiredCheckNames.length || (forceHost && requiredCheckNames.length !== checks.length)) return denied;
 
   const requestId = task.requestId;
   const validation = raw.patchValidation;
@@ -95,7 +102,9 @@ export function evaluateHostVerificationCandidate({task, access, raw, value, pat
       typeof raw.patch !== 'string' || !raw.patch.trim() ||
       createHash('sha256').update(raw.patch, 'utf8').digest('hex') !== validation.patchSha256) return denied;
 
-  if (raw.exitCode !== 0 || raw.failureCode || raw.routeMismatch === true || raw.authFailure === true ||
+  const unrecoveredErrors = Number.isFinite(raw.unrecoveredErrors) ? raw.unrecoveredErrors : raw.toolErrors;
+  if ((forceHost && ((Number.isFinite(unrecoveredErrors) && unrecoveredErrors > 0) || value.errors.length > 0)) ||
+      raw.exitCode !== 0 || raw.failureCode || raw.routeMismatch === true || raw.authFailure === true ||
       raw.providerFailure === true || raw.transportError === true || raw.timeout === true || raw.agentError === true ||
       raw.truncated === true || raw.outputTruncated === true || raw.textTruncated === true ||
       raw.cleanupError === true || raw.cleanup?.ok === false) return denied;

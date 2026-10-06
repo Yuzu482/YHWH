@@ -7,7 +7,15 @@ import { spawnSync } from 'node:child_process';
 import {
   buildAuditRecord, createAuditLogger, redactSensitiveText,
   summarizePatch, summarizeTaskEnvelope, summarizeUsage,
+  summarizeOutputLimit,
 } from '../extensions/audit-log.js';
+
+test('output-limit diagnostics keep bounded counters and never retain task/patch secrets',()=>{
+  assert.deepEqual(summarizeOutputLimit({bucket:'direct',directBytes:129,limitBytes:128,task:'secret',patch:'source',credential:'private'}),{bucket:'direct',directBytes:129,limitBytes:128});
+  assert.equal(summarizeOutputLimit({bucket:'guessed-tool-output'}),undefined);
+  const r=buildAuditRecord({requestId:'limit',operation:'dispatch_subagent',input:{access:'workspace-write'},task:null,result:{ok:false,failure:'output-limit',outputLimitObservation:{bucket:'patch',patchBytes:7000000,limitBytes:6291456,body:'private patch'}}});
+  assert.equal(r.outputLimitObservation.bucket,'patch');assert.equal(JSON.stringify(r).includes('private patch'),false);
+});
 
 test('audit summaries retain evidence without raw task or patch text', () => {
   const secret = 'sk-super-secret-123456789';
@@ -146,6 +154,15 @@ test('host telemetry is bounded, redacted, and acceptance requires a bound host 
   assert.doesNotMatch(JSON.stringify(invalid), /secret|not a timestamp/);
   const badCounts = buildAuditRecord({ telemetry:{ counts:{ files:1, addedLines:2, deletedLines:1, estimatedLines:8 } } });
   assert.equal(badCounts.counts, undefined);
+});
+
+test('audit records only bounded execution-limitation warning codes and counts',()=>{
+  const warning=buildAuditRecord({operation:'dispatch_subagent',result:{ok:true,roleValidation:{warnings:['execution-limitation-invalid','untrusted arbitrary prose','execution-limitation-invalid']}}});
+  assert.deepEqual(warning.metadataWarnings,{codes:['execution-limitation-invalid'],count:2});
+  assert.deepEqual(warning.roleValidation,{warnings:['execution-limitation-invalid','execution-limitation-invalid']});
+  assert.doesNotMatch(JSON.stringify(warning),/untrusted arbitrary prose/);
+  const clean=buildAuditRecord({operation:'dispatch_subagent',result:{ok:true,roleValidation:{warnings:['other']}}});
+  assert.equal(clean.metadataWarnings,undefined);
 });
 
 test('audit outcomes separate successful operation from task decision', () => {

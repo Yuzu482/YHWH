@@ -13,13 +13,22 @@ test('review packet requires all evidence sections and fixed decision fields',()
   assert.throws(()=>requireReviewMaterials(validateKetherTask({...task,reviewPacket:p})),e=>e.code==='REVIEW_MATERIALS_MISSING'&&e.missingMaterials.includes(key));
  }
  assert.throws(()=>requireReviewMaterials(validateKetherTask({role:'reviewer',objective:'No packet'})),/Review materials missing/);
+ const empty=packet();empty.changes={status:'provided',content:['  ']};
+ assert.throws(()=>validateKetherTask({role:'reviewer',objective:'Empty material',reviewPacket:empty}),/Invalid reviewPacket.changes.content/);
+ assert.throws(()=>requireReviewMaterials({role:'reviewer',reviewPacket:empty}),e=>e.code==='REVIEW_MATERIALS_MISSING'&&e.missingMaterials.includes('changes'));
  assert.throws(()=>requireReviewMaterials({...task,returnFields:['status']}),/must include/);
+ const omittedFields={...task};delete omittedFields.returnFields;
+ assert.doesNotThrow(()=>requireReviewMaterials(omittedFields));
+ assert.throws(()=>requireReviewMaterials({...task,returnFields:'status'}),/must be an array/);
 });
 test('review omissions require explicit justification and cannot omit requirements or context',()=>{
- const p=packet();p.changes={status:'not-applicable',reason:'Pre-change design review; no diff exists',content:[]};p.stage='pre-change';
+ const p=packet();p.changes={status:'not-applicable',reason:'Pre-change design review; no diff exists',content:[]};p.verification={status:'not-applicable',reason:'No host execution is applicable before changes',content:[]};p.stage='pre-change';
  assert.doesNotThrow(()=>validateReviewPacket(p));
+ assert.doesNotThrow(()=>requireReviewMaterials(validateKetherTask({role:'Geburah',objective:'Review justified omissions',reviewPacket:p})));
  delete p.changes.reason;assert.throws(()=>validateReviewPacket(p),/justification/);
  p.changes={status:'missing'};p.context={status:'not-applicable',reason:'skip'};assert.throws(()=>validateReviewPacket(p),/justification/);
+ p.context={status:'provided',content:['Context']};p.requirements={status:'not-applicable',reason:'skip'};
+ assert.throws(()=>requireReviewMaterials({role:'Geburah',reviewPacket:p}),e=>e.code==='REVIEW_MATERIALS_MISSING'&&e.missingMaterials.includes('requirements'));
 });
 test('trusted T1 packet cap measures normalized whole-packet UTF-8 bytes and requires post-change',()=>{
  const exact=packet();

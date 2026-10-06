@@ -4,6 +4,17 @@ import { canonicalRole } from '../extensions/role-contract.js';
 
 const tiers = ['T0', 'T1', 'T2'];
 
+export function tierObservation(declaredTier, derived, context = []) {
+  const reasons = context.filter(value => typeof value === 'string' && value.startsWith('TIER_REASON='));
+  const reason = reasons.length === 1 ? reasons[0].slice(12).normalize('NFC').trim() : '';
+  const valid = reasons.length === 1 && reason.length >= 16 && reason.length <= 400
+    && !reason.includes('\0') && !/^(unknown|unsure|safety|conservative|不确定|保险起见)$/i.test(reason);
+  const known = tiers.includes(derived?.effective);
+  return { declaredTier, ...(known ? {derivedTier:derived.effective,
+    tierOverDeclared:tiers.indexOf(declaredTier) > tiers.indexOf(derived.effective) && !valid} : {}),
+    ...(valid ? {tierReason:reason} : {}), ...(reasons.length && !valid ? {tierReasonInvalid:true} : {}) };
+}
+
 export const tierDeclarationSchema = z.object({
   publicApiOrProtocol: z.boolean(),
   dependencyOrLockfile: z.boolean(),

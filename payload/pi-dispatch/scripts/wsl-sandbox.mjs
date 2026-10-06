@@ -120,12 +120,13 @@ export function buildSandboxScopeManifest({readScope = [], writeScope = [], fixt
 export function createJsonOutputCollector(limit) {
   if(!Number.isSafeInteger(limit)||limit<1)throw new RangeError('Invalid output budget');
   const patchLimit=6*1024*1024, wireLimit=16*limit+patchLimit;
-  let stdout='',stderr='',pending='',patch='',wire=0,retained=0,patchBytes=0,failure=null,patching=false;
+  let stdout='',stderr='',pending='',patch='',wire=0,retained=0,patchBytes=0,failure=null,patching=false,outputLimitObservation;
+  const exceeded=(bucket,limitBytes,extra={})=>{failure='output-limit';outputLimitObservation??={bucket,limitBytes,wireBytes:wire,retainedBytes:retained,patchBytes,...extra};};
   const append=(stream,text)=>{
     if(failure)return;
-    if(stream==='patch'){patchBytes+=Buffer.byteLength(text);if(patchBytes>patchLimit)failure='output-limit';else patch+=text;return;}
+    if(stream==='patch'){patchBytes+=Buffer.byteLength(text);if(patchBytes>patchLimit)exceeded('patch',patchLimit);else patch+=text;return;}
     retained+=Buffer.byteLength(text);
-    if(retained>limit){failure='output-limit';return;}
+    if(retained>limit){exceeded('retained',limit);return;}
     if(stream==='stdout')stdout+=text;else stderr+=text;
   };
   const line=text=>{
@@ -137,18 +138,20 @@ export function createJsonOutputCollector(limit) {
   return {
     feed(stream,chunk){
       if(failure)return;
-      wire+=Buffer.byteLength(chunk);if(wire>wireLimit){failure='output-limit';return;}
+      wire+=Buffer.byteLength(chunk);if(wire>wireLimit){exceeded('wire',wireLimit);return;}
       if(stream==='stderr'||patching){append(stream==='stderr'?'stderr':'patch',chunk);return;}
       pending+=chunk;
       let end;
       while(!failure&&(end=pending.indexOf('\n'))>=0){
         const text=pending.slice(0,end+1);pending=pending.slice(end+1);
-        if(Buffer.byteLength(text)>(text.startsWith(PATCH_MARKER.slice(1))?patchLimit:limit)){failure='output-limit';break;}
+        const frameBytes=Buffer.byteLength(text),frameLimit=text.startsWith(PATCH_MARKER.slice(1))?patchLimit:limit;
+        if(frameBytes>frameLimit){exceeded('frame',frameLimit,{frameBytes});break;}
         line(text);if(patching){append('patch',pending);pending='';break;}
       }
-      if(Buffer.byteLength(pending)>(pending.startsWith(PATCH_MARKER.slice(1))?patchLimit:limit))failure='output-limit';
+      const pendingBytes=Buffer.byteLength(pending),pendingLimit=pending.startsWith(PATCH_MARKER.slice(1))?patchLimit:limit;
+      if(!failure&&pendingBytes>pendingLimit)exceeded('pending',pendingLimit,{pendingBytes});
     },
-    close(){if(pending&&!failure)line(pending);pending='';return {stdout:stdout+(failure?'':patch),stderr,failure};},
+    close(){if(pending&&!failure)line(pending);pending='';return {stdout:stdout+(failure?'':patch),stderr,failure,...(outputLimitObservation?{outputLimitObservation}: {})};},
     failed(){return failure;},
   };
 }
@@ -169,7 +172,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     const scopeManifest = buildSandboxScopeManifest({readScope, writeScope, fixtureScope});
     const commandArgs = wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args]);
     const timeline=createExecutionTimeline({onProgress});
-    let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false;
+    let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false,outputLimitObservation;
     const collector=!editorBroker&&args.includes('--mode')&&args[args.indexOf('--mode')+1]==='json'?createJsonOutputCollector(resourceLimits.outputBytes):null;
     const child = spawn('wsl.exe', commandArgs, { env, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     const stop = (reason) => {
@@ -192,7 +195,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
       signal?.removeEventListener('abort', abort);
       timeline.close();
       await editorRpc?.close();
-      if(collector){const captured=collector.close();stdout=captured.stdout;stderr=captured.stderr;failure ||= captured.failure;}
+      if(collector){const captured=collector.close();stdout=captured.stdout;stderr=captured.stderr;failure ||= captured.failure;outputLimitObservation=captured.outputLimitObservation??outputLimitObservation;}
       const patchFailure = (() => {
         const terminal = stderr.endsWith('\n') ? stderr.slice(0, -1).split('\n').at(-1) : stderr.split('\n').at(-1);
         return PATCH_FAILURES.has(terminal) ? terminal : null;
@@ -205,7 +208,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
 
       }
       if (patchFailure) {
-        done({ exitCode: code, failure: patchFailure, failureCode: patchFailure, stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode}, phaseTimings: timeline.snapshot() });
+        done({ exitCode: code, failure: failure??patchFailure, failureCode: patchFailure, ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode}, phaseTimings: timeline.snapshot() });
         return;
       }
       try {
@@ -213,15 +216,15 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
         const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access });
         const patchValidation = proof.patchValidation;
         if (proof.failure) failure ||= proof.failure;
-        done({ exitCode: code, failure, stdout: separated.stdout, stderr: separated.stderr, patch: separated.patch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: separated.patchSha256, patchBytes: separated.patchBytes } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
+        done({ exitCode: code, failure, ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: separated.stdout, stderr: separated.stderr, patch: separated.patch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: separated.patchSha256, patchBytes: separated.patchBytes } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
       } catch {
-        done({ exitCode: code, failure: 'PI_PATCH_INVALID_BYTES', failureCode: 'PI_PATCH_INVALID_BYTES', stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode},phaseTimings:timeline.snapshot() });
+        done({ exitCode: code, failure: failure??'PI_PATCH_INVALID_BYTES', failureCode: 'PI_PATCH_INVALID_BYTES', ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode},phaseTimings:timeline.snapshot() });
       }
     };
     const collect = (stream) => (chunk) => {
       if(collector){if(stream==='stdout')timeline.feed(chunk);collector.feed(stream,chunk);if(collector.failed())stop(collector.failed());return;}
       bytes += Buffer.byteLength(chunk);
-      if (bytes > resourceLimits.outputBytes) { stop('output-limit'); return; }
+      if (bytes > resourceLimits.outputBytes) { outputLimitObservation={bucket:'direct',directBytes:bytes,limitBytes:resourceLimits.outputBytes};stop('output-limit'); return; }
       if (stream === 'stdout') {if(editorRpc)editorRpc.feed(chunk);else {stdout += chunk;timeline.feed(chunk);}} else stderr += chunk;
     };
     const editorRpc=editorBroker?createEditorRpc({broker:editorBroker,maxBytes:resourceLimits.outputBytes,send:line=>{if(!settled&&!killing)child.stdin.write(line);},onOutput:chunk=>{stdout+=chunk;timeline.feed(chunk);},onFailure:stop}):null;

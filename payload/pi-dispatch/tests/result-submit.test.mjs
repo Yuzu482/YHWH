@@ -44,13 +44,29 @@ test('role rejection is repairable and does not consume the success latch', asyn
   const rejected = await invoke(tool, invalid);
   assert.deepEqual(rejected.details, { type: 'kether_result_rejection', code: 'RESULT_ROLE_SCHEMA_INVALID' });
   assert.equal(Object.hasOwn(rejected.details, 'canonicalText'), false);
-  const valid = { ...invalid, status: 'failed', errors: [], uncertainty: ['Host test unavailable'], deliverable: { ...invalid.deliverable, checks: [{ name: 'tests', outcome: 'unverified', evidence: 'Host test unavailable', executionLimitation: { executor: 'host', reason: 'worker-execution-unavailable' } }] } };
-  const failedRejected = await invoke(tool, valid);
+  const invalidCheck = { ...invalid, status: 'failed', errors: [], uncertainty: ['Host test unavailable'], deliverable: { ...invalid.deliverable, checks: [{ name: 'tests', outcome: 'unknown', evidence: 'Host test unavailable', executionLimitation: { executor: 'host', reason: 'worker-execution-unavailable' } }] } };
+  const failedRejected = await invoke(tool, invalidCheck);
   assert.equal(failedRejected.details.type, 'kether_result_rejection');
-  const corrected = { ...valid, status: 'completed' };
+  const corrected = structuredClone(invalidCheck);
+  corrected.status='completed';corrected.deliverable.checks[0].outcome='unverified';
   const accepted = await invoke(tool, corrected);
   assert.equal(accepted.details.type, 'kether_result_submission');
-  await assert.rejects(invoke(tool, valid), /RESULT_ALREADY_SUBMITTED/);
+  await assert.rejects(invoke(tool, corrected), /RESULT_ALREADY_SUBMITTED/);
+});
+
+test('bounded optional Chesed limitation metadata is retained without changing worker status', async () => {
+  for (const status of ['completed','unverified','failed','blocked']) for (const executionLimitation of [null,'explanation',{executor:'host',reason:'worker-execution-unavailable'},{executor:'other',reason:'informational'}]) {
+    const {tool}=setup('Chesed');
+    const value=roleValue('Chesed');value.status=status;
+    value.deliverable.checks=[{name:'host tests',outcome:'unverified',evidence:'Host tests not run',executionLimitation}];
+    const accepted=await invoke(tool,value);
+    assert.equal(accepted.details.type,'kether_result_submission');
+    assert.deepEqual(JSON.parse(accepted.details.canonicalText.slice('KETHER_RESULT_JSON='.length)),value);
+    assert.equal(JSON.parse(accepted.details.canonicalText.slice('KETHER_RESULT_JSON='.length)).status,status);
+  }
+  const {tool}=setup('Chesed');
+  const oversized=roleValue('Chesed');oversized.deliverable.checks[0].executionLimitation={detail:'x'.repeat(4097)};
+  assert.equal((await invoke(tool,oversized)).details.type,'kether_result_rejection');
 });
 
 test('Netzach submits typed host references unchanged for authoritative gateway resolution', async () => {

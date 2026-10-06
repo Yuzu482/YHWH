@@ -153,7 +153,7 @@ function summarizeRuntimePreflight(value) {
 
 const TIERS = new Set(['T0', 'T1', 'T2']);
 const PROFILES = new Set(['standard', 'personal', 'critical']);
-const THINKING = new Set(['low', 'medium', 'high', 'max']);
+const THINKING = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 const REVIEW_STAGES = new Set(['pre-review', 'post-review']);
 function safeId(value) { return typeof value === 'string' && value.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(value) ? value : undefined; }
 function safeSha(value) { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) ? value : undefined; }
@@ -187,7 +187,9 @@ function summarizeTelemetry(value) {
     } else if (key === 'parentRunId') { const id = safeId(value[key]); if (id) out[key] = id; }
   }
   for (const key of ['workspaceSha256', 'runAnchorSha256']) { const hash = safeSha(value[key]); if (hash) out[key] = hash; }
-  for (const [key, allowed] of [['declaredTier', TIERS], ['baseTier', TIERS], ['tier', TIERS], ['riskProfile', PROFILES], ['thinking', THINKING], ['reviewStage', REVIEW_STAGES]]) if (allowed.has(value[key])) out[key] = value[key];
+  for (const [key, allowed] of [['declaredTier', TIERS], ['derivedTier',TIERS], ['baseTier', TIERS], ['tier', TIERS], ['riskProfile', PROFILES], ['thinking', THINKING], ['reviewStage', REVIEW_STAGES]]) if (allowed.has(value[key])) out[key] = value[key];
+  for (const key of ['tierOverDeclared','tierReasonInvalid']) if(typeof value[key]==='boolean')out[key]=value[key];
+  if(typeof value.tierReason==='string'&&value.tierReason.length<=400)out.tierReason=redactSensitiveText(value.tierReason);
   for (const key of ['submittedAt', 'startedAt', 'completedAt', 'acceptedAt']) { const time = safeTime(value[key]); if (time) out[key] = time; }
   if ((typeof value.modelExecution === 'boolean' || value.modelExecution === null) && (value._operation === 'dispatch_subagent' || !MODEL_EXECUTION_FORBIDDEN.has(value._operation))) out.modelExecution = value.modelExecution;
   if (typeof value.conditionalApproval === 'boolean') out.conditionalApproval = value.conditionalApproval;
@@ -214,6 +216,18 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
   if (MODEL_EXECUTION_FORBIDDEN.has(operation)) hostTelemetry.modelExecution = false;
   const parentRunId = hostTelemetry.parentRunId ?? safeId(input?.parentRunId) ?? safeId(result?.contract?.parentRunId);
   const formatDiagnostic = summarizeFormatDiagnostic(result?.formatValidation);
+  const warningCodes=['execution-limitation-invalid'];
+  const suppliedWarnings=Array.isArray(result?.roleValidation?.warnings)?result.roleValidation.warnings:[];
+  const safeWarnings=suppliedWarnings.filter(code=>typeof code==='string'&&warningCodes.includes(code));
+  const metadataWarningCodes=[...new Set(safeWarnings)];
+  const metadataWarnings=metadataWarningCodes.length?{codes:metadataWarningCodes,count:safeWarnings.length}:undefined;
+  const roleValidation=result?.roleValidation&&typeof result.roleValidation==='object'?{
+    ...(typeof result.roleValidation.ok==='boolean'?{ok:result.roleValidation.ok}:{}),
+    ...(Number.isSafeInteger(result.roleValidation.version)?{version:result.roleValidation.version}:{}),
+    ...(typeof result.roleValidation.role==='string'&&/^[A-Za-z][A-Za-z0-9._ -]{0,63}$/.test(result.roleValidation.role)?{role:result.roleValidation.role}:{}),
+    ...(typeof result.roleValidation.code==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(result.roleValidation.code)?{code:result.roleValidation.code}:{}),
+    ...(safeWarnings.length?{warnings:safeWarnings}:{}),
+  }:undefined;
   const hostVerification = summarizeHostVerification(result?.hostVerification ?? (operation==='record_host_verification' ? result : null));
   // Dispatch can return a completed operation while the task awaits host verification or has a valid review decision.
   const awaitingHost = result?.status === 'awaiting-host-verification' || result?.failure === 'awaiting-host-verification';
@@ -265,8 +279,10 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     durationMs: Math.max(0, Math.round(finiteNumber(durationMs) || 0)),
     timings:result?.timings?{queueWaitMs:finiteNumber(result.timings.queueWaitMs),executionMs:finiteNumber(result.timings.executionMs)}:undefined,
     contract:result?.contract,
-    roleValidation:result?.roleValidation,
+    ...(roleValidation?{roleValidation}:{}),
     ...(formatDiagnostic ? { formatDiagnostic } : {}),
+    ...(metadataWarnings ? { metadataWarnings } : {}),
+    ...(summarizeOutputLimit(result?.outputLimitObservation) ? {outputLimitObservation:summarizeOutputLimit(result.outputLimitObservation)} : {}),
     reviewDecision:result?.reviewValidation?.decision??result?.reviewDecision,
     ...(hostVerification ? {hostVerification} : {}),
     tokens: summarizeUsage(result?.usage),
@@ -276,6 +292,13 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     taskOutcome,
     failureReason: reason ? redactSensitiveText(reason) : null,
   };
+}
+
+export function summarizeOutputLimit(value) {
+  if(!value||!['patch','retained','wire','frame','pending','direct'].includes(value.bucket))return undefined;
+  const out={bucket:value.bucket};
+  for(const key of ['wireBytes','retainedBytes','patchBytes','frameBytes','pendingBytes','directBytes','limitBytes'])if(safeCount(value[key])!==undefined)out[key]=value[key];
+  return out;
 }
 
 export const AUDIT_RETENTION_POLICY = Object.freeze({

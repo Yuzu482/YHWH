@@ -50,16 +50,22 @@ test('Chesed typed execution limitation is closed-shape and only valid for compl
   const make=()=>{const value=roleValue('Chesed');value.deliverable.checks=[{name:'host tests',outcome:'unverified',evidence:'Worker cannot run host checks.',executionLimitation:{executor:'host',reason:'worker-execution-unavailable'}}];return value;};
   assert.equal(validateRoleResult(make(),'Chesed').ok,true);
   for(const limitation of [null,{}, {executor:'host'}, {executor:'worker',reason:'worker-execution-unavailable'}, {executor:'host',reason:'other'}, {executor:'host',reason:'worker-execution-unavailable',extra:true}, 'worker-execution-unavailable']){
-    const value=make();value.deliverable.checks[0].executionLimitation=limitation;
-    assert.equal(validateRoleResult(value,'Chesed').ok,false);
+    const value=make(), unchanged=structuredClone(limitation);value.deliverable.checks[0].executionLimitation=limitation;
+    const result=validateRoleResult(value,'Chesed');
+    assert.equal(result.ok,true);
+    assert.deepEqual(value.deliverable.checks[0].executionLimitation,unchanged);
+    assert.deepEqual(result.warnings,['execution-limitation-invalid']);
   }
+  const oversized=make();oversized.deliverable.checks[0].executionLimitation={detail:'x'.repeat(4097)};
+  assert.equal(validateRoleResult(oversized,'Chesed').ok,false);
   for(const mutate of [
     value=>{value.status='failed';},
     value=>{value.status='unverified';},
-    value=>{value.errors=['failure'];},
     value=>{value.deliverable.checks[0].outcome='passed';},
     value=>{value.deliverable.checks[0].outcome='failed';},
-  ]){const value=make();mutate(value);assert.equal(validateRoleResult(value,'Chesed').ok,false);}
+  ]){const value=make();mutate(value);assert.equal(validateRoleResult(value,'Chesed').ok,true);}
+  const withErrors=make();withErrors.errors=['failure'];
+  assert.equal(validateRoleResult(withErrors,'Chesed').ok,false);
   const netzach=roleValue('Netzach');netzach.deliverable.checks[0].executionLimitation=make().deliverable.checks[0].executionLimitation;
   assert.equal(validateRoleResult(netzach,'Netzach').ok,false);
   assert.equal(validateRoleResult(roleValue('Chesed'),'Chesed').ok,true);
