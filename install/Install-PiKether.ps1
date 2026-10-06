@@ -150,7 +150,7 @@ $mcp = [ordered]@{ mcpServers = [ordered]@{ 'pi-kether-gateway' = [ordered]@{
     PI_SANDBOX_DISTRO = $WslDistro
   }
   enabled = $true
-  enabled_tools = @('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth')
+  enabled_tools = @('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','wait_subagent','get_task_handoff','wait_task_handoff','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth')
   startup_timeout_sec = 30
 }}}
 $mcp | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $pluginTarget '.mcp.json') -Encoding utf8NoBOM
@@ -250,6 +250,8 @@ if ($installWsl) {
     (Join-Path $pluginTarget 'extensions\read-scope-guard.js')='/tmp/pi-kether-install/read-scope-guard.js'
     (Join-Path $payload 'pi-dispatch\extensions\role-presets.js')='/tmp/pi-kether-install/role-presets.js'
     (Join-Path $payload 'pi-dispatch\extensions\result-submit.js')='/tmp/pi-kether-install/result-submit.js'
+    (Join-Path $payload 'pi-dispatch\extensions\role-contract.js')='/tmp/pi-kether-install/role-contract.js'
+    (Join-Path $payload 'pi-dispatch\extensions\result-export.js')='/tmp/pi-kether-install/result-export.js'
     (Join-Path $pluginTarget 'scripts\snapshot-scope.py')='/tmp/pi-kether-install/snapshot-scope.py'
     (Join-Path $pluginTarget 'scripts\lsp-result.mjs')='/tmp/pi-kether-install/lsp-result.mjs'
     (Join-Path $pluginTarget 'scripts\prepare-credentials.mjs')='/tmp/pi-kether-install/prepare-credentials.mjs'
