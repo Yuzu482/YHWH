@@ -21,3 +21,9 @@
 主代理继续遵守禁止反复轮询规则。诊断字段不是完成等待接口，不自动唤醒主代理、取消任务、重试、切换模型或接管编码。完成等待及受控交付模板需分别实现和验收。
 
 确定性测试覆盖思考与正文区分、工具结果、未知事件、无原始内容、快照隔离、分片输入、关闭后统计保留和缺失完成事件。这些测试不等于真实模型超时根因已被完整定位，也不代替部署后的有限实测。
+
+### 候选交付与宿主验收
+
+`get_task_handoff` 返回绑定到单一实现 requestId 与 artifactSha256 的证据投影；`wait_task_handoff` 是事件驱动的一次性等待，不会派发或取消工作。阶段状态 completed 不等于候选工件最终验收：宿主检查通过后，T1/T2 仍需规定的独立后审；只有 durable task_accepted 回执绑定相同候选与证明后才是 accepted。缺失、损坏或重启时不确定的证据不是通过，也不是实际失败证据。修复应保留候选历史，并使用新的稳定 requestId；人工检查和后审提交仍由宿主执行。此状态不是整个多阶段计划完成信号。
+
+`executionLimitation` 仅可在实际实现已完成、整体状态为 `completed`、`errors: []` 时，随 `outcome: "unverified"` 标记宿主尚未执行的检查：`{executor: "host", reason: "worker-execution-unavailable"}`。这不是执行证明；不得用于 `passed` / `failed`，也不得添加其他键。等待宿主验证（`awaiting-host-verification`）表示候选交付已提交、检查仍未运行，既非最终成功，也非自动失败。主代理须实际运行命令、记录退出码，并将证据绑定到产物记录 `record_host_verification`；T0 随后完成，T1 仍须 Geburah 后审，T2 保留规定门槛。此标记不授予额外执行或 shell 权限，也不能伪造通过检查。
