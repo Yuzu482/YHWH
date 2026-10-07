@@ -51,6 +51,7 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/multilspy-requirements.tx
 
 install -D -o root -g root -m 0755 /tmp/pi-kether-install/pi-kether-sandbox /usr/local/libexec/pi-kether-sandbox
 install -o root -g root -m 0644 /tmp/pi-kether-install/validate-write-scope.mjs /opt/pi-kether/scripts/validate-write-scope.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/artifact-apply.mjs /opt/pi-kether/scripts/artifact-apply.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/write-scope-guard.js /opt/pi-kether/extensions/write-scope-guard.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/auth-scrub.js /opt/pi-kether/extensions/auth-scrub.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/source-window.js /opt/pi-kether/extensions/source-window.js

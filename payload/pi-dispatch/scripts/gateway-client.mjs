@@ -109,6 +109,10 @@ async function main(args) {
       }
       return response;
     }
+    if (command === 'apply-artifact' && args.length === 1) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(args[0])) throw new Error('Invalid requestId');
+      return await client.callTool({name:'apply_artifact',arguments:{requestId:args[0]}},undefined,{timeout:30000,maxTotalTimeout:30000});
+    }
     if (command === 'host-pending' && args.length === 0) {
       return await client.callTool({name:'list_host_verification_pending',arguments:{}},undefined,{timeout:30000,maxTotalTimeout:30000});
     }
@@ -133,7 +137,7 @@ async function main(args) {
     if (command === 'lsp' && args.length >= 3 && args.length <= 4) {
       return await client.callTool({ name: 'lsp_request', arguments: { provider: args[0], model: args[1], cwd: process.cwd(), timeoutSeconds: 180, method: args[2], file: args[3] ?? 'scripts/gateway.mjs', requestId: `lsp-${Date.now()}` } }, undefined, { timeout: 1810000, maxTotalTimeout: 1810000 });
     }
-    throw new Error('Usage: gateway-client.mjs capabilities | dispatch <request.json> | record-host-verification <evidence.json> | host-pending | handoff <request.json> | wait-handoff <request.json> | wait <request.json> | probe <provider> <model> [small|standard|large] [--recovery] | lsp <provider> <model> <method> [file] | cooperative-plan <spec.json> | cooperative-submit <spec.json>');
+    throw new Error('Usage: gateway-client.mjs capabilities | dispatch <request.json> | record-host-verification <evidence.json> | apply-artifact <requestId> | host-pending | handoff <request.json> | wait-handoff <request.json> | wait <request.json> | probe <provider> <model> [small|standard|large] [--recovery] | lsp <provider> <model> <method> [file] | cooperative-plan <spec.json> | cooperative-submit <spec.json>');
   } catch (error) {
     error.message = `${stage}: ${error.message}`;
     throw error;

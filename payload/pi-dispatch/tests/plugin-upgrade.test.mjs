@@ -63,8 +63,10 @@ test('source change between plan and apply cannot replace installation', async t
   assert.equal(r.status, 'blocked'); assert.equal(r.reason, 'upgrade_plan_stale'); assert.equal(f.calls.length, 0);
 });
 test('files with WSL copies require a full installation instead of host-only update', t => {
-  const f = fixture(t); f.put(f.sourceRoot, 'scripts/multilspy-probe.py', '# changed probe');
-  assert.equal(f.plan().requiresFullInstall, true); assert.equal(f.plan().admissible, false);
+  for (const file of ['multilspy-probe.py','artifact-apply.mjs','patch-policy.mjs']) {
+    const f = fixture(t); f.put(f.sourceRoot, `scripts/${file}`, '# changed WSL copy');
+    assert.equal(f.plan().requiresFullInstall, true); assert.equal(f.plan().admissible, false);
+  }
 });
 test('concurrent edit during health failure is preserved and recovery lock retained', async t => {
   const f = fixture(t); f.runtime.health = async () => { f.put(f.targetRoot, 'scripts/main.mjs', 'concurrent edit'); return false; };

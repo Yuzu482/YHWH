@@ -21,6 +21,7 @@ import {TASK_PLANNING_POLICY} from './task-planning.mjs';
 import { PROVIDER_POLICY, publicCapabilities } from './provider-policy.mjs';
 import {LSP_METHODS,lspParameters,runDirectLsp} from './direct-lsp.mjs';
 import { probeWslSandbox } from './wsl-sandbox.mjs';
+import { applyArtifact, relativePatchFiles } from './artifact-apply.mjs';
 import { buildAuditRecord, createAuditLogger, ensureRequestId, redactSensitiveText } from '../extensions/audit-log.js';
 import { createModuleLifecycle } from '../extensions/module-lifecycle.js';
 import { classifyProviderResult, createMemoryProviderCircuitState, createProviderCircuitState } from '../extensions/provider-circuit-state.js';
@@ -57,8 +58,13 @@ export function trustedPatchProof(response, requestId, writeScope) {
   let scope;
   try { scope = compileWriteScope(writeScope); } catch { return false; }
   try {
-    const base = `/var/lib/pi-kether/jobs/${proof.jobId}`;
-    const actual = validateUnifiedPatch(response.patch, writeScope, `${base}/baseline`, `${base}/workspace`).sort();
+    let actual;
+    if (proof.format === 'relative-a-b-v1') {
+      actual=relativePatchFiles(response.patch);
+    } else {
+      const base = `/var/lib/pi-kether/jobs/${proof.jobId}`;
+      actual = validateUnifiedPatch(response.patch, writeScope, `${base}/baseline`, `${base}/workspace`).sort();
+    }
     return JSON.stringify(actual) === JSON.stringify([...proof.changedFiles].sort()) && proof.changedFiles.every(path => typeof path === 'string' && isAllowedPath(normalizeScopedPath(path).path, scope));
   } catch { return false; }
 }
@@ -723,7 +729,7 @@ export function createGatewayRuntime(options) {
             if (candidate.eligible && !tierGateFailed) {
               if (!ledger?.enabled) throw Object.assign(new Error('Host verification is unavailable because the durable request ledger is disabled'),{code:'HOST_VERIFICATION_LEDGER_REQUIRED'});
               const recoverableFileOnly=response.recoverableToolFailure===true && response.recoverableFileToolFailure===true && response.toolErrors>0 && response.unrecoveredErrors>0 && response.unrecoveredFileToolErrors===response.unrecoveredErrors && trustedPatch;
-              const originalResult={...response,structuredResult:validation.value,hostVerification:{state:'awaiting-host-verification',artifactSha256:response.patchValidation.patchSha256,requiredCheckNames:[...candidate.requiredCheckNames]},...(recoverableFileOnly?{artifactRecovery:true,recoveredErrors:response.toolErrors,unrecoveredErrors:0}:{})};
+              const originalResult={...response,trustedWriteScope:[...invocation.task.writeScope],structuredResult:validation.value,hostVerification:{state:'awaiting-host-verification',artifactSha256:response.patchValidation.patchSha256,requiredCheckNames:[...candidate.requiredCheckNames]},...(recoverableFileOnly?{artifactRecovery:true,recoveredErrors:response.toolErrors,unrecoveredErrors:0}:{})};
               const contractTemplate=completedContract(invocation.task,input,cwd,validation.value);
               if (tierDecision && actualTier) Object.assign(contractTemplate,tierContractMetadata({...actualTier,effective:response.tier}),{tierPolicyVersion:1});
               const pending=ledger.registerHostPending({
@@ -1049,6 +1055,14 @@ export function createGatewayRuntime(options) {
       inputSchema:{limit:z.number().int().min(1).max(100).default(50)},
       annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     },admitted(async input=>structuredResult({ok:true,items:ledger?.listHostPending({limit:input.limit}).map(item=>({requestId:item.requestId,artifactSha256:item.artifactSha256,goal:item.goal,phase:item.phase,requiredCheckNames:item.requiredCheckNames}))??[]})));
+    server.registerTool('apply_artifact',{
+      description:'Apply a trusted, pending repository-relative patch to its admitted workspace after Git preflight. Does not complete or verify the task.',
+      inputSchema:z.object({requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/)}).strict(),
+      annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:false,openWorldHint:false},
+    },admitted(async input=>{
+      if(!writeEnabled||!resourceLimitsEnforced)throw Object.assign(new Error('Artifact apply requires verified workspace-write sandbox admission'),{code:'ARTIFACT_APPLY_SANDBOX_REQUIRED'});
+      return structuredResult(await applyArtifact({requestId:input.requestId,ledger,roots,writeLocks}));
+    }));
     server.registerTool('record_host_verification',{
       description:'Record bounded command and exit-code evidence from checks already run by the host. This tool never executes commands; use only actual host results for the bound pending artifact.',
               inputSchema:hostVerificationSchema,

@@ -2,7 +2,8 @@ import {createExecutionTimeline} from '../extensions/execution-timeline.js';
 import {validateFixtureScope} from '../extensions/kether-envelope.js';
 import {createEditorRpc} from './editor-rpc.mjs';
 import { createHash, randomUUID } from 'node:crypto';
-import { validateUnifiedPatch, compileWriteScope } from '../extensions/write-scope-guard.js';
+import { normalizeSandboxPatch, sandboxPatchFiles } from './artifact-apply.mjs';
+import { compileWriteScope } from '../extensions/write-scope-guard.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { basename, parse, relative } from 'node:path/win32';
 
@@ -80,14 +81,15 @@ function workspaceLocation(cwd) {
   return { drive, rel };
 }
 
-export function validateSandboxPatch(patch, { job, requestId, writeScope = [], access } = {}) {
+export function validateSandboxPatch(patch, { job, requestId, writeScope = [], access, fileStates } = {}) {
   if (!patch || access !== 'workspace-write' || !requestId) return { patchValidation: undefined, failure: undefined };
   try {
     const baselinePrefix = `/var/lib/pi-kether/jobs/${job}/baseline`;
     const workspacePrefix = `/var/lib/pi-kether/jobs/${job}/workspace`;
-    const changedFiles = validateUnifiedPatch(patch, writeScope, baselinePrefix, workspacePrefix).sort();
+    const changedFiles = sandboxPatchFiles(patch,{baseline:baselinePrefix,workspace:workspacePrefix,writeScope});
+    const delivered = normalizeSandboxPatch(patch, job, changedFiles, {baseline:baselinePrefix,workspace:workspacePrefix}, fileStates);
     const canonicalScope = compileWriteScope(writeScope).map(item => `${item.tree ? 'tree' : 'file'}:${item.path}`).sort().join('\\n');
-    return { patchValidation: { ok: true, requestId, jobId: job, changedFiles, patchSha256: createHash('sha256').update(patch, 'utf8').digest('hex'), scopeSha256: createHash('sha256').update(canonicalScope, 'utf8').digest('hex') }, failure: undefined };
+    return { patch: delivered, patchValidation: { ok: true, requestId, jobId: job, format:'relative-a-b-v1', changedFiles, patchSha256: createHash('sha256').update(delivered, 'utf8').digest('hex'), scopeSha256: createHash('sha256').update(canonicalScope, 'utf8').digest('hex') }, failure: undefined };
   } catch { return { patchValidation: { ok: false, requestId, jobId: job }, failure: 'sandbox-patch-validation-failed' }; }
 }
 
@@ -109,7 +111,7 @@ export function stripPatch(stdout, stderr = '') {
   if (meta?.ok !== true || meta.patchPolicy !== 'issued-credential-v1' || typeof meta.secretLikeContent !== 'boolean' || !Number.isSafeInteger(meta.patchBytes) || meta.patchBytes !== bytes.length || !/^[a-f0-9]{64}$/.test(meta.patchSha256 ?? '') || createHash('sha256').update(bytes).digest('hex') !== meta.patchSha256) throw new Error('Sandbox returned invalid patch metadata');
   const patch = bytes.toString('utf8');
   if (!Buffer.from(patch, 'utf8').equals(bytes)) throw new Error('Sandbox returned invalid patch bytes');
-  return { stdout: stdout.slice(0, index), stderr, patch, patchPolicy: meta.patchPolicy, secretLikeContent: meta.secretLikeContent, patchSha256: meta.patchSha256, patchBytes: meta.patchBytes };
+  return { stdout: stdout.slice(0, index), stderr, patch, patchPolicy: meta.patchPolicy, secretLikeContent: meta.secretLikeContent, patchSha256: meta.patchSha256, patchBytes: meta.patchBytes, ...(meta.fileStates !== undefined ? {fileStates:meta.fileStates} : {}) };
 }
 
 export function buildSandboxScopeManifest({readScope = [], writeScope = [], fixtureScope = []} = {}) {
@@ -213,10 +215,11 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
       }
       try {
         const separated = stripPatch(stdout, stderr);
-        const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access });
+        const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access, fileStates:separated.fileStates });
         const patchValidation = proof.patchValidation;
         if (proof.failure) failure ||= proof.failure;
-        done({ exitCode: code, failure, ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: separated.stdout, stderr: separated.stderr, patch: separated.patch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: separated.patchSha256, patchBytes: separated.patchBytes } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
+        const deliveredPatch = proof.patch ?? separated.patch;
+        done({ exitCode: code, failure, ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: separated.stdout, stderr: separated.stderr, patch: deliveredPatch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: patchValidation?.patchSha256 ?? separated.patchSha256, patchBytes: Buffer.byteLength(deliveredPatch, 'utf8') } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
       } catch {
         done({ exitCode: code, failure: failure??'PI_PATCH_INVALID_BYTES', failureCode: 'PI_PATCH_INVALID_BYTES', ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode},phaseTimings:timeline.snapshot() });
       }
