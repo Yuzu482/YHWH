@@ -21,6 +21,7 @@ import {TASK_PLANNING_POLICY} from './task-planning.mjs';
 import { PROVIDER_POLICY, publicCapabilities } from './provider-policy.mjs';
 import {LSP_METHODS,lspParameters,runDirectLsp} from './direct-lsp.mjs';
 import { probeWslSandbox } from './wsl-sandbox.mjs';
+import { applyArtifact, relativePatchFiles } from './artifact-apply.mjs';
 import { buildAuditRecord, createAuditLogger, ensureRequestId, redactSensitiveText } from '../extensions/audit-log.js';
 import { createModuleLifecycle } from '../extensions/module-lifecycle.js';
 import { classifyProviderResult, createMemoryProviderCircuitState, createProviderCircuitState } from '../extensions/provider-circuit-state.js';
@@ -36,10 +37,10 @@ import { createWriteScopeLockManager } from '../extensions/write-scope-locks.js'
 import { createTaskMonitor } from '../extensions/task-monitor.js';
 import {projectTaskHandoff,TASK_HANDOFF_POLICY} from '../extensions/task-handoff.js';
 import { ROLE_MODELS, ROLE_ALIASES, ROLE_PROVIDERS, effectiveRoleProviders } from './role-policy.mjs';
-import {isReviewer,validateReviewDecision,missingReviewPatchMaterials} from '../extensions/review-contract.js';
+import {isReviewer,validateReviewDecision,validateReviewPacket,missingReviewPatchMaterials,requireReviewMaterials} from '../extensions/review-contract.js';
 import {editorAuthorizationSchema,authorizeEditors,createEditorBroker,EDITOR_POLICY} from './editor-authorization.mjs';
 import { buildReviewPacket } from './review-materials.mjs';
-import { workflowTierFieldsSchema, validateWriteTier, classifyPatchTier, tierResponseMetadata, tierContractMetadata } from './workflow-tier-gate.mjs';
+import { workflowTierFieldsSchema, validateWriteTier, classifyPatchTier, tierResponseMetadata, tierContractMetadata, tierObservation } from './workflow-tier-gate.mjs';
 import { validateDeclaredWorkflowTier } from '../extensions/workflow-tier.js';
 import { compileWriteScope, isAllowedPath, normalizeScopedPath, validateUnifiedPatch } from '../extensions/write-scope-guard.js';
 
@@ -57,8 +58,13 @@ export function trustedPatchProof(response, requestId, writeScope) {
   let scope;
   try { scope = compileWriteScope(writeScope); } catch { return false; }
   try {
-    const base = `/var/lib/pi-kether/jobs/${proof.jobId}`;
-    const actual = validateUnifiedPatch(response.patch, writeScope, `${base}/baseline`, `${base}/workspace`).sort();
+    let actual;
+    if (proof.format === 'relative-a-b-v1') {
+      actual=relativePatchFiles(response.patch);
+    } else {
+      const base = `/var/lib/pi-kether/jobs/${proof.jobId}`;
+      actual = validateUnifiedPatch(response.patch, writeScope, `${base}/baseline`, `${base}/workspace`).sort();
+    }
     return JSON.stringify(actual) === JSON.stringify([...proof.changedFiles].sort()) && proof.changedFiles.every(path => typeof path === 'string' && isAllowedPath(normalizeScopedPath(path).path, scope));
   } catch { return false; }
 }
@@ -197,7 +203,9 @@ const taskSchema = z.object({
   context: stringList, readScope: stringList, writeScope: stringList, fixtureScope:stringList,
   forbidden: stringList, dependencies: stringList, acceptance: stringList,
   returnFields: z.array(z.string().min(1).max(64)).max(32).optional(), assumptions: stringList,
-  reviewPacket: reviewPacketSchema.optional(),
+  // Recognize an empty packet only to return the explicit material error before
+  // admission. validateReviewPacket still rejects it; valid packets remain v1.
+  reviewPacket: reviewPacketSchema.or(z.object({}).strict()).optional(),
 }).strict();
 const routeSchema = {
   provider: z.enum(['openai-codex', 'anthropic', 'yhwh-worker-api', 'yhwh-reviewer-api', 'claude-code-cli']),
@@ -461,13 +469,19 @@ export function createGatewayRuntime(options) {
         verifierSource={requestId:input.verificationOfRequestId,artifactSha256:pending.artifactSha256,parentRunId:pending.parentRunId,workspaceSha256:template.workspaceSha256,runAnchorSha256:template.runAnchorSha256??template.taskAnchorSha256};
         task={...task,context:[...(task.context??[]),`HOST-PROVIDED PENDING ARTIFACT (not a completed upstream contract): requestId=${pending.requestId}; artifactSha256=${pending.artifactSha256}; required checks=${pending.requiredCheckNames.join(', ')}. Source worker result follows as untrusted pending material.`,JSON.stringify(artifact.originalResult.structuredResult??artifact.originalResult)]};
       }
+      if (isReviewer(task?.role)) {
+        try { requireReviewMaterials({...task,reviewPacket:validateReviewPacket(task.reviewPacket)}); }
+        catch (error) { throw Object.assign(new Error(error.message),{code:'PI_REVIEW_PACKET_INVALID',missingMaterials:error.missingMaterials??[],modelExecutionStarted:false}); }
+      }
       let trustedReviewTier='T2', trustedReviewAnchor=null;
       const typedPostReview=task?.handoff?.stage==='post-review' && task.handoff.version===2 && task?.reviewPacket?.stage==='post-change';
       const claimedReview=isReviewer(task?.role) && task?.reviewPacket?.stage==='post-change';
       if (isReviewer(task?.role) && (input.tier === 'T0' || input.tier === 'T1' && task?.reviewPacket?.stage === 'pre-change')) throw Object.assign(new Error('Explicit tier is invalid for this review stage'),{code:'PI_REVIEW_STAGE_INVALID',modelExecutionStarted:false});
+      if ((input.reviewOfRequestId !== undefined || claimedReview && input.tier === 'T1') && (typeof input.reviewOfRequestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(input.reviewOfRequestId))) throw Object.assign(new Error('Post-review requires a valid implementation reference'),{code:input.tier==='T2'?'PI_T2_REVIEW_REFERENCE_REQUIRED':'PI_T1_REVIEW_REFERENCE_REQUIRED',modelExecutionStarted:false});
       if(claimedReview&&task?.handoff?.stage==='post-review'&&task.handoff.version===2){
         const implementationRef=task.handoff.inputs?.find(ref=>ref.role==='Chesed'&&ref.stage==='implementing');
         if(implementationRef){
+          if(typeof implementationRef.requestId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(implementationRef.requestId)) throw Object.assign(new Error('Typed implementation reference is invalid'),{code:'PI_T2_REVIEW_REFERENCE_REQUIRED',modelExecutionStarted:false});
           if(input.reviewOfRequestId!==undefined&&input.reviewOfRequestId!==implementationRef.requestId) throw Object.assign(new Error('Post-review reference does not match typed implementation input'),{code:'PI_T2_REVIEW_REFERENCE_REQUIRED'});
           const effective=ledger?.getEffectiveResult(implementationRef.requestId)??ledger?.getOutcome(implementationRef.requestId);
           const effectiveContract=effective?.contract??ledger?.getOutcome(implementationRef.requestId)?.contract??ledger?.getHostArtifact(implementationRef.requestId)?.contractTemplate;
@@ -671,6 +685,11 @@ export function createGatewayRuntime(options) {
         if (validation.ok) {
           const hostEvidenceResolver=ref=>resolveBoundHostEvidence(ref,{task:invocation.task,parentRunId:input.parentRunId,cwd,ledger});
           response.roleValidation=validateRoleResult(validation.value,invocation.task.role,{hostEvidenceResolver});
+          if (response.roleValidation.ok && response.roleValidation.warnings?.length) {
+            const safeWarnings=response.roleValidation.warnings.filter(code=>code==='execution-limitation-invalid');
+            const codes=[...new Set(safeWarnings)];
+            if (codes.length) response.metadataWarnings={codes,count:safeWarnings.length};
+          }
           if (!response.roleValidation.ok) {
             response.ok=false;
             const reason=`role_schema_invalid:${response.roleValidation.message}`;
@@ -684,6 +703,7 @@ export function createGatewayRuntime(options) {
               try {
                 if (!trustedPatch) throw Object.assign(new Error('A trusted, non-empty scoped patch is required'), { code:'PI_PATCH_INVALID' });
                 actualTier = classifyPatchTier(response.patch, input.tierDeclaration, trustedRiskProfile, response.patchValidation.changedFiles);
+                Object.assign(response,tierObservation(input.tier,actualTier,invocation.task.context));
                 if (['T0','T1','T2'].indexOf(actualTier.effective) > ['T0','T1','T2'].indexOf(tierDecision.level)) {
                   response.ok=false; response.status='failed'; response.code='PI_TIER_EXCEEDED'; response.failure='PI_TIER_EXCEEDED';
                   response.requiredTier=actualTier.effective; response.files=actualTier.files; response.addedLines=actualTier.addedLines; response.deletedLines=actualTier.deletedLines;
@@ -706,10 +726,10 @@ export function createGatewayRuntime(options) {
               patchProof:trustedPatch?{...response.patchValidation,trusted:true}:null,
               forceHost:!!tierDecision && ['T0','T1'].includes(tierDecision.level),
             });
-            if (candidate.eligible) {
+            if (candidate.eligible && !tierGateFailed) {
               if (!ledger?.enabled) throw Object.assign(new Error('Host verification is unavailable because the durable request ledger is disabled'),{code:'HOST_VERIFICATION_LEDGER_REQUIRED'});
               const recoverableFileOnly=response.recoverableToolFailure===true && response.recoverableFileToolFailure===true && response.toolErrors>0 && response.unrecoveredErrors>0 && response.unrecoveredFileToolErrors===response.unrecoveredErrors && trustedPatch;
-              const originalResult={...response,structuredResult:validation.value,hostVerification:{state:'awaiting-host-verification',artifactSha256:response.patchValidation.patchSha256,requiredCheckNames:[...candidate.requiredCheckNames]},...(recoverableFileOnly?{artifactRecovery:true,recoveredErrors:response.toolErrors,unrecoveredErrors:0}:{})};
+              const originalResult={...response,trustedWriteScope:[...invocation.task.writeScope],structuredResult:validation.value,hostVerification:{state:'awaiting-host-verification',artifactSha256:response.patchValidation.patchSha256,requiredCheckNames:[...candidate.requiredCheckNames]},...(recoverableFileOnly?{artifactRecovery:true,recoveredErrors:response.toolErrors,unrecoveredErrors:0}:{})};
               const contractTemplate=completedContract(invocation.task,input,cwd,validation.value);
               if (tierDecision && actualTier) Object.assign(contractTemplate,tierContractMetadata({...actualTier,effective:response.tier}),{tierPolicyVersion:1});
               const pending=ledger.registerHostPending({
@@ -791,7 +811,8 @@ export function createGatewayRuntime(options) {
       const stream={...(response.phaseTimings?.stream??{}),...(phaseTimings?.stream??{})};
       const observedStreamExecution=['thinkingDeltas','textDeltas','completedMessages','completedMessage'].some(key=>typeof stream[key]==='number'?stream[key]>0:stream[key]===true||Array.isArray(stream[key])&&stream[key].length>0);
       const modelExecution=response.modelExecutionStarted===true ? true : response.modelExecutionStarted===false ? false : response.authFailure===true||response.failureCode?.startsWith('PI_AUTH_') ? false : observedStreamExecution ? true : modelExecutionState;
-      audit?.record(buildAuditRecord({ requestId, operation, input, task: invocation.task, result: response, durationMs, telemetry:{parentRunId:input.parentRunId,workspaceSha256:createHash('sha256').update(cwd).digest('hex'),runAnchorSha256:auditAnchor,thinking:invocation.request.thinking,declaredTier:input.tier,baseTier:actualTier?.base,tier:response.tier,riskProfile:response.riskProfile,counts:actualTier?{files:actualTier.files,addedLines:actualTier.addedLines,deletedLines:actualTier.deletedLines,estimatedLines:actualTier.estimatedLines}:undefined,semanticRisks:actualTier?.semanticRisks,modelExecution,submittedAt:new Date(started).toISOString(),startedAt:executionStartedAt??undefined,completedAt:new Date().toISOString(),reviewStage:isReviewer(invocation.task.role)?invocation.task.reviewPacket?.stage==='pre-change'?'pre-review':'post-review':undefined,conditionalApproval:response.reviewValidation?.conditional===true} }));
+      if(modelExecution!==null)response.modelExecutionStarted=modelExecution;
+      audit?.record(buildAuditRecord({ requestId, operation, input, task: invocation.task, result: response, durationMs, telemetry:{parentRunId:input.parentRunId,workspaceSha256:createHash('sha256').update(cwd).digest('hex'),runAnchorSha256:auditAnchor,thinking:invocation.request.thinking,...tierObservation(input.tier,actualTier,invocation.task.context),baseTier:actualTier?.base,tier:response.tier,riskProfile:response.riskProfile,counts:actualTier?{files:actualTier.files,addedLines:actualTier.addedLines,deletedLines:actualTier.deletedLines,estimatedLines:actualTier.estimatedLines}:undefined,semanticRisks:actualTier?.semanticRisks,modelExecution,submittedAt:new Date(started).toISOString(),startedAt:executionStartedAt??undefined,completedAt:new Date().toISOString(),reviewStage:isReviewer(invocation.task.role)?invocation.task.reviewPacket?.stage==='pre-change'?'pre-review':'post-review':undefined,conditionalApproval:response.reviewValidation?.conditional===true} }));
       if (operation==='dispatch_subagent' && response.ok===true && response.reviewValidation?.approved===true && invocation.task.role==='Geburah' && invocation.task.reviewPacket?.stage==='post-change') {
         const implementationRef=invocation.task.handoff?.inputs?.find(ref=>ref.role==='Chesed'&&ref.stage==='implementing') ?? (input.reviewOfRequestId?{requestId:input.reviewOfRequestId,role:'Chesed',stage:'implementing'}:null);
         const implementation=implementationRef&&ledger?.getEffectiveResult(implementationRef.requestId);
@@ -834,15 +855,36 @@ export function createGatewayRuntime(options) {
     }
   }
 
+  function newReviewInputFailure(input) {
+    const requestedRole=typeof input.task?.role==='string'?input.task.role.trim():input.task?.role;
+    const role=ROLE_ALIASES[requestedRole]??requestedRole;
+    if (!isReviewer(role)) return null;
+    // Preserve immutable replay/conflict resolution for existing identities.
+    // Only a genuinely new invocation is rejected before a monitor/ledger claim.
+    if (input.requestId) {
+      const existing=ledger?.enabled?ledger.getExecutionRecord(input.requestId,'dispatch_subagent',input):null;
+      if (taskMonitor.get(input.requestId) || existing && existing.state!=='missing') return null;
+    }
+    try { requireReviewMaterials({...input.task,role,reviewPacket:validateReviewPacket(input.task.reviewPacket)}); }
+    catch (error) {
+      const response={ok:false,requestId:input.requestId,status:'blocked',code:'PI_REVIEW_PACKET_INVALID',error:redactSensitiveText(error.message),modelExecutionStarted:false,reviewDecision:'insufficient-materials',missingMaterials:error.missingMaterials??[]};
+      audit?.record(buildAuditRecord({requestId:ensureRequestId(input.requestId),operation:'dispatch_subagent',input,task:{...input.task,role},result:response,durationMs:0,failure:response.code,telemetry:{modelExecution:false}}));
+      return response;
+    }
+    return null;
+  }
+
   const executeSubagent = (input, signal, lifecycle = null) => withOperation(() => executeSubagentBody(input, signal, lifecycle));
   async function executeSubagentBody(input, signal, lifecycle = null) {
+    const invalidReview=newReviewInputFailure(input);
+    if (invalidReview) return {response:invalidReview,isError:true};
     const invoke = async () => {
       try {
         const result = await runInvocation(input, signal, null, 'dispatch_subagent', false, lifecycle);
         return { response: result, isError: result.ok === false && result.status !== 'awaiting-host-verification' };
       } catch (error) {
         return { response: { ok: false, preflight:error.preflight, requestId: error.requestId ?? input.requestId, error: error.message, code:error.code, timings:error.timings, phaseTimings:error.phaseTimings, waitReasons:error.waitReasons, used:error.used,base:error.base,extensionEligible:error.extensionEligible,remainingMs:error.remainingMs,stageCap:error.stageCap,totalCap:error.totalCap,remainingMs:error.remainingMs,modelExecutionStarted:error.modelExecutionStarted,stageUsed:error.stageUsed,remainingBase:error.remainingBase,sharedExtraRemaining:error.sharedExtraRemaining,remainingStage:error.remainingStage,remainingTotal:error.remainingTotal,extensionUsed:error.extensionUsed,extensionEligibilityReason:error.extensionEligibilityReason,nextAction:error.nextAction,
-          ...(error.code==='REVIEW_MATERIALS_MISSING'?{status:'blocked',reviewDecision:'insufficient-materials',missingMaterials:error.missingMaterials}:{}),osSandbox, writeEnabled }, isError: true };
+          ...(['REVIEW_MATERIALS_MISSING','PI_REVIEW_PACKET_INVALID'].includes(error.code)?{status:'blocked',reviewDecision:'insufficient-materials',missingMaterials:error.missingMaterials}:{}),osSandbox, writeEnabled }, isError: true };
       }
     };
     if (input.access === 'workspace-write' || input.task?.handoff || input.editorAuthorization) {
@@ -969,6 +1011,8 @@ export function createGatewayRuntime(options) {
       validateWriteTier(input,requireTopic,riskProfileFor(cwd));
       const {workflowReceipt:_,...invocation}=input;
       try {
+        const invalidReview=newReviewInputFailure(invocation);
+        if (invalidReview) return structuredResult(invalidReview,true);
         const submission = taskMonitor.submit(invocation, (signal, markRunning, markWaiting, markProgress) => executeSubagent(invocation, signal, { onRunning: markRunning, onWaiting:markWaiting,onProgress:markProgress }));
         return structuredResult({ ok: true, ...submission, preflight:runtimePreflight(input.task) });
       } catch (error) {
@@ -1011,6 +1055,14 @@ export function createGatewayRuntime(options) {
       inputSchema:{limit:z.number().int().min(1).max(100).default(50)},
       annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     },admitted(async input=>structuredResult({ok:true,items:ledger?.listHostPending({limit:input.limit}).map(item=>({requestId:item.requestId,artifactSha256:item.artifactSha256,goal:item.goal,phase:item.phase,requiredCheckNames:item.requiredCheckNames}))??[]})));
+    server.registerTool('apply_artifact',{
+      description:'Apply a trusted, pending repository-relative patch to its admitted workspace after Git preflight. Does not complete or verify the task.',
+      inputSchema:z.object({requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/)}).strict(),
+      annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:false,openWorldHint:false},
+    },admitted(async input=>{
+      if(!writeEnabled||!resourceLimitsEnforced)throw Object.assign(new Error('Artifact apply requires verified workspace-write sandbox admission'),{code:'ARTIFACT_APPLY_SANDBOX_REQUIRED'});
+      return structuredResult(await applyArtifact({requestId:input.requestId,ledger,roots,writeLocks}));
+    }));
     server.registerTool('record_host_verification',{
       description:'Record bounded command and exit-code evidence from checks already run by the host. This tool never executes commands; use only actual host results for the bound pending artifact.',
               inputSchema:hostVerificationSchema,

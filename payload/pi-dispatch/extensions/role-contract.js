@@ -11,7 +11,7 @@ const enumeration = values => ({type:'string', enum:values});
 const object = (properties, required=Object.keys(properties)) => ({type:'object', properties, required, additionalProperties:false});
 const array = items => ({type:'array', items, maxItems:256});
 const hostEvidence = object({requestId:{type:'string', pattern:/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/}, artifactSha256:{type:'string', pattern:/^[a-f0-9]{64}$/}, recordSha256:{type:'string', pattern:/^[a-f0-9]{64}$/}, checkName:{type:'string', minLength:1, maxLength:128}});
-const executionLimitation = object({executor:enumeration(['host']), reason:enumeration(['worker-execution-unavailable'])});
+const executionLimitation = {};
 const chesedCheck = object({name:nonempty, outcome:enumeration(['passed','failed','unverified']), evidence:text, hostEvidence, executionLimitation}, ['name','outcome','evidence']);
 const check = object({name:nonempty, outcome:enumeration(['passed','failed','unverified']), evidence:text, hostEvidence}, ['name','outcome','evidence']);
 const ROLES = ['Yesod','Binah','Hod','Malkuth','Chochmah','Chesed','Netzach','Geburah'];
@@ -44,6 +44,7 @@ export function requireRoleFields(task) {
 }
 
 function validate(value, schema, path='$') {
+  if (!schema || Object.keys(schema).length===0) return;
   if (schema.type==='object') {
     if (!value || typeof value!=='object' || Array.isArray(value)) throw new Error(`${path} must be an object`);
     const keys=Object.keys(value);
@@ -73,9 +74,14 @@ function validateRoleResultAtStage(value, role, {hostEvidenceResolver, submissio
     validate(value,roleResultSchema(role));
     if (role!=='Netzach' && value?.deliverable?.checks?.some(c=>Object.hasOwn(c,'hostEvidence'))) throw Object.assign(new Error('hostEvidence is Netzach-only'),{code:'HOST_EVIDENCE_ROLE_INVALID'});
     if (role!=='Chesed' && value?.deliverable?.checks?.some(c=>Object.hasOwn(c,'executionLimitation'))) throw new Error('executionLimitation is Chesed-only');
-    if (role==='Chesed' && value?.deliverable?.checks?.some(c=>Object.hasOwn(c,'executionLimitation') &&
-        (value.status!=='completed' || value.errors.length!==0 || c.outcome!=='unverified'))) {
-      throw new Error('executionLimitation requires completed unverified check with no errors');
+    const metadataWarnings=[];
+    if (role==='Chesed') for (const c of value?.deliverable?.checks??[]) if (Object.hasOwn(c,'executionLimitation')) {
+      const limitation=c.executionLimitation;
+      let bytes, depth=0;
+      try { bytes=Buffer.byteLength(JSON.stringify(limitation),'utf8'); const visit=(node,d)=>{depth=Math.max(depth,d);if(node&&typeof node==='object')for(const child of Object.values(node))visit(child,d+1);};visit(limitation,0); }
+      catch { throw new Error('executionLimitation metadata is not serializable'); }
+      if(bytes>4096||depth>8) throw new Error('executionLimitation metadata exceeds bounds');
+      if (!(limitation && typeof limitation==='object' && !Array.isArray(limitation) && Object.keys(limitation).length===2 && limitation.executor==='host' && limitation.reason==='worker-execution-unavailable')) metadataWarnings.push('execution-limitation-invalid');
     }
     const resolved=new Set(), pending=new Set();
     if (role==='Netzach') for (const c of value.deliverable.checks) if (Object.hasOwn(c,'hostEvidence')) {
@@ -95,7 +101,7 @@ function validateRoleResultAtStage(value, role, {hostEvidenceResolver, submissio
       if (role==='Netzach' && (value.deliverable.verdict!=='passed' || !value.deliverable.checks.length || value.deliverable.checks.some(c=>c.outcome!=='passed'||(!c.evidence.trim() && !resolved.has(c) && !pending.has(c))))) throw new Error('verification completion requires passing checks with evidence');
       if (role==='Chochmah' && (!value.deliverable.steps.length || new Set(value.deliverable.steps.map(s=>s.id)).size!==value.deliverable.steps.length)) throw new Error('completed plan requires uniquely identified steps');
     }
-    return {ok:true,version:CONTRACT_VERSION,role,...(submissionOnly?{hostEvidencePending:pending.size}:{})};
+    return {ok:true,version:CONTRACT_VERSION,role,...(submissionOnly?{hostEvidencePending:pending.size}:{}),...(metadataWarnings?.length?{warnings:metadataWarnings}:{})};
   } catch(error) { return {ok:false,version:CONTRACT_VERSION,role,code:'role_schema_invalid',message:error.message}; }
 }
 

@@ -63,9 +63,17 @@ export function validateReviewPacket(packet, {tier='T2'}={}) {
 export function requireReviewMaterials(task) {
   if (!isReviewer(task.role)) return;
   const packet=task.reviewPacket;
-  const missing=REVIEW_SECTIONS.filter(name=>!packet || packet[name].status==='missing' || (packet[name].status==='provided'&&!packet[name].content.length));
+  const missing=REVIEW_SECTIONS.filter(name=>{
+    const section=packet?.[name];
+    if (!section) return true;
+    if (section.status==='not-applicable') return ['requirements','context'].includes(name) || typeof section.reason!=='string' || !section.reason.trim();
+    return section.status!=='provided' || !Array.isArray(section.content) || !section.content.length || section.content.some(item=>typeof item!=='string'||!item.trim());
+  });
   if (missing.length) throw Object.assign(new Error(`Review materials missing: ${missing.join(', ')}`),{code:'REVIEW_MATERIALS_MISSING',missingMaterials:missing});
-  for (const field of ['status','evidence',...REVIEW_FIELDS]) if (!task.returnFields.includes(field)) throw new Error(`Reviewer returnFields must include ${field}`);
+  if (task.returnFields !== undefined) {
+    if (!Array.isArray(task.returnFields)) throw new Error('Reviewer returnFields must be an array');
+    for (const field of ['status','evidence',...REVIEW_FIELDS]) if (!task.returnFields.includes(field)) throw new Error(`Reviewer returnFields must include ${field}`);
+  }
 }
 
 export function validateReviewDecision(value, {tier='T2'}={}) {

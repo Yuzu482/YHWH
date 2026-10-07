@@ -1,3 +1,5 @@
+import { decodePatchHeader } from '../scripts/artifact-apply.mjs';
+import { normalizeScopedPath } from './write-scope-guard.js';
 const RISK_KEYS = ['publicApiOrProtocol', 'dependencyOrLockfile', 'securityAuthOrCredentials', 'migration', 'irreversibleOrNoRollback'];
 const DECLARATION_KEYS = RISK_KEYS;
 const TIERS = ['T0', 'T1', 'T2'];
@@ -9,15 +11,12 @@ function exactKeys(value, keys) {
 }
 function validFiles(files) {
   return Array.isArray(files) && files.length > 0
-    && files.every(file => typeof file === 'string'
-      && /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(file))
+    && files.every(file => { try { return normalizeScopedPath(file).path === file; } catch { return false; } })
     && new Set(files).size === files.length;
 }
 function validWriteScope(scope) {
   return Array.isArray(scope) && scope.length > 0
-    && scope.every(path => typeof path === 'string'
-      && (/^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(path)
-        || (path.endsWith('/**') && /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\/$/.test(path.slice(0, -2)))))
+    && scope.every(path => { try { const item = normalizeScopedPath(path, { scope: true }); return `${item.path}${item.tree ? '/**' : ''}` === path; } catch { return false; } })
     && new Set(scope).size === scope.length;
 }
 function validateDeclaration(declaration) {
@@ -37,13 +36,14 @@ function parseRange(text) {
   return { oldExpected: match[2] === undefined ? 1 : Number(match[2]), newExpected: match[4] === undefined ? 1 : Number(match[4]), old: 0, current: 0, added: 0, deleted: 0 };
 }
 function patchPath(text) {
-  let path = text.split('\t', 1)[0];
+  let path;
+  try {path = decodePatchHeader(text);} catch {invalid('Invalid quoted patch path');}
   if (path === '/dev/null') return path;
   path = path.replace(/\\/g, '/');
   const rooted = path.match(/^\/var\/lib\/pi-kether\/jobs\/[0-9a-f-]{36}\/(?:baseline|workspace)\/(.+)$/i);
   if (rooted) path = rooted[1];
   else if (/^(?:a|b|old|new)\//.test(path)) path = path.slice(path.indexOf('/') + 1);
-  if (!/^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(path)) invalid('Unsafe unified patch path');
+  try {if (normalizeScopedPath(path).path !== path) invalid('Unsafe unified patch path');} catch {invalid('Unsafe unified patch path');}
   return path;
 }
 

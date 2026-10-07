@@ -21,6 +21,8 @@ test('gateway-client handoff uses authenticated local MCP read API and rejects i
     writeFileSync(configFile,JSON.stringify({host:'127.0.0.1',port:http.address().port,tokenFile}));const requestFile=join(directory,'request.json');
     writeFileSync(requestFile,JSON.stringify({requestId:'unknown-candidate'}));
     const valid=await runCli({PI_GATEWAY_CONFIG:configFile},['handoff',requestFile]);assert.equal(valid.code,0,valid.stderr);assert.match(valid.stdout,/"state": "unknown"/);
+    const apply=await runCli({PI_GATEWAY_CONFIG:configFile},['apply-artifact','unknown-candidate']);assert.equal(apply.code,1);assert.equal(JSON.parse(apply.stdout).code,'artifact_not_pending');
+    const invalidApply=await runCli({PI_GATEWAY_CONFIG:configFile},['apply-artifact','../invalid']);assert.equal(invalidApply.code,1);assert.match(invalidApply.stderr,/Invalid requestId/);
     writeFileSync(requestFile,JSON.stringify({requestId:'unknown-candidate',shell:'false'}));const invalid=await runCli({PI_GATEWAY_CONFIG:configFile},['handoff',requestFile]);assert.equal(invalid.code,1);assert.match(invalid.stderr,/handoff request is invalid/);
   }finally{await new Promise(resolvePromise=>http.close(resolvePromise));await runtime.shutdown?.();rmSync(directory,{recursive:true,force:true});}
 });

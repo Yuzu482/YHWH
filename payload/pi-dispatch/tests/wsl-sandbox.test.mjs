@@ -31,6 +31,11 @@ test('collector bounds retained, wire and frame output and keeps independently v
   const huge=createJsonOutputCollector(128);huge.feed('stdout','PI_SANDBOX_PATCH_B64=\n');huge.feed('stdout','x'.repeat(6*1024*1024));assert.equal(huge.close().failure,'output-limit');
 });
 
+test('collector reports actual limit bucket and numeric counters without raw content',()=>{
+  const vectors=[['pending',c=>c.feed('stdout','x'.repeat(129))],['frame',c=>c.feed('stdout','x'.repeat(129)+'\n')],['retained',c=>c.feed('stderr','x'.repeat(129))],['patch',c=>{c.feed('stdout','PI_SANDBOX_PATCH_B64=\n');c.feed('stdout','x'.repeat(6*1024*1024));}],['wire',c=>c.feed('stdout','x'.repeat(6*1024*1024+2049))]];
+  for(const [bucket,feed] of vectors){const c=createJsonOutputCollector(128);feed(c);const result=c.close();assert.equal(result.failure,'output-limit');assert.equal(result.outputLimitObservation.bucket,bucket);assert.ok(result.outputLimitObservation.limitBytes>0);assert.equal(Object.values(result.outputLimitObservation).some(x=>typeof x==='string'&&x.includes('xxx')),false);}
+});
+
 test('WSL patch proof binds real scoped diff headers to the host job and fails closed', () => {
   const job = '11111111-1111-4111-8111-111111111111';
   const patch = `--- /var/lib/pi-kether/jobs/${job}/baseline/a.js\n+++ /var/lib/pi-kether/jobs/${job}/workspace/a.js\n@@ -0,0 +1 @@\n+ok\n`;

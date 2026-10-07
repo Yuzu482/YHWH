@@ -1,8 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tierDeclarationSchema, classifyPatchTier, validateT0Patch, validateWriteTier } from '../scripts/workflow-tier-gate.mjs';
+import { tierDeclarationSchema, classifyPatchTier, validateT0Patch, validateWriteTier, tierObservation } from '../scripts/workflow-tier-gate.mjs';
 
 const declaration = overrides => ({ publicApiOrProtocol:false, dependencyOrLockfile:false, securityAuthOrCredentials:false, migration:false, irreversibleOrNoRollback:false, ...overrides });
+
+test('tier observations are advisory and never count unknown derivation as T0',()=>{
+  assert.deepEqual(tierObservation('T2',null),{declaredTier:'T2'});
+  assert.equal(tierObservation('T2',{effective:'T0'}).tierOverDeclared,true);
+  const reason='Shared gateway admission semantics affect all concurrent tasks.';
+  assert.deepEqual(tierObservation('T2',{effective:'T1'},['TIER_REASON='+reason]),{declaredTier:'T2',derivedTier:'T1',tierOverDeclared:false,tierReason:reason});
+  for(const context of [['TIER_REASON='],['TIER_REASON=unknown'],['TIER_REASON='+reason,'TIER_REASON='+reason],['TIER_REASON='+'x'.repeat(401)]]){const observed=tierObservation('T2',{effective:'T1'},context);assert.equal(observed.tierOverDeclared,true);assert.equal(observed.tierReasonInvalid,true);}
+  const derived=classifyPatchTier(diff(1),declaration(),'critical',['a.js']);assert.equal(tierObservation('T1',derived).tierOverDeclared,false);assert.equal(derived.effective,'T1');
+});
 const input = (overrides = {}) => ({ access:'workspace-write', workflowReceipt:'receipt', tier:'T0', tierDeclaration:declaration(), task:{writeScope:['src/a.js']}, ...overrides });
 const requireTopic = (topic, receipt) => { assert.equal(topic,'task-tiers'); assert.equal(receipt,'receipt'); };
 function diff(count, prefix='diff -ruN old/a.js new/a.js\n') { return `${prefix}--- old/a.js\n+++ new/a.js\n@@ -1,${count} +1,${count} @@\n${'-x\n'.repeat(count)}${'+y\n'.repeat(count)}`; }

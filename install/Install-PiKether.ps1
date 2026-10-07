@@ -246,6 +246,7 @@ if ($installWsl) {
     (Join-Path $payload 'wsl-package-lock.json')='/tmp/pi-kether-install/wsl-package-lock.json'
     (Join-Path $pluginTarget 'sandbox\pi-kether-sandbox')='/tmp/pi-kether-install/pi-kether-sandbox'
     (Join-Path $pluginTarget 'scripts\validate-write-scope.mjs')='/tmp/pi-kether-install/validate-write-scope.mjs'
+    (Join-Path $pluginTarget 'scripts\artifact-apply.mjs')='/tmp/pi-kether-install/artifact-apply.mjs'
     (Join-Path $pluginTarget 'extensions\write-scope-guard.js')='/tmp/pi-kether-install/write-scope-guard.js'
     (Join-Path $pluginTarget 'extensions\auth-scrub.js')='/tmp/pi-kether-install/auth-scrub.js'
     (Join-Path $payload 'pi-dispatch\extensions\source-window.js')='/tmp/pi-kether-install/source-window.js'

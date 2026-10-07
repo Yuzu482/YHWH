@@ -13,7 +13,7 @@ select_api_issued_token() {
 
 emit_checked_patch() {
   local token="$1" patch="$2" checked code
-  if checked=$(printf '%s' "$token" | /opt/node/bin/node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON /opt/pi-kether/scripts/patch-policy.mjs "$patch" 2>&1); then
+  if checked=$(printf '%s' "$token" | /opt/node/bin/node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON /opt/pi-kether/scripts/patch-policy.mjs "$patch" "$3" "$4" 2>&1); then
     printf '\nPI_SANDBOX_PATCH_B64='
     base64 -w0 "$patch"
     printf '\nPI_SANDBOX_PATCH_META=%s\n' "$checked"
@@ -352,7 +352,7 @@ run_job() {
     local patch_size
     patch_size=$(stat -c %s "$patch")
     (( patch_size <= 4194304 )) || { echo "sandbox patch exceeds 4 MiB" >&2; exit 6; }
-    emit_checked_patch "$issued_token" "$patch" || { unset issued_token; exit 4; }
+    emit_checked_patch "$issued_token" "$patch" "$baseline" "$workspace" || { unset issued_token; exit 4; }
     unset issued_token
   fi
   return "$status"

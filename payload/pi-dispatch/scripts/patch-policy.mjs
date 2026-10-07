@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { redactSensitiveText } from '../extensions/audit-log.js';
+import { describeSandboxFiles } from './artifact-apply.mjs';
 
 export const ISSUED_BLOCK = 'PI_PATCH_CONTAINS_ISSUED_CREDENTIAL';
 export const TOKEN_INVALID = 'PI_PATCH_TOKEN_INVALID';
@@ -60,6 +61,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       process.stderr.write(result.code);
       process.exitCode = result.code === ISSUED_BLOCK ? 4 : 3;
     } else {
+      if (process.argv.length !== 3 && process.argv.length !== 5) throw new Error('invalid patch producer arguments');
+      if (process.argv.length === 5) result.fileStates = describeSandboxFiles(bytes.toString('utf8'), {baseline:process.argv[3],workspace:process.argv[4]});
       process.stdout.write(JSON.stringify(result));
     }
   } catch {

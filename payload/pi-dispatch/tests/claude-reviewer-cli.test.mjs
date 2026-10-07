@@ -45,6 +45,18 @@ test('sanitizes protected environment names case-insensitively without mutating 
   assert.equal(env.ANTHROPIC_API_KEY, 'fake-token');
 });
 
+test('missing, blank and non-string compiled packets never launch a process', async t => {
+  const f=fixture(t);
+  let processes=0,models=0;
+  for (const packet of [undefined,null,'',' \r\n\t',Buffer.from('text'),{}]) {
+    const result=await invoke(f,{packet,runProcessImpl:async()=>{processes++;throw new Error('must not run');},onModelStart:()=>{models++;}});
+    assert.equal(result.reason,'invalid_configuration');
+    assert.equal(result.modelExecutionStarted,false);
+  }
+  assert.equal(processes,0);assert.equal(models,0);
+  assert.equal(fs.existsSync(path.join(f.root,'observed.json')),false);
+});
+
 test('success uses strict no-tools argv, stdin-only packet, sanitized environment and removes empty cwd', async t => {
   const f = fixture(t), before = new Set(fs.readdirSync(os.tmpdir()));
   const result = await invoke(f);
