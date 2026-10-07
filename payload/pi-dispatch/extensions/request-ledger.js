@@ -383,6 +383,30 @@ export function createRequestLedger(directory, options = {}) {
     return sanitizeForPersistence({pending,originalResult:stored.result,contractTemplate:stored.contractTemplate});
   }
 
+  // Private host apply consumer only: never use this projection for model context or tool output.
+  // Generic getHostArtifact remains redacted. Restore exactly one captured patch after raw binding checks.
+  function getHostApplyArtifact(requestId) {
+    try {
+      const pending=loadHostPending(requestId);
+      if (!pending) return null;
+      const stored=validateHostSource(hostPaths(requestId),pending);
+      if (!stored) return null;
+      const response=stored.result?.response ?? stored.result;
+      if (!response || typeof response!=='object' || Array.isArray(response)) return null;
+      // Legacy records retain the original redacted apply path; they never gain raw-byte access.
+      if (response.patchPolicy===undefined || response.patchPolicy==='legacy') return sanitizeForPersistence({pending,originalResult:stored.result,contractTemplate:stored.contractTemplate});
+      if (response.patchPolicy!=='issued-credential-v1' || typeof response.patch!=='string') return null;
+      const bytes=Buffer.from(response.patch,'utf8'), proof=response.patchValidation;
+      const digest=createHash('sha256').update(bytes).digest('hex');
+      if (bytes.toString('utf8')!==response.patch || !/^[a-f0-9]{64}$/.test(pending.artifactSha256 ?? '') || digest!==pending.artifactSha256 || digest!==response.patchSha256 || digest!==proof?.patchSha256 || proof?.ok!==true || proof?.requestId!==requestId || !Number.isSafeInteger(response.patchBytes) || response.patchBytes!==bytes.length || typeof response.secretLikeContent!=='boolean') return null;
+      const artifact=sanitizeForPersistence({pending,originalResult:stored.result,contractTemplate:stored.contractTemplate});
+      const target=artifact.originalResult?.response ?? artifact.originalResult;
+      if (!target || typeof target!=='object' || Array.isArray(target)) return null;
+      target.patch=response.patch;
+      return artifact;
+    } catch { return null; }
+  }
+
   function recordVerifierVerification(input) {
     const keys=['implementationRequestId','verifierRequestId','parentRunId','workspaceSha256','artifactSha256','verifierContract','verifierResult'];
     if (!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).length!==keys.length || Object.keys(input).some(k=>!keys.includes(k))) throw new RequestLedgerError('verifier_input_invalid','verifier record input must match the exact contract');
@@ -524,6 +548,7 @@ export function createRequestLedger(directory, options = {}) {
     recordHostVerification,
     getHostVerification,
     getHostArtifact,
+    getHostApplyArtifact,
     recordVerifierVerification,
     getEffectiveResult,
     listHostPending,

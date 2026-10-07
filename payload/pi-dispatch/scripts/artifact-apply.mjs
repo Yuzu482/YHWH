@@ -170,7 +170,7 @@ export function runArtifactGit({cwd,args,patch,spawnFn=spawn,timeoutMs=15000,out
 export async function applyArtifact({requestId,ledger,roots=[],writeLocks,spawnFn=spawn}) {
   const fail = (code,error=code) => ({ok:false,requestId,code,error});
   if (typeof requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(requestId)) return fail('invalid_request');
-  const artifact = ledger?.getHostArtifact(requestId), pending = artifact?.pending;
+  const artifact = typeof ledger?.getHostApplyArtifact === 'function' ? ledger.getHostApplyArtifact(requestId) : ledger?.getHostArtifact(requestId), pending = artifact?.pending;
   if (!pending || ledger?.getEffectiveResult(requestId)?.state !== 'awaiting-host-verification') return fail('artifact_not_pending');
   const response = artifact.originalResult?.response ?? artifact.originalResult, patch = response?.patch, proof = response?.patchValidation;
   if (typeof patch !== 'string' || !HEX.test(pending.artifactSha256 ?? '') || pending.artifactSha256 !== response.patchSha256 || pending.artifactSha256 !== proof?.patchSha256 || !proof.ok || proof.requestId !== requestId || digest(patch) !== pending.artifactSha256 || response.patchBytes !== Buffer.byteLength(patch)) return fail('artifact_hash_mismatch');
