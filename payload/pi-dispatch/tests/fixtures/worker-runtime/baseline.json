@@ -1,0 +1,5067 @@
+{
+  "version": 1,
+  "provenance": "synthetic boundary fixtures; baseline outputs computed from frozen pre-change source and installed snapshots",
+  "sourceHead": "8f16c51f533b4e77ba7309f0d73c67655a4170b6",
+  "sourceInstalledGoldenEquivalent": true,
+  "counts": {
+    "args": 27,
+    "summaries": 35,
+    "timelines": 5
+  },
+  "source": {
+    "args": [
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--no-tools"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--no-tools"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--no-tools"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "@USERPROFILE@/.pi/agent/npm/node_modules/pi-lsp-extension/src/index.ts",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,lsp_diagnostics,lsp_hover,lsp_definition,lsp_references,lsp_symbols,lsp_rename,lsp_completions,lsp_code_actions,code_overview,ast_search"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,yhwh_lsp_diagnostics,yhwh_lsp_hover,yhwh_lsp_definition,yhwh_lsp_references,yhwh_lsp_symbols,yhwh_lsp_completions,yhwh_lsp_code_actions,yhwh_source_window"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires a trusted role preset"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,yhwh_source_window"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--extension",
+          "/opt/pi-kether/extensions/result-submit.js",
+          "--yhwh-result-role",
+          "Chesed",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,yhwh_source_window,yhwh_submit_result"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "@USERPROFILE@/.pi/agent/npm/node_modules/pi-lsp-extension/src/index.ts",
+          "--extension",
+          "@RUNTIME_ROOT@/extensions/write-scope-guard.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,lsp_diagnostics,lsp_hover,lsp_definition,lsp_references,lsp_symbols,lsp_rename,lsp_completions,lsp_code_actions,code_overview,ast_search,edit,write,code_rewrite"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/write-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,edit,write,yhwh_lsp_diagnostics,yhwh_lsp_hover,yhwh_lsp_definition,yhwh_lsp_references,yhwh_lsp_symbols,yhwh_lsp_completions,yhwh_lsp_code_actions,yhwh_source_window"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires a trusted role preset"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/write-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,edit,write,yhwh_source_window"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/write-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--extension",
+          "/opt/pi-kether/extensions/result-submit.js",
+          "--yhwh-result-role",
+          "Chesed",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,edit,write,yhwh_source_window,yhwh_submit_result"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--extension",
+          "/opt/pi-kether/extensions/result-submit.js",
+          "--yhwh-result-role",
+          "Chesed",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "high",
+          "--extension",
+          "/opt/pi-kether/extensions/editor-proxy.js",
+          "--tools",
+          "read,grep,find,ls,yhwh_source_window,yhwh_submit_result,pi_editor_execute"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/controlled-provider.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--provider",
+          "yhwh-worker-api",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "max",
+          "--yhwh-config",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "--no-tools"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "PI_PROVIDER_CONFIG_REQUIRED"
+        }
+      }
+    ],
+    "summaries": [
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "harmless warning",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 1,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 1,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [
+            "edit",
+            "edit"
+          ],
+          "total": 1,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Tool execution failed",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 1,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": true,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [
+            "edit",
+            "edit"
+          ],
+          "total": 1,
+          "unrecoveredErrors": 1,
+          "unrecoveredFileToolErrors": 1,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Tool execution failed",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [
+            "edit",
+            "edit"
+          ],
+          "total": 1,
+          "unrecoveredErrors": 1,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Tool execution failed",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [],
+          "total": 1,
+          "unrecoveredErrors": 1,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Tool execution failed",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [
+            "edit",
+            "edit"
+          ],
+          "total": 1,
+          "unrecoveredErrors": 1,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Missing complete assistant response",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Missing complete assistant response",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": {
+            "$undefined": true
+          },
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": {
+            "$undefined": true
+          },
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "$undefined": true
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Missing complete assistant response",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": {
+            "$undefined": true
+          },
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": {
+            "$undefined": true
+          },
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "$undefined": true
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "synthetic failure",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Provider/model mismatch in Pi response",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "unselected-model",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 124,
+          "failure": "EXECUTION_TIMEOUT",
+          "failureCode": "EXECUTION_TIMEOUT",
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 143,
+          "failure": "EXECUTION_CANCELLED",
+          "failureCode": "EXECUTION_CANCELLED",
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 143,
+          "failure": "TERMINATED",
+          "failureCode": "TERMINATED",
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "output-limit",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "PI_AUTH_EXPIRED\n",
+          "exitCode": 4,
+          "failure": "PI_AUTH_EXPIRED",
+          "failureCode": "PI_AUTH_EXPIRED",
+          "fileToolErrors": 0,
+          "model": {
+            "$undefined": true
+          },
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": {
+            "$undefined": true
+          },
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "$undefined": true
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 124,
+          "failure": "PRIMARY_FAILURE",
+          "failureCode": "PRIMARY_FAILURE",
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 1,
+            "ok": false,
+            "stderr": "synthetic"
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "sandbox-cleanup-failed:synthetic",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": "wsl2-bwrap",
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "canonicalText": "KETHER_RESULT_JSON={\"a\":1,\"b\":2}",
+            "ok": true
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MISSING",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MULTIPLE",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "canonicalText": "KETHER_RESULT_JSON={\"a\":1,\"b\":2}",
+            "ok": true
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MALFORMED",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MALFORMED",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MALFORMED",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 0,
+            "ok": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": "--- a/x\n+++ b/x\n",
+          "patchBytes": 20,
+          "patchPolicy": "issued-credential-v1",
+          "patchSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "patchValidation": {
+            "ok": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": "wsl2-bwrap",
+          "secretLikeContent": false,
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": "synthetic patch",
+          "patchBytes": 15,
+          "patchConfirmationRequired": true,
+          "patchPolicy": "issued-credential-v1",
+          "patchSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "patchValidation": {
+            "$undefined": true
+          },
+          "patchWarning": "Generic secret-like patterns detected; obtain human confirmation before applying this patch.",
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "secretLikeContent": true,
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 1,
+            "ok": false
+          },
+          "exitCode": 1,
+          "failure": "PI_PATCH_CONTAINS_ISSUED_CREDENTIAL",
+          "failureCode": "PI_PATCH_CONTAINS_ISSUED_CREDENTIAL",
+          "ok": false,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "target": "model"
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 1,
+            "ok": false
+          },
+          "exitCode": 1,
+          "failure": "PI_PATCH_TOKEN_INVALID",
+          "failureCode": "PI_PATCH_TOKEN_INVALID",
+          "ok": false,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "target": "model"
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 1,
+            "ok": false
+          },
+          "exitCode": 1,
+          "failure": "PI_PATCH_INVALID_BYTES",
+          "failureCode": "PI_PATCH_INVALID_BYTES",
+          "ok": false,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "target": "model"
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "configuredTransport": {
+            "capabilityEvidence": "operator-declared",
+            "platform": "synthetic",
+            "protocol": "openai-responses"
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "yhwh-worker-api",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "yhwh-worker-api",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "cost": null,
+            "costUnavailable": true,
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "error": {
+          "name": "TypeError",
+          "message": "Cannot read properties of null (reading 'type')"
+        }
+      },
+      {
+        "error": {
+          "name": "TypeError",
+          "message": "((intermediate value) || []).filter is not a function"
+        }
+      }
+    ],
+    "timelines": [
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "message_update",
+                "textDeltas": 0,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 3,
+                "lastEventType": "message_update",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 4,
+                "lastEventType": "tool_execution_start",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 5,
+                "lastEventType": "tool_execution_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 6,
+                "lastEventType": "message_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": 8,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": 8,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": "stream-delta",
+            "generationMs": 5,
+            "processMs": 8,
+            "processTailMs": 1,
+            "startupMs": 1,
+            "stream": {
+              "firstTextMs": 3,
+              "lastEventMs": 7,
+              "lastEventType": "agent_end",
+              "textDeltas": 1,
+              "thinkingDeltas": 1,
+              "toolEnds": 1,
+              "toolErrors": 1,
+              "toolStarts": 1
+            },
+            "timeToFirstResponseMs": 2
+          }
+        }
+      },
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "message_update",
+                "textDeltas": 0,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 3,
+                "lastEventType": "message_update",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 4,
+                "lastEventType": "tool_execution_start",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 5,
+                "lastEventType": "tool_execution_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 6,
+                "lastEventType": "message_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": 8,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": 8,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": "stream-delta",
+            "generationMs": 5,
+            "processMs": 8,
+            "processTailMs": 1,
+            "startupMs": 1,
+            "stream": {
+              "firstTextMs": 3,
+              "lastEventMs": 7,
+              "lastEventType": "agent_end",
+              "textDeltas": 1,
+              "thinkingDeltas": 1,
+              "toolEnds": 1,
+              "toolErrors": 1,
+              "toolStarts": 1
+            },
+            "timeToFirstResponseMs": 2
+          }
+        }
+      },
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": 2,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": 2,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": null,
+            "generationMs": null,
+            "processMs": 2,
+            "processTailMs": null,
+            "startupMs": 1,
+            "stream": {
+              "firstTextMs": null,
+              "lastEventMs": 1,
+              "lastEventType": "agent_start",
+              "textDeltas": 0,
+              "thinkingDeltas": 0,
+              "toolEnds": 0,
+              "toolErrors": 0,
+              "toolStarts": 0
+            },
+            "timeToFirstResponseMs": null
+          }
+        }
+      },
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "completed-message",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": null,
+              "stream": {
+                "firstTextMs": 1,
+                "lastEventMs": 1,
+                "lastEventType": "message_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 1
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "completed-message",
+              "generationMs": null,
+              "processMs": 2,
+              "processTailMs": null,
+              "startupMs": null,
+              "stream": {
+                "firstTextMs": 1,
+                "lastEventMs": 1,
+                "lastEventType": "message_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 1
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": "completed-message",
+              "generationMs": null,
+              "processMs": 2,
+              "processTailMs": null,
+              "startupMs": null,
+              "stream": {
+                "firstTextMs": 1,
+                "lastEventMs": 1,
+                "lastEventType": "message_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 1
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": "completed-message",
+            "generationMs": null,
+            "processMs": 2,
+            "processTailMs": null,
+            "startupMs": null,
+            "stream": {
+              "firstTextMs": 1,
+              "lastEventMs": 1,
+              "lastEventType": "message_end",
+              "textDeltas": 0,
+              "thinkingDeltas": 0,
+              "toolEnds": 0,
+              "toolErrors": 0,
+              "toolStarts": 0
+            },
+            "timeToFirstResponseMs": 1
+          }
+        }
+      },
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "agent_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": 3,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "agent_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": 3,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "agent_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": null,
+            "generationMs": null,
+            "processMs": 3,
+            "processTailMs": 1,
+            "startupMs": 1,
+            "stream": {
+              "firstTextMs": null,
+              "lastEventMs": 2,
+              "lastEventType": "agent_end",
+              "textDeltas": 0,
+              "thinkingDeltas": 0,
+              "toolEnds": 0,
+              "toolErrors": 0,
+              "toolStarts": 0
+            },
+            "timeToFirstResponseMs": null
+          }
+        }
+      }
+    ]
+  },
+  "installed": {
+    "args": [
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--no-tools"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--no-tools"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--no-tools"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "@USERPROFILE@/.pi/agent/npm/node_modules/pi-lsp-extension/src/index.ts",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,lsp_diagnostics,lsp_hover,lsp_definition,lsp_references,lsp_symbols,lsp_rename,lsp_completions,lsp_code_actions,code_overview,ast_search"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,yhwh_lsp_diagnostics,yhwh_lsp_hover,yhwh_lsp_definition,yhwh_lsp_references,yhwh_lsp_symbols,yhwh_lsp_completions,yhwh_lsp_code_actions,yhwh_source_window"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires a trusted role preset"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,yhwh_source_window"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--extension",
+          "/opt/pi-kether/extensions/result-submit.js",
+          "--yhwh-result-role",
+          "Chesed",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,yhwh_source_window,yhwh_submit_result"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "@USERPROFILE@/.pi/agent/npm/node_modules/pi-lsp-extension/src/index.ts",
+          "--extension",
+          "@RUNTIME_ROOT@/extensions/write-scope-guard.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,lsp_diagnostics,lsp_hover,lsp_definition,lsp_references,lsp_symbols,lsp_rename,lsp_completions,lsp_code_actions,code_overview,ast_search,edit,write,code_rewrite"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires WSL2 read or workspace-write access"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Role presets require WSL2"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/write-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,edit,write,yhwh_lsp_diagnostics,yhwh_lsp_hover,yhwh_lsp_definition,yhwh_lsp_references,yhwh_lsp_symbols,yhwh_lsp_completions,yhwh_lsp_code_actions,yhwh_source_window"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "Structured result tool requires a trusted role preset"
+        }
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/write-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,edit,write,yhwh_source_window"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/write-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--extension",
+          "/opt/pi-kether/extensions/result-submit.js",
+          "--yhwh-result-role",
+          "Chesed",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "medium",
+          "--tools",
+          "read,grep,find,ls,edit,write,yhwh_source_window,yhwh_submit_result"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/role-presets.js",
+          "--yhwh-role-preset",
+          "Chesed",
+          "--extension",
+          "/opt/pi-kether/extensions/read-scope-guard.js",
+          "--extension",
+          "/opt/pi-kether/extensions/lsp-proxy.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--extension",
+          "/opt/pi-kether/extensions/source-window.js",
+          "--extension",
+          "/opt/pi-kether/extensions/result-submit.js",
+          "--yhwh-result-role",
+          "Chesed",
+          "--provider",
+          "openai-codex",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "high",
+          "--extension",
+          "/opt/pi-kether/extensions/editor-proxy.js",
+          "--tools",
+          "read,grep,find,ls,yhwh_source_window,yhwh_submit_result,pi_editor_execute"
+        ]
+      },
+      {
+        "value": [
+          "--offline",
+          "--no-approve",
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-context-files",
+          "--no-themes",
+          "--no-extensions",
+          "--print",
+          "--mode",
+          "json",
+          "--no-session",
+          "--extension",
+          "/opt/pi-kether/extensions/controlled-provider.js",
+          "--extension",
+          "/opt/pi-kether/extensions/auth-scrub.js",
+          "--provider",
+          "yhwh-worker-api",
+          "--model",
+          "gpt-6-luna",
+          "--thinking",
+          "max",
+          "--yhwh-config",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "--no-tools"
+        ]
+      },
+      {
+        "error": {
+          "name": "Error",
+          "message": "PI_PROVIDER_CONFIG_REQUIRED"
+        }
+      }
+    ],
+    "summaries": [
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "harmless warning",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 1,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 1,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [
+            "edit",
+            "edit"
+          ],
+          "total": 1,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Tool execution failed",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 1,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": true,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [
+            "edit",
+            "edit"
+          ],
+          "total": 1,
+          "unrecoveredErrors": 1,
+          "unrecoveredFileToolErrors": 1,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Tool execution failed",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [
+            "edit",
+            "edit"
+          ],
+          "total": 1,
+          "unrecoveredErrors": 1,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Tool execution failed",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [],
+          "total": 1,
+          "unrecoveredErrors": 1,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Tool execution failed",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": true,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 1,
+          "toolsUsed": [
+            "edit",
+            "edit"
+          ],
+          "total": 1,
+          "unrecoveredErrors": 1,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Missing complete assistant response",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Missing complete assistant response",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": {
+            "$undefined": true
+          },
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": {
+            "$undefined": true
+          },
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "$undefined": true
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Missing complete assistant response",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": {
+            "$undefined": true
+          },
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": {
+            "$undefined": true
+          },
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "$undefined": true
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "synthetic failure",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "Provider/model mismatch in Pi response",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "unselected-model",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 124,
+          "failure": "EXECUTION_TIMEOUT",
+          "failureCode": "EXECUTION_TIMEOUT",
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 143,
+          "failure": "EXECUTION_CANCELLED",
+          "failureCode": "EXECUTION_CANCELLED",
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 143,
+          "failure": "TERMINATED",
+          "failureCode": "TERMINATED",
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "output-limit",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "PI_AUTH_EXPIRED\n",
+          "exitCode": 4,
+          "failure": "PI_AUTH_EXPIRED",
+          "failureCode": "PI_AUTH_EXPIRED",
+          "fileToolErrors": 0,
+          "model": {
+            "$undefined": true
+          },
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": {
+            "$undefined": true
+          },
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "$undefined": true
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 124,
+          "failure": "PRIMARY_FAILURE",
+          "failureCode": "PRIMARY_FAILURE",
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 1,
+            "ok": false,
+            "stderr": "synthetic"
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": "sandbox-cleanup-failed:synthetic",
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": false,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": "wsl2-bwrap",
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "canonicalText": "KETHER_RESULT_JSON={\"a\":1,\"b\":2}",
+            "ok": true
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MISSING",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MULTIPLE",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "canonicalText": "KETHER_RESULT_JSON={\"a\":1,\"b\":2}",
+            "ok": true
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MALFORMED",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MALFORMED",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "resultSubmission": {
+            "code": "RESULT_SUBMISSION_MALFORMED",
+            "ok": false
+          },
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 0,
+            "ok": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": "--- a/x\n+++ b/x\n",
+          "patchBytes": 20,
+          "patchPolicy": "issued-credential-v1",
+          "patchSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "patchValidation": {
+            "ok": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": "wsl2-bwrap",
+          "secretLikeContent": false,
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": "synthetic patch",
+          "patchBytes": 15,
+          "patchConfirmationRequired": true,
+          "patchPolicy": "issued-credential-v1",
+          "patchSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "patchValidation": {
+            "$undefined": true
+          },
+          "patchWarning": "Generic secret-like patterns detected; obtain human confirmation before applying this patch.",
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "secretLikeContent": true,
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 1,
+            "ok": false
+          },
+          "exitCode": 1,
+          "failure": "PI_PATCH_CONTAINS_ISSUED_CREDENTIAL",
+          "failureCode": "PI_PATCH_CONTAINS_ISSUED_CREDENTIAL",
+          "ok": false,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "target": "model"
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 1,
+            "ok": false
+          },
+          "exitCode": 1,
+          "failure": "PI_PATCH_TOKEN_INVALID",
+          "failureCode": "PI_PATCH_TOKEN_INVALID",
+          "ok": false,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "target": "model"
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "exitCode": 1,
+            "ok": false
+          },
+          "exitCode": 1,
+          "failure": "PI_PATCH_INVALID_BYTES",
+          "failureCode": "PI_PATCH_INVALID_BYTES",
+          "ok": false,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "target": "model"
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "configuredTransport": {
+            "capabilityEvidence": "operator-declared",
+            "platform": "synthetic",
+            "protocol": "openai-responses"
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "yhwh-worker-api",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "yhwh-worker-api",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "cost": null,
+            "costUnavailable": true,
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "value": {
+          "cleanup": {
+            "$undefined": true
+          },
+          "diagnostics": "",
+          "exitCode": 0,
+          "failure": null,
+          "failureCode": {
+            "$undefined": true
+          },
+          "fileToolErrors": 0,
+          "model": "gpt-6-luna",
+          "ok": true,
+          "patch": {
+            "$undefined": true
+          },
+          "patchValidation": {
+            "$undefined": true
+          },
+          "provider": "openai-codex",
+          "recoverableFileToolFailure": false,
+          "recoverableToolFailure": false,
+          "recoveredErrors": 0,
+          "requestedModel": "gpt-6-luna",
+          "requestedProvider": "openai-codex",
+          "sandbox": {
+            "$undefined": true
+          },
+          "target": "model",
+          "text": "first\n第二行 café",
+          "toolErrors": 0,
+          "toolsUsed": [],
+          "total": 0,
+          "unrecoveredErrors": 0,
+          "unrecoveredFileToolErrors": 0,
+          "usage": {
+            "input": 12,
+            "output": 4
+          }
+        }
+      },
+      {
+        "error": {
+          "name": "TypeError",
+          "message": "Cannot read properties of null (reading 'type')"
+        }
+      },
+      {
+        "error": {
+          "name": "TypeError",
+          "message": "((intermediate value) || []).filter is not a function"
+        }
+      }
+    ],
+    "timelines": [
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "message_update",
+                "textDeltas": 0,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 3,
+                "lastEventType": "message_update",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 4,
+                "lastEventType": "tool_execution_start",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 5,
+                "lastEventType": "tool_execution_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 6,
+                "lastEventType": "message_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": 8,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": 8,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": "stream-delta",
+            "generationMs": 5,
+            "processMs": 8,
+            "processTailMs": 1,
+            "startupMs": 1,
+            "stream": {
+              "firstTextMs": 3,
+              "lastEventMs": 7,
+              "lastEventType": "agent_end",
+              "textDeltas": 1,
+              "thinkingDeltas": 1,
+              "toolEnds": 1,
+              "toolErrors": 1,
+              "toolStarts": 1
+            },
+            "timeToFirstResponseMs": 2
+          }
+        }
+      },
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "message_update",
+                "textDeltas": 0,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 3,
+                "lastEventType": "message_update",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 4,
+                "lastEventType": "tool_execution_start",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 5,
+                "lastEventType": "tool_execution_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 6,
+                "lastEventType": "message_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": 8,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": "stream-delta",
+              "generationMs": 5,
+              "processMs": 8,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": 3,
+                "lastEventMs": 7,
+                "lastEventType": "agent_end",
+                "textDeltas": 1,
+                "thinkingDeltas": 1,
+                "toolEnds": 1,
+                "toolErrors": 1,
+                "toolStarts": 1
+              },
+              "timeToFirstResponseMs": 2
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": "stream-delta",
+            "generationMs": 5,
+            "processMs": 8,
+            "processTailMs": 1,
+            "startupMs": 1,
+            "stream": {
+              "firstTextMs": 3,
+              "lastEventMs": 7,
+              "lastEventType": "agent_end",
+              "textDeltas": 1,
+              "thinkingDeltas": 1,
+              "toolEnds": 1,
+              "toolErrors": 1,
+              "toolStarts": 1
+            },
+            "timeToFirstResponseMs": 2
+          }
+        }
+      },
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": 2,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": 2,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": null,
+            "generationMs": null,
+            "processMs": 2,
+            "processTailMs": null,
+            "startupMs": 1,
+            "stream": {
+              "firstTextMs": null,
+              "lastEventMs": 1,
+              "lastEventType": "agent_start",
+              "textDeltas": 0,
+              "thinkingDeltas": 0,
+              "toolEnds": 0,
+              "toolErrors": 0,
+              "toolStarts": 0
+            },
+            "timeToFirstResponseMs": null
+          }
+        }
+      },
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "completed-message",
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": null,
+              "stream": {
+                "firstTextMs": 1,
+                "lastEventMs": 1,
+                "lastEventType": "message_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 1
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": "completed-message",
+              "generationMs": null,
+              "processMs": 2,
+              "processTailMs": null,
+              "startupMs": null,
+              "stream": {
+                "firstTextMs": 1,
+                "lastEventMs": 1,
+                "lastEventType": "message_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 1
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": "completed-message",
+              "generationMs": null,
+              "processMs": 2,
+              "processTailMs": null,
+              "startupMs": null,
+              "stream": {
+                "firstTextMs": 1,
+                "lastEventMs": 1,
+                "lastEventType": "message_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": 1
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": "completed-message",
+            "generationMs": null,
+            "processMs": 2,
+            "processTailMs": null,
+            "startupMs": null,
+            "stream": {
+              "firstTextMs": 1,
+              "lastEventMs": 1,
+              "lastEventType": "message_end",
+              "textDeltas": 0,
+              "thinkingDeltas": 0,
+              "toolEnds": 0,
+              "toolErrors": 0,
+              "toolStarts": 0
+            },
+            "timeToFirstResponseMs": 1
+          }
+        }
+      },
+      {
+        "value": {
+          "progress": [
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 1,
+                "lastEventType": "agent_start",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": null,
+              "processTailMs": null,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "agent_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": null,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": 3,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "agent_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            },
+            {
+              "cleanupMs": 17,
+              "firstResponseSource": null,
+              "generationMs": null,
+              "processMs": 3,
+              "processTailMs": 1,
+              "startupMs": 1,
+              "stream": {
+                "firstTextMs": null,
+                "lastEventMs": 2,
+                "lastEventType": "agent_end",
+                "textDeltas": 0,
+                "thinkingDeltas": 0,
+                "toolEnds": 0,
+                "toolErrors": 0,
+                "toolStarts": 0
+              },
+              "timeToFirstResponseMs": null
+            }
+          ],
+          "snapshot": {
+            "cleanupMs": 17,
+            "firstResponseSource": null,
+            "generationMs": null,
+            "processMs": 3,
+            "processTailMs": 1,
+            "startupMs": 1,
+            "stream": {
+              "firstTextMs": null,
+              "lastEventMs": 2,
+              "lastEventType": "agent_end",
+              "textDeltas": 0,
+              "thinkingDeltas": 0,
+              "toolEnds": 0,
+              "toolErrors": 0,
+              "toolStarts": 0
+            },
+            "timeToFirstResponseMs": null
+          }
+        }
+      }
+    ]
+  }
+}
