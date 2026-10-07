@@ -254,6 +254,8 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     },
     phaseTimings: result?.phaseTimings,
     executionMode: result?.executionMode,
+    // Internal adapter identity is separate from process isolation/transport runtime.
+    ...(['pi','claude-code-cli'].includes(result?.workerRuntime) ? {workerRuntime:result.workerRuntime} : {}),
     // A configured backend is runtime evidence only after the process actually ran.
     runtime: result?.runtime ?? ((finiteNumber(result?.exitCode) !== undefined || finiteNumber(result?.phaseTimings?.processMs) > 0)
       ? result?.osSandbox ?? (operation === 'dispatch_subagent' ? result?.sandbox : undefined) : undefined),

@@ -81,6 +81,7 @@ test('runtime registry is fixed, rejects unknown providers and cannot be selecte
   assert.equal(resolveRuntime({provider:'openai-codex'}).id,'pi');assert.equal(resolveRuntime({provider:'claude-code-cli'}).id,'claude-code-cli');
   for(const provider of [undefined,'unknown','toString','__proto__'])assert.throws(()=>resolveRuntime({provider}));
   assert.throws(()=>validateRequest({target:'model',cwd:process.cwd(),provider:'openai-codex',model:'gpt-6-luna',prompt:'fixture',runtime:'fake'}),/Unknown request key/);
+  assert.throws(()=>validateRequest({target:'model',cwd:process.cwd(),provider:'openai-codex',model:'gpt-6-luna',prompt:'fixture',workerRuntime:'claude-code-cli'}),/Unknown request key/);
 });
 
 const reviewTask={role:'Geburah',objective:'Review synthetic fixture only',acceptance:['fixture review'],reviewPacket:{version:1,stage:'post-change',requirements:{status:'provided',content:['synthetic requirements']},changes:{status:'provided',content:['synthetic change']},context:{status:'provided',content:['synthetic context']},verification:{status:'provided',content:['synthetic passed check']}}};
@@ -100,7 +101,7 @@ test('Claude adapter keeps sparse legacy output, launch callback, no-tools trans
   for(const response of [{status:'completed',text:'fixture',usage:{input_tokens:2},modelExecutionStarted:true},{status:'failed',reason:'PI_AUTH_EXPIRED',modelExecutionStarted:false},{status:'failed',reason:'PI_QUOTA_LIMITED',resetTime:'fixture-reset',modelExecutionStarted:true},{status:'failed'}]){
     let observed;const callback=()=>{};const actual=await dispatch({...reviewRequest},undefined,structuredClone(reviewTask),{claudeCliEntryResolver:()=>'/synthetic/claude.js',onModelStart:callback,claudeReviewerRunner:async args=>{observed=args;return response;}});
     const expected={target:'model',requestedProvider:'claude-code-cli',requestedModel:'claude-sonnet-5',provider:'claude-code-cli',model:'claude-sonnet-5',ok:response.status==='completed',...(response.text!==undefined?{text:response.text}:{}),usage:response.usage??null,modelExecutionStarted:response.modelExecutionStarted===true,toolsUsed:[],toolErrors:0,runtime:'host-cli',osSandbox:'none',...(response.status!=='completed'?{failureCode:response.reason,failure:response.reason??'Claude Code CLI failed'}:{}),...(response.resetTime?{resetTime:response.resetTime}:{})};
-    assert.deepEqual(actual,expected);assert.equal(observed.timeoutMs,30000);assert.equal(observed.thinking,'medium');assert.equal(observed.onModelStart,callback);assert.ok(observed.resultSchema);assert.ok(observed.packet.includes('TASK_PACKET_JSON='));assert.equal(observed.cliScript,'/synthetic/claude.js');
+    assert.deepEqual(actual,{...expected,workerRuntime:'claude-code-cli'});assert.equal(observed.timeoutMs,30000);assert.equal(observed.thinking,'medium');assert.equal(observed.onModelStart,callback);assert.ok(observed.resultSchema);assert.ok(observed.packet.includes('TASK_PACKET_JSON='));assert.equal(observed.cliScript,'/synthetic/claude.js');
   }
 });
 test('normalizer rejects invalid limits and never retains private thinking or arbitrary tool output',()=>{

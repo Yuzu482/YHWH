@@ -36,7 +36,7 @@ test('exact validated reviewer route runs only injected host CLI and returns com
   assert.deepEqual(response, {
     target: 'model', requestedProvider: 'claude-code-cli', requestedModel: 'claude-sonnet-5',
     provider: 'claude-code-cli', model: 'claude-sonnet-5', ok: true, text: 'findings',
-    usage: { input_tokens: 3 }, toolsUsed: [], toolErrors: 0, runtime: 'host-cli', osSandbox: 'none', modelExecutionStarted: false,
+    usage: { input_tokens: 3 }, toolsUsed: [], toolErrors: 0, runtime: 'host-cli', workerRuntime: 'claude-code-cli', osSandbox: 'none', modelExecutionStarted: false,
   });
 });
 

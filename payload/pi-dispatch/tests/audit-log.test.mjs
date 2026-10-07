@@ -9,6 +9,17 @@ import {
   summarizePatch, summarizeTaskEnvelope, summarizeUsage,
 } from '../extensions/audit-log.js';
 
+test('worker runtime audit identity is allowlisted and distinct from transport runtime',()=>{
+  for(const [workerRuntime,runtime] of [['pi','wsl2-bwrap'],['claude-code-cli','host-cli']]){
+    const r=buildAuditRecord({requestId:'runtime-fixture',operation:'dispatch_subagent',input:{workerRuntime:'spoofed'},result:{ok:true,exitCode:0,workerRuntime,runtime}});
+    assert.equal(r.workerRuntime,workerRuntime);assert.equal(r.runtime,runtime);
+  }
+  for(const workerRuntime of ['host-cli','wsl2-bwrap','private',undefined]){
+    const r=buildAuditRecord({requestId:'runtime-fixture',operation:'dispatch_subagent',input:{workerRuntime:'pi'},result:{ok:false,workerRuntime}});
+    assert.equal(Object.hasOwn(r,'workerRuntime'),false);
+  }
+});
+
 test('audit summaries retain evidence without raw task or patch text', () => {
   const secret = 'sk-super-secret-123456789';
   const task = { role: 'worker', objective: `Use ${secret}`, context: ['private text'], writeScope: ['src/**'] };

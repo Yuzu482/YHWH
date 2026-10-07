@@ -222,8 +222,9 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
   enforceWorkerExecution({ provider: request.provider, model: request.model, access: request.access, reviewerValidated, probe, probeToken, probeApproved, task });
   if (process.env.PI_DISPATCH_ACTIVE === '1') throw new Error('Recursive Pi dispatch is disabled');
   const runtime = runtimeResolver(request);
+  const runtimeMetadata = ['pi','claude-code-cli'].includes(runtime.id) ? {workerRuntime:runtime.id} : {};
   if (request.provider === 'claude-code-cli') {
-    return executeRuntime(runtime, {request,task,signal,context:{resultFormat,probe,probeToken,claudeReviewerRunner,claudeCliEntryResolver,onModelStart}});
+    return {...await executeRuntime(runtime, {request,task,signal,context:{resultFormat,probe,probeToken,claudeReviewerRunner,claudeCliEntryResolver,onModelStart}}),...runtimeMetadata};
   }
   if (!sandboxRequested(process.env)) throw new Error('Pi task execution requires the verified WSL2 resource sandbox');
   let authentication;
@@ -236,15 +237,15 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
       if(request.provider==='openai-codex')authentication=await ensureOpenAIAuth({piEntry:findPiEntry(),signal,minimumValidityMs:request.timeoutSeconds*1000+360000});
       else {apiPacket=await prepareWindowsApiPacket(request,{signal});authentication={ok:true,authentication:'api_key',atRestEncryption:'Windows DPAPI CurrentUser',networkValidated:false};}
     }
-    catch(error){return {ok:false,...(structuredResultTool ? {resultSubmissionRequired:true} : {}),target:request.target,requestedProvider:request.provider,requestedModel:request.model,failureCode:error.code??'PI_AUTH_RENEW_FAILED',failure:error.code??'PI_AUTH_RENEW_FAILED',toolsUsed:[],toolErrors:0,phaseTimings:{authenticationMs:Date.now()-authStarted}};}
+    catch(error){return {ok:false,...runtimeMetadata,...(structuredResultTool ? {resultSubmissionRequired:true} : {}),target:request.target,requestedProvider:request.provider,requestedModel:request.model,failureCode:error.code??'PI_AUTH_RENEW_FAILED',failure:error.code??'PI_AUTH_RENEW_FAILED',toolsUsed:[],toolErrors:0,phaseTimings:{authenticationMs:Date.now()-authStarted}};}
   }
   authenticationMs=Date.now()-authStarted;progress({});
   const prepared = runtime.prepare(request, task, {resultFormat,upstreamResults,editorBroker,structuredResultTool,dispatchStarted,childEnvironment});
   const executionBudget = calculateExecutionBudget({ overallTimeoutSeconds: request.timeoutSeconds, elapsedMs: performance.now() - dispatchStarted });
-  if (!executionBudget.ok) return { ok:false, ...(structuredResultTool ? {resultSubmissionRequired:true} : {}), target:request.target, requestedProvider:request.provider, requestedModel:request.model, failureCode:'PI_EXECUTION_BUDGET_EXHAUSTED', failure:'No whole sandbox second remains', authentication, phaseTimings:{authenticationMs}, resourceLimits:request.resourceLimits, executionBudget };
+  if (!executionBudget.ok) return { ok:false, ...runtimeMetadata, ...(structuredResultTool ? {resultSubmissionRequired:true} : {}), target:request.target, requestedProvider:request.provider, requestedModel:request.model, failureCode:'PI_EXECUTION_BUDGET_EXHAUSTED', failure:'No whole sandbox second remains', authentication, phaseTimings:{authenticationMs}, resourceLimits:request.resourceLimits, executionBudget };
   const sandboxResourceLimits = { ...request.resourceLimits, timeoutSeconds: executionBudget.sandboxSeconds };
   const raw = await runtime.run(prepared, {request,task,signal,editorBroker,apiPacket,resourceLimits:sandboxResourceLimits,onProgress:progress});
-  return { ...runtime.summarize(raw, { ...request, resultSubmissionRequired: structuredResultTool }), ...(raw.outputLimitObservation?{outputLimitObservation:raw.outputLimitObservation}:{}), ...(structuredResultTool ? { resultSubmissionRequired: true } : {}), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits, executionBudget };
+  return { ...runtime.summarize(raw, { ...request, resultSubmissionRequired: structuredResultTool }), ...runtimeMetadata, ...(raw.outputLimitObservation?{outputLimitObservation:raw.outputLimitObservation}:{}), ...(structuredResultTool ? { resultSubmissionRequired: true } : {}), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits, executionBudget };
 }
 
 async function main(args, signal) {
