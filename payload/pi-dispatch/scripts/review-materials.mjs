@@ -9,11 +9,16 @@ export function buildReviewPacket({stage,requirements,changes,context,verificati
   for(const name of sections){
     const value={requirements,changes,context,verification}[name];
     if(!value||!Array.isArray(value)||!value.length) throw new Error(`Missing review section: ${name}`);
-    const chunks=[];
+    const chunks=[],excerpts=[];
     for(const raw of value){
       if(typeof raw!=='string'||!raw.trim()||raw.includes('\0')) throw new Error(`Invalid review material: ${name}`);
       const safe=redact(raw);
-      for(let i=0;i<safe.length;i+=LIMITS.sectionChars) chunks.push(safe.slice(i,i+LIMITS.sectionChars));
+      excerpts.push(safe);
+      chunks.push(...chunkReviewText(safe));
+    }
+    if(chunks.length>LIMITS.stringsPerSection){
+      chunks.length=0;
+      for(const safe of excerpts) chunks.push(...chunkReviewText(safe,false));
     }
     if(chunks.length>LIMITS.stringsPerSection) throw new Error(`Review section exceeds string budget: ${name}`);
     packet[name]={status:'provided',content:chunks};
@@ -27,3 +32,22 @@ export function buildReviewPacket({stage,requirements,changes,context,verificati
 }
 
 export {LIMITS as REVIEW_MATERIAL_LIMITS};
+
+function chunkReviewText(text,preferLines=true) {
+  const chunks=[];
+  let start=0;
+  while(start<text.length){
+    let end=Math.min(start+LIMITS.sectionChars,text.length);
+    if(end<text.length){
+      const newline=preferLines?text.lastIndexOf('\n',end-1):-1;
+      const nextChunk=text.slice(newline+1,newline+1+LIMITS.sectionChars);
+      if(newline>=start&&text.slice(start,newline).trim()&&nextChunk.trim()) end=newline+1;
+      else if(text.charCodeAt(end-1)>=0xd800&&text.charCodeAt(end-1)<=0xdbff&&text.charCodeAt(end)>=0xdc00&&text.charCodeAt(end)<=0xdfff) end--;
+      else if(text.charCodeAt(end-1)===13&&text.charCodeAt(end)===10) end--;
+    }
+    if(end===start) end=Math.min(start+LIMITS.sectionChars,text.length);
+    chunks.push(text.slice(start,end));
+    start=end;
+  }
+  return chunks;
+}
