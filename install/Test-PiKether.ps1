@@ -102,7 +102,15 @@ if ($Installed) {
   if (-not $catalogParity) { Report-ArtifactDrift 'plugins/pi-dispatch/workflow/catalog.json' $sourceCatalog $installedCatalog }
   if($Hosts -contains 'codex'){
   $installedPluginManifest = Join-Path $TargetHome 'plugins\pi-dispatch\.codex-plugin\plugin.json'
-  $pluginManifestParity = (Test-Path -LiteralPath $installedPluginManifest -PathType Leaf) -and ((Get-FileHash -LiteralPath $pluginManifestPath -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedPluginManifest -Algorithm SHA256).Hash)
+  $pluginManifestParity = $false
+  if (Test-Path -LiteralPath $installedPluginManifest -PathType Leaf) {
+    $identity = & (Join-Path $PSScriptRoot 'Get-PluginBuildIdentity.ps1') -PackageRoot $packageRoot
+    $expectedPluginManifest = Get-Content -LiteralPath $pluginManifestPath -Raw | ConvertFrom-Json
+    $expectedPluginManifest.version = $identity.pluginVersion
+    $actualPluginManifest = Get-Content -LiteralPath $installedPluginManifest -Raw | ConvertFrom-Json
+    $installedProof = Get-Content -LiteralPath (Join-Path $TargetHome 'plugins/pi-dispatch/build-provenance.json') -Raw | ConvertFrom-Json
+    $pluginManifestParity = ($expectedPluginManifest | ConvertTo-Json -Depth 100 -Compress) -ceq ($actualPluginManifest | ConvertTo-Json -Depth 100 -Compress) -and $installedProof.sourceCommit -ceq $identity.sourceCommit -and $installedProof.pluginVersion -ceq $identity.pluginVersion
+  }
   Check $pluginManifestParity 'installed plugin manifest parity'
   if (-not $pluginManifestParity) { Report-ArtifactDrift 'plugins/pi-dispatch/.codex-plugin/plugin.json' $pluginManifestPath $installedPluginManifest }
   $agentsInstalled = Join-Path $TargetHome '.codex\AGENTS.md'

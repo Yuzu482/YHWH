@@ -45,11 +45,28 @@ try {
   }
   Assert-Stamp $false
   [IO.File]::WriteAllText((Join-Path $source 'untracked.fixture'), 'ignored')
-  Assert-Stamp $false
+  Assert-Stamp $true
   Remove-Item -LiteralPath (Join-Path $source 'untracked.fixture')
   [IO.File]::AppendAllText((Join-Path $source $pluginRel), "`n")
   Assert-Stamp $true
   if ([IO.File]::ReadAllText((Join-Path $source $pluginRel)) -cne ($pluginText + "`n") -or [IO.File]::ReadAllText((Join-Path $source 'portable.manifest.json')) -cne $portableText) { throw 'Source manifests were modified.' }
+  $installed = Join-Path $full 'installed plugin'
+  New-Item -ItemType Directory -Force -Path (Join-Path $installed '.codex-plugin') | Out-Null
+  Copy-Item -LiteralPath (Join-Path $source $pluginRel) -Destination (Join-Path $installed '.codex-plugin/plugin.json')
+  & (Join-Path $PSScriptRoot 'Set-InstalledPluginVersion.ps1') -PackageRoot $source -PluginRoot $installed | Out-Null
+  $sourceIdentity = & (Join-Path $PSScriptRoot 'Get-PluginBuildIdentity.ps1') -PackageRoot $source
+  $sourceInstall = Get-Content -LiteralPath (Join-Path $installed '.codex-plugin/plugin.json') -Raw | ConvertFrom-Json
+  if ($sourceInstall.version -cne $sourceIdentity.pluginVersion -or -not $sourceInstall.version.EndsWith('.dirty')) { throw 'Source install lost dirty commit identity.' }
+  # No .git: packaged installs use validated build provenance, not a static source version.
+  & (Join-Path $PSScriptRoot 'Set-InstalledPluginVersion.ps1') -PackageRoot $stage -PluginRoot $installed | Out-Null
+  $packaged = & (Join-Path $PSScriptRoot 'Get-PluginBuildIdentity.ps1') -PackageRoot $stage
+  if ($packaged.pluginVersion -cne $sourceIdentity.pluginVersion) { throw 'Packaged install lost build identity.' }
+  $proof = Get-Content -LiteralPath (Join-Path $stage 'build-provenance.json') -Raw | ConvertFrom-Json
+  $proof.shortHash = '000000000000'
+  $proof | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage 'build-provenance.json') -Encoding utf8NoBOM
+  $badProof = ''
+  try { & (Join-Path $PSScriptRoot 'Get-PluginBuildIdentity.ps1') -PackageRoot $stage | Out-Null } catch { $badProof = $_.Exception.Message }
+  if ($badProof -ne 'Packaged plugin provenance is missing or inconsistent.') { throw 'Corrupt packaged provenance was accepted.' }
   $empty = Join-Path $full 'no commit'
   New-Item -ItemType Directory -Force -Path $empty | Out-Null
   $previousConfig = $env:GIT_CONFIG_GLOBAL
@@ -58,6 +75,8 @@ try {
   $env:GIT_CONFIG_NOSYSTEM = '1'
   try {
     Invoke-FixtureGit $empty @('init','-q')
+    New-Item -ItemType Directory -Force -Path (Join-Path $empty (Split-Path $pluginRel)) | Out-Null
+    [IO.File]::WriteAllText((Join-Path $empty $pluginRel), $pluginText)
     PrepareStage
     $proofPath = Join-Path $stage 'build-provenance.json'
     if (Test-Path -LiteralPath $proofPath) { Remove-Item -LiteralPath $proofPath -Force }

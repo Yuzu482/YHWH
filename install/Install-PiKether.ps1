@@ -83,6 +83,7 @@ $nodeMajor = [int]((& $nodePath --version).TrimStart('v').Split('.')[0])
 if ($nodeMajor -lt 22) { throw 'Node.js 22 or newer is required on Windows.' }
 
 $pluginSource = Join-Path $payload 'pi-dispatch'
+$pluginIdentity = & (Join-Path $PSScriptRoot 'Get-PluginBuildIdentity.ps1') -PackageRoot $packageRoot
 $templatePath = Join-Path $packageRoot 'templates\AGENTS.kether.md'
 $referencesSource = Join-Path $packageRoot 'templates\agent-references'
 foreach ($required in @($pluginSource, $templatePath, $referencesSource, (Join-Path $packageRoot 'install\patch-pi-lsp.mjs'))) {
@@ -126,6 +127,7 @@ New-Item -ItemType Directory -Force -Path $backupRoot, $stateRoot | Out-Null
 
 $pluginTarget = Join-Path $TargetHome 'plugins\pi-dispatch'
 Copy-WithBackup $pluginSource $pluginTarget $backupRoot
+& (Join-Path $PSScriptRoot 'Set-InstalledPluginVersion.ps1') -PackageRoot $packageRoot -PluginRoot $pluginTarget | Out-Null
 Push-Location $pluginTarget
 try {
   & (Join-Path (Split-Path -Parent $nodePath) 'npm.cmd') ci --omit=dev --ignore-scripts=false
