@@ -35,7 +35,7 @@ if ($version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$') { throw 'Invalid r
 $release = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $release | Out-Null
 
-foreach($script in @('Test-PiKether.ps1','Test-HostWorkflowSync.ps1','Test-HindsightWrapper.ps1','Test-WorkflowConfig.ps1','Test-Headless.ps1','Test-PluginVersion.ps1')) {
+foreach($script in @('Test-PiKether.ps1','Test-HostWorkflowSync.ps1','Test-HindsightWrapper.ps1','Test-WorkflowConfig.ps1','Test-Headless.ps1','Test-PluginVersion.ps1','Test-DeploymentSource.ps1')) {
   $r=Invoke-ValidationProcess $pwsh @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $root ('install/'+$script))) 300 $root
   Assert-ValidationSuccess $r $pwsh 300
 }

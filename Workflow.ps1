@@ -12,10 +12,36 @@ param(
   [string]$TargetHome=$HOME,
   [switch]$SkipWsl,
   [switch]$SkipTunnel,
-  [switch]$SkipCodexRegistration
+  [switch]$SkipCodexRegistration,
+  [switch]$AllowDirty,
+  [string]$DirtyReason
 )
 $ErrorActionPreference='Stop'
 switch($Action) {
+  'Install' {
+    $admission = & (Join-Path $PSScriptRoot 'install/Assert-DeploymentSource.ps1') -PackageRoot $PSScriptRoot -AllowDirty:$AllowDirty -DirtyReason $DirtyReason
+    $recordRoot = Join-Path ([IO.Path]::GetFullPath($TargetHome)) '.local/state/pi-kether/installation-records'
+    New-Item -ItemType Directory -Force -Path $recordRoot | Out-Null
+    $recordPath = Join-Path $recordRoot (([guid]::NewGuid().ToString('N')) + '.json')
+    $record = [ordered]@{schemaVersion=1;startedAt=[DateTime]::UtcNow.ToString('o');status='admitted';source=$PSScriptRoot;admission=$admission}
+    function Save-InstallRecord {
+      $temporary = $recordPath + '.tmp'
+      try {
+        [IO.File]::WriteAllText($temporary, ($record | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+        [IO.File]::Move($temporary, $recordPath, $true)
+      } finally { if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Force} }
+    }
+    Save-InstallRecord
+    try {
+      & (Join-Path $PSScriptRoot 'install/Install-PiKether.ps1') -ConfigFile $ConfigFile -TargetHome $TargetHome -SkipWsl:$SkipWsl -SkipTunnel:$SkipTunnel -SkipCodexRegistration:$SkipCodexRegistration
+      if(-not $?){throw 'Installer failed.'}
+      $record.status='completed'
+    } catch {
+      $record.status='failed'; throw
+    } finally {
+      $record.finishedAt=[DateTime]::UtcNow.ToString('o'); Save-InstallRecord
+    }
+  }
   'HeadlessEvents' { & (Join-Path $PSScriptRoot 'install/Invoke-Headless.ps1') -Action Events -ConfigFile $HeadlessConfigFile -RequestFile $HeadlessRequestFile }
   'HeadlessBatch' { & (Join-Path $PSScriptRoot 'install/Invoke-Headless.ps1') -Action Batch -ConfigFile $HeadlessConfigFile -RequestFile $HeadlessRequestFile }
   'HeadlessBatchEvents' { & (Join-Path $PSScriptRoot 'install/Invoke-Headless.ps1') -Action BatchEvents -ConfigFile $HeadlessConfigFile -RequestFile $HeadlessRequestFile }
