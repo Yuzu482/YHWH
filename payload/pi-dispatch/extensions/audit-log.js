@@ -65,12 +65,31 @@ export function summarizePatch(patch) {
   const pathHashes = new Set();
   let additions = 0;
   let deletions = 0;
+  let oldRemaining = 0;
+  let newRemaining = 0;
   for (const line of patch.split(/\r?\n/)) {
+    if (oldRemaining > 0 || newRemaining > 0) {
+      if (line.startsWith('+') && newRemaining > 0) { additions++; newRemaining--; continue; }
+      if (line.startsWith('-') && oldRemaining > 0) { deletions++; oldRemaining--; continue; }
+      if (line.startsWith(' ') && oldRemaining > 0 && newRemaining > 0) { oldRemaining--; newRemaining--; continue; }
+      if (line === '\\ No newline at end of file') continue;
+      oldRemaining = 0;
+      newRemaining = 0;
+    }
+    const hunk = /^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/.exec(line);
+    if (hunk) {
+      const oldCount = Number(hunk[1] ?? 1);
+      const newCount = Number(hunk[2] ?? 1);
+      if (Number.isSafeInteger(oldCount) && Number.isSafeInteger(newCount)) {
+        oldRemaining = oldCount;
+        newRemaining = newCount;
+      }
+      continue;
+    }
     if (line.startsWith('+++ ') || line.startsWith('--- ')) {
       const path = line.slice(4).split('\t', 1)[0];
-      if (path !== '/dev/null') pathHashes.add(sha256(path.replace(/^[ab]\//, '')));
-    } else if (line.startsWith('+')) additions++;
-    else if (line.startsWith('-')) deletions++;
+      if (path !== '/dev/null') pathHashes.add(sha256(path.replace(/^("?)[ab]\//, '$1')));
+    }
   }
   return {
     present: true,
