@@ -7,6 +7,49 @@ const base = {
   access: 'read', resourceProfile: 'small', priority: 5, dependsOnRequestIds: [], task: { role: 'worker', objective: 'bounded task' },
 };
 
+test('memory-only monitor enforces count and byte budgets without a persistence callback', async()=>{
+  const monitor=createTaskMonitor({gatewayInstanceId:'memory-count',maxEntries:16,maintenanceIntervalMs:0});
+  const budget=createTaskMonitor({gatewayInstanceId:'memory-bytes',maxResultBytes:1,maintenanceIntervalMs:0});
+  try {
+    for(let i=0;i<19;i++) {
+      const id=`memory-${i}`;
+      monitor.submit({...base,requestId:id},async()=>({ok:true,patch:'bounded'}));
+      assert.equal((await monitor.wait(id)).ready,true);
+    }
+    assert.equal(monitor.size,16);
+    assert.equal(monitor.getResult('memory-0').code,'RESULT_NOT_FOUND');
+    assert.equal(monitor.getResult('memory-18').result.patch,'bounded');
+    budget.submit(base,async()=>({ok:true,patch:'large'.repeat(100)}));
+    assert.equal((await budget.wait(base.requestId)).ready,true);
+    assert.equal(budget.getResult(base.requestId).code,'RESULT_NOT_FOUND');
+    assert.equal(budget.get(base.requestId).state,'completed');
+  } finally {monitor.close();budget.close();}
+});
+
+test('memory-only maintenance expires completed results while retaining active work', async()=>{
+  const monitor=createTaskMonitor({gatewayInstanceId:'memory-ttl',terminalTtlMs:20,maintenanceIntervalMs:5});
+  let release;
+  try {
+    monitor.submit({...base,requestId:'active'},async(_signal,running)=>{running();await new Promise(resolve=>{release=resolve;});return {ok:true};});
+    monitor.submit(base,async()=>({ok:true,patch:'expire'}));
+    assert.equal((await monitor.wait(base.requestId)).ready,true);
+    await new Promise(resolve=>setTimeout(resolve,100));
+    assert.equal(monitor.get(base.requestId),null);
+    assert.equal(monitor.get('active').state,'running');
+  } finally {release?.();monitor.close();}
+});
+
+test('configured persistence failure keeps the only copy despite count, TTL and byte pressure', async()=>{
+  for(const persistResult of [()=>false,()=>{throw Error('storage offline');}]) {
+    const monitor=createTaskMonitor({gatewayInstanceId:'failed-storage',maxEntries:16,terminalTtlMs:0,maxResultBytes:1,maintenanceIntervalMs:0,persistResult});
+    try {
+      for(let i=0;i<19;i++) {const id=`failed-${i}`;monitor.submit({...base,requestId:id},async()=>({ok:true,patch:'only-copy'}));await monitor.wait(id);}
+      assert.equal(monitor.size,19);
+      assert.equal(monitor.getResult('failed-0').result.patch,'only-copy');
+    } finally {monitor.close();}
+  }
+});
+
 test('task monitor deduplicates stable request IDs and rejects conflicting reuse', async () => {
   const monitor = createTaskMonitor({ gatewayInstanceId: 'gateway-1' });
   let release;
