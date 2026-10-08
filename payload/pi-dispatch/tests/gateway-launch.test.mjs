@@ -25,7 +25,9 @@ async function command(exe, args, options = {}) {
   });
 }
 async function fixture(t, scenario = 'ready') {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yhwh launch '));
+  // Windows TEMP may use an 8.3 alias. Settings require a canonical absolute path.
+  const temporaryRoot = fs.realpathSync.native(os.tmpdir());
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(temporaryRoot, 'yhwh launch ')));
   fs.mkdirSync(path.join(root, 'scripts'));
   const launcher = path.join(root, 'scripts/start-gateway.mjs');
   fs.copyFileSync(entry, launcher);
@@ -45,7 +47,7 @@ if(c.scenario==='wrapper-failure')setTimeout(()=>process.kill(process.ppid),50);
 const server=http.createServer((req,res)=>{
  if(req.headers.authorization!=='Bearer isolated-launch-token'){res.writeHead(401);res.end('{}');return;}
  res.setHeader('Content-Type','application/json');
- if(req.url==='/readyz')res.end(JSON.stringify({ok:c.scenario!=='timeout'}));
+ if(req.url==='/readyz')res.end(JSON.stringify({ok:!['timeout','wrapper-failure'].includes(c.scenario)}));
  else if(req.url==='/admin/upgrade/status')res.end(JSON.stringify({pid:c.scenario==='wrong-pid'?process.pid+1:process.pid,phase:'running'}));
  else {res.writeHead(404);res.end('{}');}
 });
@@ -61,12 +63,36 @@ server.listen(c.port,'127.0.0.1');`);
   t.after(async () => {
     if(fs.existsSync(pidFile)){const pid=Number(fs.readFileSync(pidFile));try{process.kill(pid);}catch{}}
     await new Promise(r=>setTimeout(r,100));
-    assert.equal(path.dirname(root),path.resolve(os.tmpdir()));fs.rmSync(root,{recursive:true,force:true});
+    assert.equal(path.dirname(root),temporaryRoot);fs.rmSync(root,{recursive:true,force:true});
   });
   return {root,launcher,settings,config,data,pidFile,port,
     run:args=>command(process.execPath,[launcher,...(args??['--settings-file',settings,'--timeout-ms',scenario==='timeout'?'1000':'5000'])])};
 }
 function dead(pid){assert.throws(()=>process.kill(pid,0),{code:'ESRCH'});}
+test('Windows short TEMP aliases still generate canonical gateway fixtures and launch successfully',
+  {skip:process.platform!=='win32',timeout:40000},async t=>{
+    const parent=fs.realpathSync.native(os.tmpdir());
+    const base=fs.realpathSync.native(fs.mkdtempSync(path.join(parent,'yhwh alias base ')));
+    try {
+    const shell=shells.find(s=>s.label==='windowsPS51');
+    if(!shell)return t.skip('Windows PowerShell unavailable');
+    const source='using System.Text;using System.Runtime.InteropServices;public static class ShortFixturePath{[DllImport("kernel32.dll",CharSet=CharSet.Unicode)]public static extern uint GetShortPathName(string path,StringBuilder output,uint length);}';
+    const converted=await command(shell.exe,['-NoProfile','-NonInteractive','-Command',
+      `Add-Type -TypeDefinition ${q(source)};$b=New-Object Text.StringBuilder 32768;if(-not [ShortFixturePath]::GetShortPathName(${q(base)},$b,32768)){throw 'Short path unavailable'};[Console]::Write($b.ToString())`]);
+    assert.equal(converted.exitCode,0,converted.stderr);const alias=converted.stdout.trim();
+    if(alias.toLowerCase()===base.toLowerCase())return t.skip('Filesystem has no short filename alias');
+    const saved={TEMP:process.env.TEMP,TMP:process.env.TMP};let f;
+    try{process.env.TEMP=alias;process.env.TMP=alias;f=await fixture(t);}
+    finally{for(const [key,value]of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
+    assert.equal(f.root,fs.realpathSync.native(f.root));
+    assert.equal(path.dirname(f.root),base);
+    const actual=await f.run();assert.equal(actual.exitCode,0,actual.stdout+actual.stderr);
+    assert.equal(JSON.parse(actual.stdout).status,'ready');
+    } finally {
+      // Register last: the nested service fixture must close and clean up first.
+      t.after(()=>{assert.equal(path.dirname(base),parent);fs.rmSync(base,{recursive:true,force:true});});
+    }
+  });
 for(const scenario of ['ready','exit7','timeout','wrong-pid','record-failure']){
   test('real detached gateway: '+scenario,{timeout:40000},async t=>{
     const f=await fixture(t,scenario),actual=await f.run(),r=JSON.parse(actual.stdout);
