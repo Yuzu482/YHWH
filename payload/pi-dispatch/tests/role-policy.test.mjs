@@ -13,13 +13,14 @@ test('Claude review is pinned and cannot gain tools or filesystem scope',()=>{
  assert.equal(request.provider,'claude-code-cli');
  assert.equal(request.model,'claude-sonnet-5');
  assert.equal(task.role,'Geburah');
- assert.equal(request.thinking,'max');
+ assert.equal(request.thinking,'medium');
  assert.throws(()=>validateKetherInvocation({...value,provider:'openai-codex'}),/requires provider/);
  assert.throws(()=>validateKetherInvocation({...value,model:'sonnet'}),/requires model/);
  assert.throws(()=>validateKetherInvocation({...value,access:'read',task:{...value.task,readScope:['package.json']}}),/Role Geburah does not allow read access/);
  assert.throws(()=>validateKetherInvocation({...value,access:'workspace-write',task:{...value.task,writeScope:['package.json']}},true),/Role Geburah does not allow workspace-write access/);
  assert.throws(()=>validateKetherInvocation({...value,provider:'anthropic',task:{...value.task,role:'worker'}}),/requires provider/);
- assert.throws(()=>validateKetherInvocation({...value,thinking:'high'}),/validated Geburah reviewer packet/);
+ for(const thinking of ['medium','high','xhigh']) assert.equal(validateKetherInvocation({...value,thinking}).request.thinking,thinking);
+ for(const thinking of ['low','off','minimal','max']) assert.throws(()=>validateKetherInvocation({...value,thinking}),e=>e.code==='YHWH_WORKER_ENFORCEMENT_REJECTED');
  assert.throws(()=>validateKetherInvocation({...value,provider:'claude-code-cli',model:'claude-sonnet-5',task:{...value.task,role:'worker'}}),/requires provider/);
  assert.throws(()=>validateKetherInvocation({...value,access:'read',task:{...value.task,readScope:['package.json']}},false),/Role Geburah does not allow read access/);
 });

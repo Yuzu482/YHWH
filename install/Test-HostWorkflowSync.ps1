@@ -21,11 +21,15 @@ try {
   if (Test-Path -LiteralPath (Join-Path $references 'governance.md')) { throw 'Retired governance reference remained active.' }
   if ([IO.File]::ReadAllText((Join-Path $references 'local-only.md')) -cne 'preserve-this') { throw 'Unmanaged reference was modified.' }
   $sourceManifest = Join-Path $repo 'payload/pi-dispatch/.codex-plugin/plugin.json'
-  if ((Get-FileHash -LiteralPath $pluginManifest).Hash -ne (Get-FileHash -LiteralPath $sourceManifest).Hash) { throw 'Installed plugin manifest differs from source.' }
+  $identity = & (Join-Path $PSScriptRoot 'Get-PluginBuildIdentity.ps1') -PackageRoot $repo
+  $installed = Get-Content -LiteralPath $pluginManifest -Raw | ConvertFrom-Json
+  $proof = Get-Content -LiteralPath (Join-Path $fullFixture 'plugins/pi-dispatch/build-provenance.json') -Raw | ConvertFrom-Json
+  if ($installed.version -cne $identity.pluginVersion -or $proof.sourceCommit -cne $identity.sourceCommit) { throw 'Installed plugin version differs from actual build identity.' }
   $hashManifestPath = Join-Path $codexRoot 'yhwh-managed-hashes.json'
   if (-not (Test-Path -LiteralPath $hashManifestPath -PathType Leaf)) { throw 'Managed hash manifest was not created.' }
   $hashManifest = Get-Content -LiteralPath $hashManifestPath -Raw | ConvertFrom-Json
   if ($hashManifest.schemaVersion -ne 1) { throw 'Managed hash manifest schema version is incorrect.' }
+  if ($hashManifest.files.'plugins/pi-dispatch/.codex-plugin/plugin.json' -cne (Get-FileHash -LiteralPath $pluginManifest).Hash.ToLowerInvariant()) { throw 'Stamped manifest hash is incorrect.' }
   $managedBlock = [regex]::Match($agents, '(?s)<!-- PI-KETHER:BEGIN -->.*?<!-- PI-KETHER:END -->').Value
   $blockHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($managedBlock))).ToLowerInvariant()
   if ($hashManifest.files.'.codex/AGENTS.md#PI-KETHER' -cne $blockHash) { throw 'Managed AGENTS block hash is incorrect.' }

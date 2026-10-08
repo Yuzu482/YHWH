@@ -65,7 +65,7 @@ export function planCooperativeRun(spec) {
     } catch (error) {
       fail(`invalid cooperative tierDeclaration: ${error.message}`);
     }
-    tierDeclaration = { ...spec.tierDeclaration, files: [...spec.tierDeclaration.files] };
+    tierDeclaration = { ...spec.tierDeclaration };
   } else if (spec.writeTier !== undefined || spec.tierDeclaration !== undefined) {
     fail('read-only cooperative runs cannot declare a write tier');
   }
@@ -87,7 +87,7 @@ export function planCooperativeRun(spec) {
     };
     if (unit.writeScope.length) {
       request.tier = 'T1';
-      request.tierDeclaration = Object.freeze({ ...tierDeclaration, files: Object.freeze([...unit.writeScope]) });
+      request.tierDeclaration = Object.freeze({ ...tierDeclaration });
     }
     if (Buffer.byteLength(JSON.stringify(request), 'utf8') > 8192) fail('emitted request exceeds 8 KiB');
     Object.freeze(task.context);

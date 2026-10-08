@@ -7,7 +7,26 @@ import { spawnSync } from 'node:child_process';
 import {
   buildAuditRecord, createAuditLogger, redactSensitiveText,
   summarizePatch, summarizeTaskEnvelope, summarizeUsage,
+  summarizeOutputLimit,
 } from '../extensions/audit-log.js';
+
+test('worker runtime audit identity is allowlisted and distinct from transport runtime',()=>{
+  for(const [workerRuntime,runtime] of [['pi','wsl2-bwrap'],['claude-code-cli','host-cli']]){
+    const r=buildAuditRecord({requestId:'runtime-fixture',operation:'dispatch_subagent',input:{workerRuntime:'spoofed'},result:{ok:true,exitCode:0,workerRuntime,runtime}});
+    assert.equal(r.workerRuntime,workerRuntime);assert.equal(r.runtime,runtime);
+  }
+  for(const workerRuntime of ['host-cli','wsl2-bwrap','private',undefined]){
+    const r=buildAuditRecord({requestId:'runtime-fixture',operation:'dispatch_subagent',input:{workerRuntime:'pi'},result:{ok:false,workerRuntime}});
+    assert.equal(Object.hasOwn(r,'workerRuntime'),false);
+  }
+});
+
+test('output-limit diagnostics keep bounded counters and never retain task/patch secrets',()=>{
+  assert.deepEqual(summarizeOutputLimit({bucket:'direct',directBytes:129,limitBytes:128,task:'secret',patch:'source',credential:'private'}),{bucket:'direct',directBytes:129,limitBytes:128});
+  assert.equal(summarizeOutputLimit({bucket:'guessed-tool-output'}),undefined);
+  const r=buildAuditRecord({requestId:'limit',operation:'dispatch_subagent',input:{access:'workspace-write'},task:null,result:{ok:false,failure:'output-limit',outputLimitObservation:{bucket:'patch',patchBytes:7000000,limitBytes:6291456,body:'private patch'}}});
+  assert.equal(r.outputLimitObservation.bucket,'patch');assert.equal(JSON.stringify(r).includes('private patch'),false);
+});
 
 test('audit summaries retain evidence without raw task or patch text', () => {
   const secret = 'sk-super-secret-123456789';
@@ -107,6 +126,54 @@ test('audit usage normalizes token counters and logger persists JSONL', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('host telemetry is bounded, redacted, and acceptance requires a bound host event', () => {
+  const hash = 'a'.repeat(64);
+  const telemetry = { parentRunId: 'run-1', workspaceSha256: hash, runAnchorSha256: 'b'.repeat(64), thinking: 'high', declaredTier: 'T1', baseTier: 'T0', tier: 'T1', riskProfile: 'standard', semanticRisks: { publicApiOrProtocol:false, dependencyOrLockfile:false, securityAuthOrCredentials:false, migration:false, irreversibleOrNoRollback:false }, counts: { files:2, addedLines:3, deletedLines:1, estimatedLines:4 }, modelExecution:true, submittedAt:'2026-10-02T12:00:00Z', startedAt:'2026-10-02T12:01:00Z', completedAt:'2026-10-02T12:02:00Z', reviewStage:'post-review', conditionalApproval:false };
+  const record = buildAuditRecord({ operation:'dispatch_subagent', input:{ parentRunId:'fallback-1' }, telemetry, result:{ ok:true, status:'completed', modelExecution:false, acceptedAt:'2026-10-02T12:03:00Z' } });
+  assert.equal(record.parentRunId, 'run-1');
+  assert.equal(record.modelExecution, true);
+  assert.equal(record.files, 2);
+  assert.deepEqual(record.semanticRisks, telemetry.semanticRisks);
+  const invalidRisks = buildAuditRecord({ telemetry: { semanticRisks: { a:false, b:false, c:false, d:false, e:false } } });
+  assert.equal(invalidRisks.semanticRisks, undefined);
+  const extraRisk = buildAuditRecord({ telemetry: { semanticRisks: { ...telemetry.semanticRisks, unknown:false } } });
+  assert.equal(extraRisk.semanticRisks, undefined);
+  assert.equal(buildAuditRecord({ operation:'probe_model', telemetry:{ modelExecution:true } }).modelExecution, false);
+  assert.equal(buildAuditRecord({ operation:'dispatch_subagent', telemetry:{ modelExecution:true } }).modelExecution, true);
+  assert.equal(record.acceptedAt, undefined);
+  assert.equal(buildAuditRecord({ operation:'dispatch_subagent', input:{ parentRunId:'fallback-2' }, failure:'failed' }).parentRunId, 'fallback-2');
+  const fake = buildAuditRecord({ operation:'dispatch_subagent', input:{ modelExecution:true, acceptedAt:'2026-10-02T12:03:00Z' }, task:{ acceptedAt:'2026-10-02T12:03:00Z' }, result:{ ok:true, acceptedAt:'2026-10-02T12:03:00Z', modelExecution:true } });
+  assert.equal(fake.modelExecution, undefined);
+  assert.equal(fake.acceptedAt, undefined);
+  const ordinary = buildAuditRecord({ operation:'dispatch_subagent', result:{ ok:true, status:'completed' }, telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'] } });
+  assert.equal(ordinary.acceptedAt, undefined);
+  const accepted = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'] } });
+  assert.equal(accepted.acceptedAt, '2026-10-02T12:03:00Z');
+  assert.deepEqual(accepted.implementationRequestIds, ['req-1']);
+  const validProof = { state:'completed', source:'netzach', artifactSha256:'c'.repeat(64), recordSha256:'d'.repeat(64) };
+  const acceptedProof = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00.123Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'], verification:validProof } });
+  assert.deepEqual(acceptedProof.verification, validProof);
+  const badProof = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'], verification:{ ...validProof, artifactSha256:'bad' } } });
+  assert.equal(badProof.verification, undefined);
+  const missingProof = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'2026-10-02T12:03:00Z', parentRunId:'run-1', workspaceSha256:'a'.repeat(64), runAnchorSha256:'b'.repeat(64), implementationRequestIds:['req-1'], verification:{ state:'completed', source:'netzach', recordSha256:'d'.repeat(64) } } });
+  assert.equal(missingProof.verification, undefined);
+  assert.equal(buildAuditRecord({ operation:'dispatch_subagent', telemetry:{ verification:validProof } }).verification, undefined);
+  const invalid = buildAuditRecord({ operation:'task_accepted', telemetry:{ taskAccepted:true, acceptedAt:'not a timestamp secret', parentRunId:'run secret', workspaceSha256:'bad', runAnchorSha256:'bad', implementationRequestIds:['bad id secret'] } });
+  assert.equal(invalid.acceptedAt, undefined);
+  assert.doesNotMatch(JSON.stringify(invalid), /secret|not a timestamp/);
+  const badCounts = buildAuditRecord({ telemetry:{ counts:{ files:1, addedLines:2, deletedLines:1, estimatedLines:8 } } });
+  assert.equal(badCounts.counts, undefined);
+});
+
+test('audit records only bounded execution-limitation warning codes and counts',()=>{
+  const warning=buildAuditRecord({operation:'dispatch_subagent',result:{ok:true,roleValidation:{warnings:['execution-limitation-invalid','untrusted arbitrary prose','execution-limitation-invalid']}}});
+  assert.deepEqual(warning.metadataWarnings,{codes:['execution-limitation-invalid'],count:2});
+  assert.deepEqual(warning.roleValidation,{warnings:['execution-limitation-invalid','execution-limitation-invalid']});
+  assert.doesNotMatch(JSON.stringify(warning),/untrusted arbitrary prose/);
+  const clean=buildAuditRecord({operation:'dispatch_subagent',result:{ok:true,roleValidation:{warnings:['other']}}});
+  assert.equal(clean.metadataWarnings,undefined);
 });
 
 test('audit outcomes separate successful operation from task decision', () => {

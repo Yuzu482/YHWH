@@ -51,12 +51,15 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/multilspy-requirements.tx
 
 install -D -o root -g root -m 0755 /tmp/pi-kether-install/pi-kether-sandbox /usr/local/libexec/pi-kether-sandbox
 install -o root -g root -m 0644 /tmp/pi-kether-install/validate-write-scope.mjs /opt/pi-kether/scripts/validate-write-scope.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/artifact-apply.mjs /opt/pi-kether/scripts/artifact-apply.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/write-scope-guard.js /opt/pi-kether/extensions/write-scope-guard.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/auth-scrub.js /opt/pi-kether/extensions/auth-scrub.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/source-window.js /opt/pi-kether/extensions/source-window.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/read-scope-guard.js /opt/pi-kether/extensions/read-scope-guard.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/role-presets.js /opt/pi-kether/extensions/role-presets.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/result-submit.js /opt/pi-kether/extensions/result-submit.js
+install -o root -g root -m 0644 /tmp/pi-kether-install/role-contract.js /opt/pi-kether/extensions/role-contract.js
+install -o root -g root -m 0644 /tmp/pi-kether-install/result-export.js /opt/pi-kether/extensions/result-export.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/snapshot-scope.py /opt/pi-kether/scripts/snapshot-scope.py
 install -o root -g root -m 0644 /tmp/pi-kether-install/lsp-result.mjs /opt/pi-kether/scripts/lsp-result.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/prepare-credentials.mjs /opt/pi-kether/scripts/prepare-credentials.mjs

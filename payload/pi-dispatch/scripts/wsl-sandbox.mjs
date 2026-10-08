@@ -2,7 +2,8 @@ import {createExecutionTimeline} from '../extensions/execution-timeline.js';
 import {validateFixtureScope} from '../extensions/kether-envelope.js';
 import {createEditorRpc} from './editor-rpc.mjs';
 import { createHash, randomUUID } from 'node:crypto';
-import { validateUnifiedPatch, compileWriteScope } from '../extensions/write-scope-guard.js';
+import { normalizeSandboxPatch, sandboxPatchFiles } from './artifact-apply.mjs';
+import { compileWriteScope } from '../extensions/write-scope-guard.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { basename, parse, relative } from 'node:path/win32';
 
@@ -80,14 +81,15 @@ function workspaceLocation(cwd) {
   return { drive, rel };
 }
 
-export function validateSandboxPatch(patch, { job, requestId, writeScope = [], access } = {}) {
+export function validateSandboxPatch(patch, { job, requestId, writeScope = [], access, fileStates } = {}) {
   if (!patch || access !== 'workspace-write' || !requestId) return { patchValidation: undefined, failure: undefined };
   try {
     const baselinePrefix = `/var/lib/pi-kether/jobs/${job}/baseline`;
     const workspacePrefix = `/var/lib/pi-kether/jobs/${job}/workspace`;
-    const changedFiles = validateUnifiedPatch(patch, writeScope, baselinePrefix, workspacePrefix).sort();
+    const changedFiles = sandboxPatchFiles(patch,{baseline:baselinePrefix,workspace:workspacePrefix,writeScope});
+    const delivered = normalizeSandboxPatch(patch, job, changedFiles, {baseline:baselinePrefix,workspace:workspacePrefix}, fileStates);
     const canonicalScope = compileWriteScope(writeScope).map(item => `${item.tree ? 'tree' : 'file'}:${item.path}`).sort().join('\\n');
-    return { patchValidation: { ok: true, requestId, jobId: job, changedFiles, patchSha256: createHash('sha256').update(patch, 'utf8').digest('hex'), scopeSha256: createHash('sha256').update(canonicalScope, 'utf8').digest('hex') }, failure: undefined };
+    return { patch: delivered, patchValidation: { ok: true, requestId, jobId: job, format:'relative-a-b-v1', changedFiles, patchSha256: createHash('sha256').update(delivered, 'utf8').digest('hex'), scopeSha256: createHash('sha256').update(canonicalScope, 'utf8').digest('hex') }, failure: undefined };
   } catch { return { patchValidation: { ok: false, requestId, jobId: job }, failure: 'sandbox-patch-validation-failed' }; }
 }
 
@@ -109,11 +111,51 @@ export function stripPatch(stdout, stderr = '') {
   if (meta?.ok !== true || meta.patchPolicy !== 'issued-credential-v1' || typeof meta.secretLikeContent !== 'boolean' || !Number.isSafeInteger(meta.patchBytes) || meta.patchBytes !== bytes.length || !/^[a-f0-9]{64}$/.test(meta.patchSha256 ?? '') || createHash('sha256').update(bytes).digest('hex') !== meta.patchSha256) throw new Error('Sandbox returned invalid patch metadata');
   const patch = bytes.toString('utf8');
   if (!Buffer.from(patch, 'utf8').equals(bytes)) throw new Error('Sandbox returned invalid patch bytes');
-  return { stdout: stdout.slice(0, index), stderr, patch, patchPolicy: meta.patchPolicy, secretLikeContent: meta.secretLikeContent, patchSha256: meta.patchSha256, patchBytes: meta.patchBytes };
+  return { stdout: stdout.slice(0, index), stderr, patch, patchPolicy: meta.patchPolicy, secretLikeContent: meta.secretLikeContent, patchSha256: meta.patchSha256, patchBytes: meta.patchBytes, ...(meta.fileStates !== undefined ? {fileStates:meta.fileStates} : {}) };
 }
 
 export function buildSandboxScopeManifest({readScope = [], writeScope = [], fixtureScope = []} = {}) {
   return Buffer.from(JSON.stringify({read:readScope, write:writeScope, fixtures:validateFixtureScope(fixtureScope, writeScope)}), 'utf8').toString('base64');
+}
+
+// Bound retained evidence separately from repetitive Pi progress and the 4 MiB patch transport.
+export function createJsonOutputCollector(limit) {
+  if(!Number.isSafeInteger(limit)||limit<1)throw new RangeError('Invalid output budget');
+  const patchLimit=6*1024*1024, wireLimit=16*limit+patchLimit;
+  let stdout='',stderr='',pending='',patch='',wire=0,retained=0,patchBytes=0,failure=null,patching=false,outputLimitObservation;
+  const exceeded=(bucket,limitBytes,extra={})=>{failure='output-limit';outputLimitObservation??={bucket,limitBytes,wireBytes:wire,retainedBytes:retained,patchBytes,...extra};};
+  const append=(stream,text)=>{
+    if(failure)return;
+    if(stream==='patch'){patchBytes+=Buffer.byteLength(text);if(patchBytes>patchLimit)exceeded('patch',patchLimit);else patch+=text;return;}
+    retained+=Buffer.byteLength(text);
+    if(retained>limit){exceeded('retained',limit);return;}
+    if(stream==='stdout')stdout+=text;else stderr+=text;
+  };
+  const line=text=>{
+    if(text.startsWith(PATCH_MARKER.slice(1))){patching=true;append('patch','\n'+text);return;}
+    let type;try{type=JSON.parse(text)?.type;}catch{}
+    if(['message_update','message_start','tool_execution_update'].includes(type))return;
+    append('stdout',type==='agent_end'?'{"type":"agent_end"}\n':text);
+  };
+  return {
+    feed(stream,chunk){
+      if(failure)return;
+      wire+=Buffer.byteLength(chunk);if(wire>wireLimit){exceeded('wire',wireLimit);return;}
+      if(stream==='stderr'||patching){append(stream==='stderr'?'stderr':'patch',chunk);return;}
+      pending+=chunk;
+      let end;
+      while(!failure&&(end=pending.indexOf('\n'))>=0){
+        const text=pending.slice(0,end+1);pending=pending.slice(end+1);
+        const frameBytes=Buffer.byteLength(text),frameLimit=text.startsWith(PATCH_MARKER.slice(1))?patchLimit:limit;
+        if(frameBytes>frameLimit){exceeded('frame',frameLimit,{frameBytes});break;}
+        line(text);if(patching){append('patch',pending);pending='';break;}
+      }
+      const pendingBytes=Buffer.byteLength(pending),pendingLimit=pending.startsWith(PATCH_MARKER.slice(1))?patchLimit:limit;
+      if(!failure&&pendingBytes>pendingLimit)exceeded('pending',pendingLimit,{pendingBytes});
+    },
+    close(){if(pending&&!failure)line(pending);pending='';return {stdout:stdout+(failure?'':patch),stderr,failure,...(outputLimitObservation?{outputLimitObservation}: {})};},
+    failed(){return failure;},
+  };
 }
 
 export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], fixtureScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket } = {}) {
@@ -132,7 +174,8 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     const scopeManifest = buildSandboxScopeManifest({readScope, writeScope, fixtureScope});
     const commandArgs = wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args]);
     const timeline=createExecutionTimeline({onProgress});
-    let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false;
+    let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false,outputLimitObservation;
+    const collector=!editorBroker&&args.includes('--mode')&&args[args.indexOf('--mode')+1]==='json'?createJsonOutputCollector(resourceLimits.outputBytes):null;
     const child = spawn('wsl.exe', commandArgs, { env, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     const stop = (reason) => {
       if (killing || settled) return;
@@ -154,6 +197,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
       signal?.removeEventListener('abort', abort);
       timeline.close();
       await editorRpc?.close();
+      if(collector){const captured=collector.close();stdout=captured.stdout;stderr=captured.stderr;failure ||= captured.failure;outputLimitObservation=captured.outputLimitObservation??outputLimitObservation;}
       const patchFailure = (() => {
         const terminal = stderr.endsWith('\n') ? stderr.slice(0, -1).split('\n').at(-1) : stderr.split('\n').at(-1);
         return PATCH_FAILURES.has(terminal) ? terminal : null;
@@ -166,22 +210,24 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
 
       }
       if (patchFailure) {
-        done({ exitCode: code, failure: patchFailure, failureCode: patchFailure, stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode}, phaseTimings: timeline.snapshot() });
+        done({ exitCode: code, failure: failure??patchFailure, failureCode: patchFailure, ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode}, phaseTimings: timeline.snapshot() });
         return;
       }
       try {
         const separated = stripPatch(stdout, stderr);
-        const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access });
+        const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access, fileStates:separated.fileStates });
         const patchValidation = proof.patchValidation;
         if (proof.failure) failure ||= proof.failure;
-        done({ exitCode: code, failure, stdout: separated.stdout, stderr: separated.stderr, patch: separated.patch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: separated.patchSha256, patchBytes: separated.patchBytes } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
+        const deliveredPatch = proof.patch ?? separated.patch;
+        done({ exitCode: code, failure, ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: separated.stdout, stderr: separated.stderr, patch: deliveredPatch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: patchValidation?.patchSha256 ?? separated.patchSha256, patchBytes: Buffer.byteLength(deliveredPatch, 'utf8') } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
       } catch {
-        done({ exitCode: code, failure: 'PI_PATCH_INVALID_BYTES', failureCode: 'PI_PATCH_INVALID_BYTES', stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode},phaseTimings:timeline.snapshot() });
+        done({ exitCode: code, failure: failure??'PI_PATCH_INVALID_BYTES', failureCode: 'PI_PATCH_INVALID_BYTES', ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode},phaseTimings:timeline.snapshot() });
       }
     };
     const collect = (stream) => (chunk) => {
+      if(collector){if(stream==='stdout')timeline.feed(chunk);collector.feed(stream,chunk);if(collector.failed())stop(collector.failed());return;}
       bytes += Buffer.byteLength(chunk);
-      if (bytes > resourceLimits.outputBytes) { stop('output-limit'); return; }
+      if (bytes > resourceLimits.outputBytes) { outputLimitObservation={bucket:'direct',directBytes:bytes,limitBytes:resourceLimits.outputBytes};stop('output-limit'); return; }
       if (stream === 'stdout') {if(editorRpc)editorRpc.feed(chunk);else {stdout += chunk;timeline.feed(chunk);}} else stderr += chunk;
     };
     const editorRpc=editorBroker?createEditorRpc({broker:editorBroker,maxBytes:resourceLimits.outputBytes,send:line=>{if(!settled&&!killing)child.stdin.write(line);},onOutput:chunk=>{stdout+=chunk;timeline.feed(chunk);},onFailure:stop}):null;

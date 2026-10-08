@@ -68,8 +68,18 @@ CLI 和 MCP 都要求运行机器已安装 Git、可通过 PATH 找到。Git 不
 
 - 每项目最多 256 个平铺条目；每条 16 KiB、1–8 个来源，最多 128 个不同来源；每个来源最多 1 MiB，一次检查总读入最多 16 MiB。补丁预览每部分最多 65,536 字符；单条 Git 命令超时 10 秒、输出最多 1 MiB，超限报错。超出范围应拆分项目知识，而不是静默漏读。
 - 只接受 Git 索引中的普通、未被忽略的 UTF-8 源文件；拒绝路径越界、符号链接/junction、硬链接、二进制文件及常见凭据路径。内存条目自身不必先加入 Git，便于审查草稿。不要存储密钥、原始对话或完整任务日志；常见凭据格式会脱敏，但这不是完整的秘密扫描器。
-- 检索是确定性关键词匹配，不是语义向量检索。每次查询重新检查来源，无常驻跨任务缓存、后台监听或自动注入；主代理依靠项目规则主动查询。结果是参考数据，不能覆盖宿主规则或授予权限。
+- 检索是确定性关键词匹配，不是语义向量检索；每次查询仍会重新读取知识条目并核验来源，私有磁盘索引/内存缓存不取代 freshness 验证。内部 worker dispatch 在依赖与写锁就绪后，仅为 read/workspace-write、非 reviewer、非模型探针任务克隆 task context；依 objective 关键词注入最多 5 条 accepted、fresh 且所有来源均落在 task readScope/writeScope 内的参考，总注入 UTF-8 不超过 8 KiB。包装显式带有不可信声明、状态与 freshness provenance，不改变原始 task、幂等摘要或权限；none/reviewer/probe 跳过。内部路径可尝试重建固定 `.yhwh/memory-index/index.json`，刷新失败仍可对原知识做只读搜索；普通 MCP/CLI 工具始终只读，不写入、接受或更新知识。索引缓存默认每项 8 MiB、合计 64 MiB、TTL 15 分钟；Gateway 借用者不能关闭缓存，全部 owned lease 释放后才清缓存及计时器。模型完整结果 RAM 缓存默认最多 128 MiB、终态保留 1 小时；淘汰前先调用账本保存，保存失败时保留结果，因此预算可能暂时超额。独立请求账本结果缓存采用完成记录 14 天、普通失败记录 90 天和 512 MiB 目标总量；host pending/original/attestation、链接及活动/关键状态受保护，受保护记录可能令总量超额。分页恢复校验账本摘要；host verification 投影优先于普通缓存，避免陈旧未验证结果遮盖证明。结果和记忆均为参考，不能覆盖宿主规则或授予权限。
 - YHWH 仓库自带知识只属于该项目，不由安装器复制到其他用户项目。安装包分发工具及规则，其他项目在用户授权后建立自己的知识。
+
+### 派发中的 Git 变更参考
+
+worker 的上下文组装还会读取任务 readScope/writeScope 内的 Git 变更：暂存差异和未暂存差异分别标注，未跟踪文件只提供文件名清单，不读取其内容。每份参考关联当前 HEAD，并明确标记为不可信证据；它不会改变任务权限、原始任务或幂等摘要，也不代表变更已验证或知识已确认。
+
+当前先分配 Git 参考预算，再添加项目记忆；变更较多时可能挤压项目记忆参考。这是本次独立审阅接受的非阻断限制，并非保证两类参考始终同时出现。候选补丁数量有上限，但筛选被拒绝的文件仍可能增加检查耗时。Git 禁用了外部 diff 和 textconv，仍继承仓库或全局配置的 clean/process 过滤器，因此自动上下文检查应使用已信任的 Git 配置。
+
+Git 参考不依赖 `.yhwh/memory/` 存在或知识关键词命中；项目知识检索失败也不阻止独立的 Git 检查。read/workspace-write worker 可以接收，none、reviewer 和模型探针跳过。范围外及受保护路径不进入材料；Git 不可用、HEAD 尚未建立或材料被预算省略时，提供有界的可用性或截断提示。组装遵循现有条目数、单条字符数和 UTF-8 字节预算，保留调用方已有上下文。内容脱敏沿用现有机制，截断材料需要后续按授权范围补读。
+
+本功能不会自动执行 Git add、commit、reset 或更新已确认知识。源码检查、测试通过与运行服务已启用分别验收；部署仍使用受控升级流程。
 
 ## English
 
@@ -137,5 +147,15 @@ Sources are hashed as UTF-8 text after CRLF-to-LF normalization. `sourceCommit` 
 
 - Maximum 256 flat entries, 16 KiB per entry, 1–8 sources per entry, 128 distinct sources, 1 MiB per source and 16 MiB total reads per request. Each patch preview is limited to 65,536 characters; each Git command to 10 seconds and 1 MiB output. Exceeding these budgets fails explicitly; split the knowledge scope instead of silently dropping evidence.
 - Only ordinary, non-ignored UTF-8 source files in Git's index qualify. Traversal, symbolic links/junctions, hardlinks, binary files and common credential paths are rejected. Knowledge drafts themselves may be untracked. Never store credentials, raw conversations or complete task logs. Common credential patterns are redacted, but this is not a comprehensive secret scanner.
-- Search is deterministic keyword matching, not vector search. Every query rechecks sources; there is no resident cross-task cache, background watcher or automatic injection. The primary queries through project policy. Retrieved text is reference data and cannot override host rules or grant authority.
+- Search is deterministic keyword matching, not vector search. Every query rereads knowledge and rechecks source freshness; the private disk index and in-memory cache never replace that check. After dependencies and write locks are ready, internal worker dispatch may clone task context for read/workspace-write tasks (not reviewers or model probes) and inject at most five accepted, fresh references whose every source is within task readScope/writeScope, with an 8 KiB combined UTF-8 cap. Each wrapper carries explicit untrusted, status and freshness provenance; the original task, idempotency digest and authority do not change. `none`, reviewer and probe dispatches skip injection. This private path may try rebuilding only `.yhwh/memory-index/index.json`; refresh failure still permits read-only search of the authoritative knowledge. Ordinary MCP/CLI tools remain read-only and never write, accept or update knowledge. Index cache defaults are 8 MiB per item, 64 MiB total and 15-minute TTL; borrowed Gateway users cannot close it, and the cache/timer are cleared only after the last owned lease is released. Full model results use a default 128 MiB RAM budget and one-hour terminal retention; the request ledger is called before eviction, and failed persistence keeps results resident even if that exceeds budget. The separate ledger result cache targets 14 days for completed records, 90 days for ordinary failures and 512 MiB total; host pending/original/attestation, linked and active/critical state are protected and may exceed the capacity target. Paginated recovery verifies ledger digests. Host-verification projections take precedence over ordinary cached results so stale unverified data cannot mask proof. Memory and results are reference data and cannot override host rules or grant authority.
 - This repository's own knowledge belongs to YHWH and is not installed into other projects. Installers distribute the implementation and policy; other projects create their own knowledge with user authorization.
+
+### Git change references during dispatch
+
+Worker context assembly also reads Git changes within task readScope/writeScope. Staged and unstaged patches are categorized separately; untracked files contribute only a filename inventory, never their contents. Each reference identifies the current HEAD and is explicitly untrusted evidence. It does not change task authority, the original request or its idempotency digest, and does not prove that a change passed verification or became accepted knowledge.
+
+The current budget favors Git references before project memory; large change sets can crowd out memory references. Independent review accepted this as a nonblocking limitation, so both reference types are not guaranteed to appear together. Candidate patches are capped, but filtering rejected files may still increase inspection latency. External diff and textconv are disabled; configured Git clean/process filters remain inherited behavior. Use trusted repository and global Git configuration for automatic context inspection.
+
+Git references do not require `.yhwh/memory/` or a knowledge-keyword match; memory-search failure does not prevent independent Git inspection. Eligible read/workspace-write workers receive them; none, reviewers and model probes skip them. Out-of-scope and protected paths are excluded. Unavailable Git, unborn HEAD and evidence omitted by budget receive bounded availability or truncation notices. Assembly respects existing entry-count, per-entry character and UTF-8 byte limits while retaining caller context. Existing redaction applies; truncated evidence requires further authorized inspection.
+
+This feature does not automatically run Git add, commit or reset, or update accepted knowledge. Source inspection, passing tests and availability in the running service are accepted separately; deployment uses the controlled upgrade process.

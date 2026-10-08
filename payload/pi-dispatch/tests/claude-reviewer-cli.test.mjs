@@ -13,7 +13,7 @@ function fixture(t, mode = 'success') {
   fs.writeFileSync(script, `
 import fs from 'node:fs';
 const mode=${JSON.stringify(mode)};
-if(process.argv.includes('--help')) { if(mode!=='missing-help') console.log('--print --output-format --tools --strict-mcp-config --safe-mode --mcp-config --disallowedTools --permission-mode --no-session-persistence --model --effort'); process.exit(0); }
+if(process.argv.includes('--help')) { if(mode!=='missing-help') console.log('--print --output-format --tools --strict-mcp-config --safe-mode --mcp-config --disallowedTools --permission-mode --no-session-persistence --model --effort'+(mode==='missing-schema-help'?'':' --json-schema')); process.exit(0); }
 if(process.argv.includes('auth')) { if(mode==='logged-out') console.log('{"loggedIn":false}'); else if(mode==='malformed-status') console.log('{bad'); else console.log('{"loggedIn":true}'); process.exit(0); }
 if(mode==='timeout') { setInterval(()=>{},1000); }
 let input=''; process.stdin.setEncoding('utf8'); for await (const c of process.stdin) input+=c;
@@ -22,7 +22,7 @@ fs.writeFileSync(${JSON.stringify(path.join(root, 'observed.json'))}, JSON.strin
 if(mode==='auth') { console.error('401 not logged in fake-token'); process.exit(1); }
 if(mode==='quota') { console.log(JSON.stringify({error:'quota exceeded; reset at 2025-06-12T12:30:00Z fake-token'})); process.exit(1); }
 if(mode==='invalid') { console.log('{invalid'); process.exit(0); }
-console.log(JSON.stringify({type:'result',subtype:'success',is_error:false,result:input,usage:{input_tokens:2}}));
+console.log(JSON.stringify(mode==='structured' ? {type:'result',subtype:'success',is_error:false,result:'',structured_output:{status:'completed',reviewDecision:'approve'},usage:{input_tokens:2}} : mode==='structured-missing' ? {type:'result',subtype:'success',is_error:false,result:'',usage:{input_tokens:2}} : mode==='structured-null' ? {type:'result',subtype:'success',is_error:false,result:'',structured_output:null,usage:{input_tokens:2}} : mode==='structured-array' ? {type:'result',subtype:'success',is_error:false,result:'',structured_output:[],usage:{input_tokens:2}} : {type:'result',subtype:'success',is_error:false,result:input,usage:{input_tokens:2}}));
 `);
   const wrapped = async (executable, args, options) => {
     assert.equal(executable, process.execPath);
@@ -45,16 +45,76 @@ test('sanitizes protected environment names case-insensitively without mutating 
   assert.equal(env.ANTHROPIC_API_KEY, 'fake-token');
 });
 
+test('missing, blank and non-string compiled packets never launch a process', async t => {
+  const f=fixture(t);
+  let processes=0,models=0;
+  for (const packet of [undefined,null,'',' \r\n\t',Buffer.from('text'),{}]) {
+    const result=await invoke(f,{packet,runProcessImpl:async()=>{processes++;throw new Error('must not run');},onModelStart:()=>{models++;}});
+    assert.equal(result.reason,'invalid_configuration');
+    assert.equal(result.modelExecutionStarted,false);
+  }
+  assert.equal(processes,0);assert.equal(models,0);
+  assert.equal(fs.existsSync(path.join(f.root,'observed.json')),false);
+});
+
 test('success uses strict no-tools argv, stdin-only packet, sanitized environment and removes empty cwd', async t => {
   const f = fixture(t), before = new Set(fs.readdirSync(os.tmpdir()));
   const result = await invoke(f);
-  assert.deepEqual(result, { runtime: 'host-cli', status: 'completed', text: 'review packet only', usage: { input_tokens: 2 } });
+  assert.deepEqual(result, { runtime: 'host-cli', modelExecutionStarted:true, status: 'completed', text: 'review packet only', usage: { input_tokens: 2 } });
   const observed = JSON.parse(fs.readFileSync(path.join(f.root, 'observed.json'), 'utf8'));
   assert.equal(observed.input, 'review packet only');
-  assert.deepEqual(observed.args, ['--print','--output-format','json','--no-session-persistence','--model','sonnet','--effort','max','--safe-mode','--tools','','--strict-mcp-config','--mcp-config','{"mcpServers":{}}','--disallowedTools','mcp__*','--permission-mode','dontAsk']);
+  assert.deepEqual(observed.args, ['--print','--output-format','json','--no-session-persistence','--model','sonnet','--effort','medium','--safe-mode','--tools','','--strict-mcp-config','--mcp-config','{"mcpServers":{}}','--disallowedTools','mcp__*','--permission-mode','dontAsk']);
   assert.equal(observed.benign, 'retained'); assert.equal(observed.secret, undefined);
   assert.equal(fs.existsSync(observed.cwd), false);
   assert.deepEqual(fs.readdirSync(os.tmpdir()).filter(name => name.startsWith('pi-claude-review-') && !before.has(name)), []);
+});
+
+test('schema mode uses official structured output and fails closed on absent structured output', async t => {
+  const schema={type:'object',properties:{status:{type:'string',pattern:/^done$/}}};
+  const f=fixture(t,'structured');
+  const result=await invoke(f,{resultSchema:schema});
+  assert.equal(result.status,'completed');
+  assert.equal(result.text,'KETHER_RESULT_JSON={"status":"completed","reviewDecision":"approve"}');
+  const observed=JSON.parse(fs.readFileSync(path.join(f.root,'observed.json'),'utf8'));
+  assert.deepEqual(observed.args.slice(-2),['--json-schema','{"type":"object","properties":{"status":{"type":"string","pattern":"^done$"}}}']);
+  const unsupported=await invoke(fixture(t,'missing-schema-help'),{resultSchema:schema});
+  assert.equal(unsupported.reason,'unsupported_cli');assert.equal(unsupported.modelExecutionStarted,false);
+  for(const mode of ['structured-missing','structured-null','structured-array','invalid']) {
+    const invalid=await invoke(fixture(t,mode),{resultSchema:schema});
+    assert.equal(invalid.status,'failed');
+  }
+});
+
+test('model-start callback follows preflight, runs once, and fails closed before invocation', async t => {
+  const f=fixture(t), order=[];
+  const result=await invoke(f,{onModelStart:async()=>{order.push('start');}});
+  assert.deepEqual(order,['start']);assert.equal(result.modelExecutionStarted,true);
+  const preflight=fixture(t,'logged-out'), calls=[];
+  const rejected=await invoke(preflight,{onModelStart:()=>calls.push('start')});
+  assert.equal(rejected.modelExecutionStarted,false);assert.deepEqual(calls,[]);
+  const failed=await invoke(fixture(t),{onModelStart:async()=>{throw new Error('no admission');}});
+  assert.equal(failed.modelExecutionStarted,false);assert.equal(failed.reason,'runner_error');
+  const controller=new AbortController();controller.abort();
+  let processStarts=0;
+  const cancelled=await invoke(fixture(t),{signal:controller.signal,onModelStart:()=>calls.push('aborted-start'),runProcessImpl:async()=>{processStarts++;throw new Error('must not spawn');}});
+  assert.equal(cancelled.reason,'cancelled');assert.equal(cancelled.modelExecutionStarted,false);assert.deepEqual(calls,[]);assert.equal(processStarts,0);
+  const afterCallback=new AbortController();
+  const stopped=await invoke(fixture(t),{signal:afterCallback.signal,onModelStart:()=>afterCallback.abort()});
+  assert.equal(stopped.reason,'cancelled');assert.equal(stopped.modelExecutionStarted,false);
+});
+
+test('native invocation preserves supported medium/high/xhigh effort and records model start', async t => {
+  for(const effort of ['medium','high','xhigh']) {
+    const f=fixture(t), result=await invoke(f,{thinking:effort});
+    assert.equal(result.modelExecutionStarted,true);
+    const observed=JSON.parse(fs.readFileSync(path.join(f.root,'observed.json'),'utf8'));
+    assert.equal(observed.args[observed.args.indexOf('--effort')+1],effort);
+    assert.equal(observed.secret,undefined);
+  }
+  const preflight=fixture(t,'logged-out');
+  assert.equal((await invoke(preflight,{thinking:'high'})).modelExecutionStarted,false);
+  assert.equal((await invoke(fixture(t),{thinking:'low'})).reason,'invalid_configuration');
+  assert.equal((await invoke(fixture(t),{thinking:'max'})).reason,'invalid_configuration');
 });
 
 test('fails closed when temporary directory cleanup fails', async t => {

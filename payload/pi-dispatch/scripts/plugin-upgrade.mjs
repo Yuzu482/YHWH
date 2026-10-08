@@ -67,6 +67,8 @@ export function planUpgrade({ sourceRoot, targetRoot, baselineRoot }) {
   const dependencyChange = actions.some(a => ['package.json', 'package-lock.json'].includes(a.path));
   // These files also have installed WSL copies; a host-only transaction cannot update them.
   const wslScripts = new Set(['validate-write-scope.mjs','snapshot-scope.py','lsp-result.mjs','prepare-credentials.mjs','direct-lsp-bootstrap.mjs','legacy-structural-bootstrap.mjs','multilspy-probe.py','secure-pi-bootstrap.mjs','editor-pi-bootstrap.mjs','lsp-sandbox-broker.mjs','csharp-probe-project.mjs','java-probe-launch.py','editor-rpc.mjs','accept-api-packet.mjs','controlled-provider.mjs','provider-transport.mjs','anthropic-api-credential.mjs']);
+  wslScripts.add('artifact-apply.mjs');
+  wslScripts.add('patch-policy.mjs');
   const requiresFullInstall = actions.some(a => a.path.startsWith('sandbox/') || a.path.startsWith('extensions/') || (a.path.startsWith('scripts/') && wslScripts.has(path.posix.basename(a.path))));
   const plan = { schemaVersion: 1, sourceRoot, targetRoot, actions, conflicts, dependencyChange, requiresFullInstall,
     admissible: conflicts.length === 0 && !dependencyChange && !requiresFullInstall, files: next };

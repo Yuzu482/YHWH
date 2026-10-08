@@ -37,8 +37,10 @@ test('validated Luna and reviewer envelopes are distinct from raw routes', () =>
     assert.throws(() => validateRequest(raw('anthropic', 'claude-sonnet-5'), false, cwd), /YHWH_WORKER_ENFORCEMENT_REJECTED/);
     assert.doesNotThrow(() => validateKetherInvocation({ cwd, access: 'none', task: reviewerTask }));
     assert.throws(() => validateRequest(raw('claude-code-cli', 'claude-sonnet-5'), false, cwd), { code: WORKER_ENFORCEMENT_REJECTED });
-    assert.throws(() => validateRequest({ ...raw('claude-code-cli', 'claude-sonnet-5'), thinking: 'high' }, false, cwd, { reviewerValidated: true, task: { role: 'Geburah' } }), /validated Geburah reviewer packet/);
-    assert.throws(() => validateRequest(raw('claude-code-cli', 'claude-sonnet-5'), false, cwd, { reviewerValidated: true, task: { role: 'Chesed' } }), /validated Geburah reviewer packet/);
+    assert.doesNotThrow(() => validateRequest({ ...raw('claude-code-cli', 'claude-sonnet-5'), thinking: 'high' }, false, cwd, { reviewerValidated: true, task: { role: 'Geburah' } }));
+    for (const thinking of ['medium', 'high', 'xhigh']) assert.doesNotThrow(() => validateRequest({ ...raw('claude-code-cli', 'claude-sonnet-5'), thinking }, false, cwd, { reviewerValidated: true, task: { role: 'Geburah' } }));
+    for (const thinking of ['max', 'off', 'minimal', 'low']) assert.throws(() => validateRequest({ ...raw('claude-code-cli', 'claude-sonnet-5'), thinking }, false, cwd, { reviewerValidated: true, task: { role: 'Geburah' } }), { code: WORKER_ENFORCEMENT_REJECTED });
+    assert.throws(() => validateRequest(raw('claude-code-cli', 'claude-sonnet-5'), false, cwd, { reviewerValidated: true, task: { role: 'Chesed' } }), { code: WORKER_ENFORCEMENT_REJECTED });
     assert.throws(() => validateKetherInvocation({ cwd, access: 'none', task: { ...reviewerTask, reviewPacket: undefined } }), /review|materials/i);
   });
 });

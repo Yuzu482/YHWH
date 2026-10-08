@@ -43,7 +43,13 @@ test('resource profiles are fixed and callers can only shorten runtime', () => {
   assert.deepEqual(Object.keys(publicResourceProfiles()), ['small', 'standard', 'large']);
   assert.equal(resolveResourceLimits('small').memoryBytes, 1024 * 1024 * 1024);
   assert.equal(resolveResourceLimits('standard', 30).timeoutSeconds, 30);
-  assert.equal(resolveResourceLimits('standard', 999).timeoutSeconds, 300);
+  assert.equal(resolveResourceLimits('standard', 999).timeoutSeconds, 900);
+  assert.equal(resolveResourceLimits('small').timeoutSeconds,120);
+  assert.equal(resolveResourceLimits('standard').timeoutSeconds,300);
+  assert.equal(resolveResourceLimits('standard',600).timeoutSeconds,600);
+  assert.equal(resolveResourceLimits('small',900).timeoutSeconds,900);
+  assert.equal(resolveResourceLimits('large',901).timeoutSeconds,900);
+  assert.equal(resolveResourceLimits('standard',600).memoryBytes,3*1024*1024*1024);
   assert.equal(resolveResourceLimits('large').pidsMax, 256);
   assert.throws(() => resolveResourceLimits('custom'), /resourceProfile/);
   assert.throws(() => validate({ ...base, memoryBytes: 1 }), /Unknown request key/);
@@ -82,7 +88,18 @@ assert.equal(invocation.request.model, 'gpt-6-luna');
   assert.match(compiledMalkuth, /do not force overall status to unverified/);
   assert.throws(() => validate({ ...base, provider: 'anthropic', model: 'claude-sonnet-5' }), /YHWH_WORKER_ENFORCEMENT_REJECTED/);
   const reviewerInvocation = validateKetherInvocation({ cwd, access: 'none', task: reviewerTask }, false, cwd);
-  assert.equal(reviewerInvocation.request.thinking, 'max');
+  assert.equal(reviewerInvocation.request.thinking, 'medium');
+  for (const thinking of ['medium','high','xhigh']) {
+    assert.equal(validateKetherInvocation({cwd,access:'none',thinking,task:reviewerTask},false,cwd).request.thinking,thinking);
+    assert.equal(validateKetherInvocation({cwd,access:'none',thinking,task:reviewerTask},false,cwd,{reviewTier:'T1'}).request.thinking,thinking);
+  }
+  const t1Reviewer = validateKetherInvocation({ cwd, access:'none', task:reviewerTask },false,cwd,{reviewTier:'T1'});
+  assert.equal(t1Reviewer.request.thinking,'medium');
+  assert.equal(t1Reviewer.request.reviewTier,'T1');
+  for(const thinking of ['low','off','minimal','max']) assert.throws(()=>validateKetherInvocation({cwd,access:'none',thinking,task:reviewerTask}),e=>e.code==='YHWH_WORKER_ENFORCEMENT_REJECTED');
+  assert.throws(()=>validateKetherInvocation({cwd,access:'none',task:{...reviewerTask,reviewTier:'T1'}},false,cwd,{reviewTier:'T2'}),/Unknown task key/);
+  assert.throws(()=>validateKetherInvocation({cwd,access:'none',task:reviewerTask},false,cwd,{reviewTier:'T0'}),e=>e.code==='REVIEW_TIER_INVALID');
+  assert.equal(validateKetherInvocation({cwd,access:'none',task:reviewerTask},false,cwd,{reviewTier:'mystery'}).request.thinking,'medium');
   assert.throws(() => validateKetherInvocation({ cwd, access: 'read', provider: 'other', task: semanticTask }, false, cwd), /allowlist/);
   assert.throws(() => validateKetherInvocation({ cwd, access: 'none', task: semanticTask }, false, cwd), /none access/);
   assert.throws(() => validateKetherInvocation({ cwd, access: 'read', task: { ...semanticTask, writeScope: ['x'] } }, false, cwd), /read access/);
@@ -293,6 +310,17 @@ test('dispatch accepts a later same-target edit recovery but preserves transport
   const unrecovered=summarize({...raw,stdout:raw.stdout.replace('edit-2','different')},base);
   assert.equal(unrecovered.ok,false);
   assert.equal(unrecovered.unrecoveredErrors,1);
+});
+
+test('timeout causes override complete streams, preserve cancellation and distinguish termination',()=>{
+  const stream=JSON.stringify({type:'message_end',message:{role:'assistant',provider:base.provider,model:base.model,stopReason:'stop',content:[{type:'text',text:'KETHER_RESULT_JSON={"ok":true}'}]}})+'\n'+JSON.stringify({type:'agent_end'});
+  const timeout=summarize({exitCode:124,failure:null,stderr:'',stdout:stream},base);
+  assert.equal(timeout.ok,false);assert.equal(timeout.failureCode,'EXECUTION_TIMEOUT');
+  const explicit=summarize({exitCode:143,failure:'cancelled',stderr:'',stdout:stream},base);
+  assert.equal(explicit.failureCode,'EXECUTION_CANCELLED');
+  const terminated=summarize({exitCode:143,failure:null,stderr:'',stdout:stream},base);
+  assert.equal(terminated.failureCode,'TERMINATED');
+  assert.equal(summarize({exitCode:0,failure:'timeout',stderr:'',stdout:stream},base).failureCode,'EXECUTION_TIMEOUT');
 });
 
 test('tool execution names are exposed for caller verification', () => {

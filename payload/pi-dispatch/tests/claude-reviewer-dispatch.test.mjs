@@ -8,7 +8,7 @@ const task = {
   reviewPacket: { version: 1, stage: 'post-change', ...Object.fromEntries(['requirements', 'changes', 'context', 'verification'].map(key => [key, { status: 'provided', content: ['fixture'] }])) },
 };
 const request = (provider = 'claude-code-cli', model = 'claude-sonnet-5', access = 'none') => ({
-  target: 'model', cwd, provider, model, access, thinking: 'max', prompt: 'ignored', timeoutSeconds: 30,
+  target: 'model', cwd, provider, model, access, thinking: 'medium', prompt: 'ignored', timeoutSeconds: 30,
 });
 
 function harness(result) {
@@ -30,10 +30,13 @@ test('exact validated reviewer route runs only injected host CLI and returns com
   assert.match(fake.calls[0].packet, /RESULT_SCHEMA_JSON=/);
   assert.equal(fake.calls[0].nodePath, process.execPath);
   assert.equal(fake.calls[0].cliScript, '/trusted/claude.js');
+  assert.equal(fake.calls[0].thinking, 'medium');
+  assert.equal(fake.calls[0].resultSchema.type, 'object');
+  assert.equal(fake.calls[0].resultSchema.properties.reviewDecision.type, 'string');
   assert.deepEqual(response, {
     target: 'model', requestedProvider: 'claude-code-cli', requestedModel: 'claude-sonnet-5',
     provider: 'claude-code-cli', model: 'claude-sonnet-5', ok: true, text: 'findings',
-    usage: { input_tokens: 3 }, toolsUsed: [], toolErrors: 0, runtime: 'host-cli', osSandbox: 'none',
+    usage: { input_tokens: 3 }, toolsUsed: [], toolErrors: 0, runtime: 'host-cli', workerRuntime: 'claude-code-cli', osSandbox: 'none', modelExecutionStarted: false,
   });
 });
 

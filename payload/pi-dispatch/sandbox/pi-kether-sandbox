@@ -13,7 +13,7 @@ select_api_issued_token() {
 
 emit_checked_patch() {
   local token="$1" patch="$2" checked code
-  if checked=$(printf '%s' "$token" | /opt/node/bin/node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON /opt/pi-kether/scripts/patch-policy.mjs "$patch" 2>&1); then
+  if checked=$(printf '%s' "$token" | /opt/node/bin/node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON /opt/pi-kether/scripts/patch-policy.mjs "$patch" "$3" "$4" 2>&1); then
     printf '\nPI_SANDBOX_PATCH_B64='
     base64 -w0 "$patch"
     printf '\nPI_SANDBOX_PATCH_META=%s\n' "$checked"
@@ -183,9 +183,9 @@ run_job() {
   [[ "$access" == none || "$access" == read || "$access" == workspace-write ]] || { echo "invalid access" >&2; exit 2; }
   local memory_bytes cpu_quota cpu_period pids_max max_output_bytes max_run_seconds
   case "$resource_profile" in
-    small) memory_bytes=1073741824; cpu_quota=50000; cpu_period=100000; pids_max=64; max_output_bytes=1048576; max_run_seconds=120 ;;
-    standard) memory_bytes=3221225472; cpu_quota=100000; cpu_period=100000; pids_max=128; max_output_bytes=4194304; max_run_seconds=300 ;;
-    large) memory_bytes=6442450944; cpu_quota=200000; cpu_period=100000; pids_max=256; max_output_bytes=8388608; max_run_seconds=900 ;;
+    small) memory_bytes=1073741824; cpu_quota=50000; cpu_period=100000; pids_max=64; max_output_bytes=1048576; max_run_seconds=900 ;;
+    standard) memory_bytes=3221225472; cpu_quota=100000; cpu_period=100000; pids_max=128; max_output_bytes=4194304; max_run_seconds=900 ;;
+    large) memory_bytes=6442450944; cpu_quota=200000; cpu_period=100000; pids_max=256; max_output_bytes=8388608; max_run_seconds=900 ;; 
     *) echo "invalid resource profile" >&2; exit 2 ;;
   esac
   [[ "$timeout_seconds" =~ ^[0-9]+$ ]] && (( timeout_seconds >= 1 && timeout_seconds <= max_run_seconds )) || { echo "invalid timeout for resource profile" >&2; exit 2; }
@@ -352,7 +352,7 @@ run_job() {
     local patch_size
     patch_size=$(stat -c %s "$patch")
     (( patch_size <= 4194304 )) || { echo "sandbox patch exceeds 4 MiB" >&2; exit 6; }
-    emit_checked_patch "$issued_token" "$patch" || { unset issued_token; exit 4; }
+    emit_checked_patch "$issued_token" "$patch" "$baseline" "$workspace" || { unset issued_token; exit 4; }
     unset issued_token
   fi
   return "$status"

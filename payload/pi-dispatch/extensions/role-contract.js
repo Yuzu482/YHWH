@@ -11,6 +11,8 @@ const enumeration = values => ({type:'string', enum:values});
 const object = (properties, required=Object.keys(properties)) => ({type:'object', properties, required, additionalProperties:false});
 const array = items => ({type:'array', items, maxItems:256});
 const hostEvidence = object({requestId:{type:'string', pattern:/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/}, artifactSha256:{type:'string', pattern:/^[a-f0-9]{64}$/}, recordSha256:{type:'string', pattern:/^[a-f0-9]{64}$/}, checkName:{type:'string', minLength:1, maxLength:128}});
+const executionLimitation = {};
+const chesedCheck = object({name:nonempty, outcome:enumeration(['passed','failed','unverified']), evidence:text, hostEvidence, executionLimitation}, ['name','outcome','evidence']);
 const check = object({name:nonempty, outcome:enumeration(['passed','failed','unverified']), evidence:text, hostEvidence}, ['name','outcome','evidence']);
 const ROLES = ['Yesod','Binah','Hod','Malkuth','Chochmah','Chesed','Netzach','Geburah'];
 const deliverables = {
@@ -19,9 +21,9 @@ const deliverables = {
   Hod:object({complexity:enumeration(['low','medium','high']), risk:enumeration(['low','medium','high']), rationale:nonempty, dependencies:strings}),
   Malkuth:object({observations:strings, sources:strings, limitations:strings}),
   Chochmah:object({steps:array(object({id:nonempty, role:enumeration(ROLES), objective:nonempty, readScope:strings, writeScope:strings, dependsOn:strings, acceptance:strings})), verification:strings}),
-  Chesed:object({summary:nonempty, changes:strings, checks:array(check)}),
+  Chesed:object({summary:nonempty, changes:strings, checks:array(chesedCheck)}),
   Netzach:object({verdict:enumeration(['passed','failed','unverified']), checks:array(check)}),
-  Geburah:object({findings:array(object({severity:enumeration(['info','low','medium','high','critical']), description:nonempty, evidence:text})), recommendations:strings}),
+  Geburah:object({findings:array(object({severity:enumeration(['info','low','medium','high','critical']), description:nonempty, evidence:text, blocking:{type:'boolean'}}, ['severity','description','evidence'])), recommendations:strings}),
 };
 
 export function roleResultSchema(role) {
@@ -42,6 +44,7 @@ export function requireRoleFields(task) {
 }
 
 function validate(value, schema, path='$') {
+  if (!schema || Object.keys(schema).length===0) return;
   if (schema.type==='object') {
     if (!value || typeof value!=='object' || Array.isArray(value)) throw new Error(`${path} must be an object`);
     const keys=Object.keys(value);
@@ -56,12 +59,33 @@ function validate(value, schema, path='$') {
 }
 
 export function validateRoleResult(value, role, {hostEvidenceResolver}={}) {
+  return validateRoleResultAtStage(value, role, {hostEvidenceResolver, submissionOnly:false});
+}
+
+// Worker-side shape/semantic checks cannot resolve the gateway's private ledger.
+// Submission validation never establishes trusted host evidence or final acceptance.
+export function validateRoleSubmission(value, role) {
+  return validateRoleResultAtStage(value, role, {submissionOnly:true});
+}
+
+function validateRoleResultAtStage(value, role, {hostEvidenceResolver, submissionOnly}) {
   role = canonicalRole(role);
   try {
     validate(value,roleResultSchema(role));
     if (role!=='Netzach' && value?.deliverable?.checks?.some(c=>Object.hasOwn(c,'hostEvidence'))) throw Object.assign(new Error('hostEvidence is Netzach-only'),{code:'HOST_EVIDENCE_ROLE_INVALID'});
-    const resolved=new Set();
+    if (role!=='Chesed' && value?.deliverable?.checks?.some(c=>Object.hasOwn(c,'executionLimitation'))) throw new Error('executionLimitation is Chesed-only');
+    const metadataWarnings=[];
+    if (role==='Chesed') for (const c of value?.deliverable?.checks??[]) if (Object.hasOwn(c,'executionLimitation')) {
+      const limitation=c.executionLimitation;
+      let bytes, depth=0;
+      try { bytes=Buffer.byteLength(JSON.stringify(limitation),'utf8'); const visit=(node,d)=>{depth=Math.max(depth,d);if(node&&typeof node==='object')for(const child of Object.values(node))visit(child,d+1);};visit(limitation,0); }
+      catch { throw new Error('executionLimitation metadata is not serializable'); }
+      if(bytes>4096||depth>8) throw new Error('executionLimitation metadata exceeds bounds');
+      if (!(limitation && typeof limitation==='object' && !Array.isArray(limitation) && Object.keys(limitation).length===2 && limitation.executor==='host' && limitation.reason==='worker-execution-unavailable')) metadataWarnings.push('execution-limitation-invalid');
+    }
+    const resolved=new Set(), pending=new Set();
     if (role==='Netzach') for (const c of value.deliverable.checks) if (Object.hasOwn(c,'hostEvidence')) {
+      if (submissionOnly) { pending.add(c); continue; }
       if (typeof hostEvidenceResolver!=='function') throw Object.assign(new Error('hostEvidence requires trusted resolution'),{code:'HOST_EVIDENCE_UNRESOLVED'});
       let answer;
       try { answer=hostEvidenceResolver(c.hostEvidence); } catch { throw Object.assign(new Error('hostEvidence resolver failed'),{code:'HOST_EVIDENCE_UNRESOLVED'}); }
@@ -74,10 +98,10 @@ export function validateRoleResult(value, role, {hostEvidenceResolver}={}) {
     if (value.status==='completed') {
       if (!value.result.trim() || !value.evidence.length || value.errors.length) throw new Error('completed requires result, evidence and no errors');
       if (role==='Binah' && value.deliverable.clarificationNeeded) throw new Error('unresolved clarification cannot complete');
-      if (role==='Netzach' && (value.deliverable.verdict!=='passed' || !value.deliverable.checks.length || value.deliverable.checks.some(c=>c.outcome!=='passed'||(!c.evidence.trim() && !resolved.has(c))))) throw new Error('verification completion requires passing checks with evidence');
+      if (role==='Netzach' && (value.deliverable.verdict!=='passed' || !value.deliverable.checks.length || value.deliverable.checks.some(c=>c.outcome!=='passed'||(!c.evidence.trim() && !resolved.has(c) && !pending.has(c))))) throw new Error('verification completion requires passing checks with evidence');
       if (role==='Chochmah' && (!value.deliverable.steps.length || new Set(value.deliverable.steps.map(s=>s.id)).size!==value.deliverable.steps.length)) throw new Error('completed plan requires uniquely identified steps');
     }
-    return {ok:true,version:CONTRACT_VERSION,role};
+    return {ok:true,version:CONTRACT_VERSION,role,...(submissionOnly?{hostEvidencePending:pending.size}:{}),...(metadataWarnings?.length?{warnings:metadataWarnings}:{})};
   } catch(error) { return {ok:false,version:CONTRACT_VERSION,role,code:'role_schema_invalid',message:error.message}; }
 }
 

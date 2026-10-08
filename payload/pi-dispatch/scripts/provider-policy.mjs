@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { getWorkerEnforcementStatus } from './worker-enforcement.mjs';
 
 export const PROVIDER_POLICY = Object.freeze({
-  'anthropic': Object.freeze({defaultModel:'claude-sonnet-5',defaultThinking:'max',models:Object.freeze(['claude-sonnet-5'])}),
-  'claude-code-cli': Object.freeze({defaultModel:'claude-sonnet-5',defaultThinking:'max',models:Object.freeze(['claude-sonnet-5'])}),
+  'anthropic': Object.freeze({defaultModel:'claude-sonnet-5',defaultThinking:'medium',models:Object.freeze(['claude-sonnet-5'])}),
+  'claude-code-cli': Object.freeze({defaultModel:'claude-sonnet-5',defaultThinking:'medium',models:Object.freeze(['claude-sonnet-5'])}),
   'openai-codex': Object.freeze({
     defaultModel: 'gpt-6-luna',
     defaultThinking: 'medium',

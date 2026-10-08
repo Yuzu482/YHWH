@@ -83,6 +83,7 @@ $nodeMajor = [int]((& $nodePath --version).TrimStart('v').Split('.')[0])
 if ($nodeMajor -lt 22) { throw 'Node.js 22 or newer is required on Windows.' }
 
 $pluginSource = Join-Path $payload 'pi-dispatch'
+$pluginIdentity = & (Join-Path $PSScriptRoot 'Get-PluginBuildIdentity.ps1') -PackageRoot $packageRoot
 $templatePath = Join-Path $packageRoot 'templates\AGENTS.kether.md'
 $referencesSource = Join-Path $packageRoot 'templates\agent-references'
 foreach ($required in @($pluginSource, $templatePath, $referencesSource, (Join-Path $packageRoot 'install\patch-pi-lsp.mjs'))) {
@@ -126,6 +127,7 @@ New-Item -ItemType Directory -Force -Path $backupRoot, $stateRoot | Out-Null
 
 $pluginTarget = Join-Path $TargetHome 'plugins\pi-dispatch'
 Copy-WithBackup $pluginSource $pluginTarget $backupRoot
+& (Join-Path $PSScriptRoot 'Set-InstalledPluginVersion.ps1') -PackageRoot $packageRoot -PluginRoot $pluginTarget | Out-Null
 Push-Location $pluginTarget
 try {
   & (Join-Path (Split-Path -Parent $nodePath) 'npm.cmd') ci --omit=dev --ignore-scripts=false
@@ -150,7 +152,7 @@ $mcp = [ordered]@{ mcpServers = [ordered]@{ 'pi-kether-gateway' = [ordered]@{
     PI_SANDBOX_DISTRO = $WslDistro
   }
   enabled = $true
-  enabled_tools = @('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth')
+  enabled_tools = @('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','wait_subagent','get_task_handoff','wait_task_handoff','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth')
   startup_timeout_sec = 30
 }}}
 $mcp | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $pluginTarget '.mcp.json') -Encoding utf8NoBOM
@@ -244,12 +246,15 @@ if ($installWsl) {
     (Join-Path $payload 'wsl-package-lock.json')='/tmp/pi-kether-install/wsl-package-lock.json'
     (Join-Path $pluginTarget 'sandbox\pi-kether-sandbox')='/tmp/pi-kether-install/pi-kether-sandbox'
     (Join-Path $pluginTarget 'scripts\validate-write-scope.mjs')='/tmp/pi-kether-install/validate-write-scope.mjs'
+    (Join-Path $pluginTarget 'scripts\artifact-apply.mjs')='/tmp/pi-kether-install/artifact-apply.mjs'
     (Join-Path $pluginTarget 'extensions\write-scope-guard.js')='/tmp/pi-kether-install/write-scope-guard.js'
     (Join-Path $pluginTarget 'extensions\auth-scrub.js')='/tmp/pi-kether-install/auth-scrub.js'
     (Join-Path $payload 'pi-dispatch\extensions\source-window.js')='/tmp/pi-kether-install/source-window.js'
     (Join-Path $pluginTarget 'extensions\read-scope-guard.js')='/tmp/pi-kether-install/read-scope-guard.js'
     (Join-Path $payload 'pi-dispatch\extensions\role-presets.js')='/tmp/pi-kether-install/role-presets.js'
     (Join-Path $payload 'pi-dispatch\extensions\result-submit.js')='/tmp/pi-kether-install/result-submit.js'
+    (Join-Path $payload 'pi-dispatch\extensions\role-contract.js')='/tmp/pi-kether-install/role-contract.js'
+    (Join-Path $payload 'pi-dispatch\extensions\result-export.js')='/tmp/pi-kether-install/result-export.js'
     (Join-Path $pluginTarget 'scripts\snapshot-scope.py')='/tmp/pi-kether-install/snapshot-scope.py'
     (Join-Path $pluginTarget 'scripts\lsp-result.mjs')='/tmp/pi-kether-install/lsp-result.mjs'
     (Join-Path $pluginTarget 'scripts\prepare-credentials.mjs')='/tmp/pi-kether-install/prepare-credentials.mjs'

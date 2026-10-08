@@ -11,7 +11,21 @@
 | 跨文件设计、原因不明的故障 | high | 有明确的分析目标和结束条件 |
 | 困难推理 | max | 主代理记录为什么需要最高档位 |
 
-档位由主代理判断，不是自动复杂度分类器。派发时明确传入 `thinking`，并在任务上下文记录选择理由。旧服务可以继续声明默认 max；显式参数优先，升级前不能把源码默认值当作运行服务事实。既有 API 平台路由的能力约束不因本次原生路由调整而自动改变。
+主代理先评估任务，再明确传入 `thinking` 或使用原生 worker 的确定性自适应选择。显式档位始终保留；未指定时，根据 `task.context` 中唯一一条 `TASK_COMPLEXITY_JSON=` 记录选择 low、medium 或 high。缺少或无效的评估保守使用 medium，不从源码片段、任务长度、tier 或文件数量推断高档位。Reviewer、probe 与受控 API 路由仍使用各自既有策略；自动选择不启用 off、minimal 或 max。升级前不能把源码行为当作运行服务事实。
+
+复杂度记录必须恰好包含四个字段：`changeKind`（exact / bounded / design / diagnosis）、`uncertainty`（none / localized / unresolved）、`coupling`（local / cross-file / concurrent）、`reason`（不超过 400 字符的具体依据）。示例：
+
+```text
+TASK_COMPLEXITY_JSON={"changeKind":"exact","uncertainty":"none","coupling":"local","reason":"已知条件替换，接口不变，有明确回归用例"}
+```
+
+exact、none、local 且最多 2 个写文件、4 个读文件、无目录通配范围、待解依赖或假设、每项验收均有可观察结果时，自动选择 low；存在未解决的不确定性、并发耦合或跨文件设计时选择 high；其他情况使用 medium。这是主代理评估的确定性执行，不证明实际复杂度或验收语义正确。结果 `thinkingDecision` 记录实际档位、选择来源和固定理由代码，不包含评估正文。
+
+派发前可运行 `node scripts/gateway-client.mjs task-plan <request.json>`，在本机检查任务并返回显式档位及预检提示，不连接网关、不读取网关认证、不调用模型、不修改输入文件，也不派发任务。返回的 `request` 可由主代理检查后用于既有派发入口；规划成功不证明资源可接纳、授权完整或任务已通过验收。
+
+范围预检建议每包一个可观察行为，通常不超过 3 个写文件、8 个读文件；实现、调用方和必要测试应保持在同一任务中。超过范围只提示缩小或说明耦合依据，不拒绝任务、不自动生成子任务、不通过拆分降低 tier。复用已确认事实，限定未知问题与停止条件；修复只包含实际失败证据涉及的行为。
+
+每项验收写明输入或触发条件、预期结果、稳定的检查名、执行方式和负责人。代码任务包括正常路径和相关失败路径；“完成”“返回补丁”不足以作为行为验收。示例：`parser-focused: host runs node --test tests/parser.test.mjs; exit 0; asserts valid input matches expected output and invalid input throws`。Worker 无执行工具时，提前分配给 host；worker 保留原检查名，记录 unverified 和真实执行限制，主机随后记录实际退出码与输出。可观察性和负责人预检是启发式提示，不能代替最终验收。
 
 每个任务包只负责一个明确行为，包含精确读写范围、验收条件和必要材料。计划为最终输出与验证交接保留约 20% 时间；提示词中的时间目标只是软约束，不能限制隐藏推理 token，也不保证按时交付。不要通过关闭思考、替换模型、原样重试或放宽权限来规避失败。
 

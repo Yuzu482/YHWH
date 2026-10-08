@@ -4,7 +4,7 @@ Inspected 2026-09-04. Historical DSH comparison sources were `~/.dsh/.agent-pres
 
 ## Preserved concepts
 
-Kether owns user intent, governance, ExecutionContract and escalation. Tifereth owns scheduling, never contract override. Yesod/Binah/Hod/Malkuth/Chochmah handle normalization, clarification, classification, observation and planning. Geburah judges pre/post changes. Chesed implements. Netzach verifies. Da'at bridges missing modalities. Preserve bounded scope, actual evidence, review-before-write, final review, one writer by default, bounded repairs and visible capability limits.
+Kether owns user intent, governance, ExecutionContract and escalation. Tifereth owns scheduling, never contract override. Yesod/Binah/Hod/Malkuth/Chochmah handle normalization, clarification, classification, observation and planning. Chesed implements. Current AGENTS.md tier/profile rules select host verification, Netzach and Geburah calls; historical review-before-write and final-review stages are not universal requirements. Preserve bounded scope, actual evidence, one writer by default, bounded repairs and visible capability limits.
 
 ## Deliberate host adaptations
 

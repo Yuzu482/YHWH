@@ -1,23 +1,27 @@
 import * as z from 'zod/v4';
-import { validateDeclaredWorkflowTier } from '../extensions/workflow-tier.js';
+import { classifyWorkflowTier, parseUnifiedPatch, validateDeclaredWorkflowTier } from '../extensions/workflow-tier.js';
 import { canonicalRole } from '../extensions/role-contract.js';
 
 const tiers = ['T0', 'T1', 'T2'];
-const filePath = z.string().min(1).max(1024).regex(/^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/);
+
+export function tierObservation(declaredTier, derived, context = []) {
+  const reasons = context.filter(value => typeof value === 'string' && value.startsWith('TIER_REASON='));
+  const reason = reasons.length === 1 ? reasons[0].slice(12).normalize('NFC').trim() : '';
+  const valid = reasons.length === 1 && reason.length >= 16 && reason.length <= 400
+    && !reason.includes('\0') && !/^(unknown|unsure|safety|conservative|不确定|保险起见)$/i.test(reason);
+  const known = tiers.includes(derived?.effective);
+  return { declaredTier, ...(known ? {derivedTier:derived.effective,
+    tierOverDeclared:tiers.indexOf(declaredTier) > tiers.indexOf(derived.effective) && !valid} : {}),
+    ...(valid ? {tierReason:reason} : {}), ...(reasons.length && !valid ? {tierReasonInvalid:true} : {}) };
+}
 
 export const tierDeclarationSchema = z.object({
-  files: z.array(filePath).min(1).max(32),
-  estimatedLines: z.number().int().nonnegative().safe(),
-  isTestOrConfigChange: z.boolean(),
   publicApiOrProtocol: z.boolean(),
   dependencyOrLockfile: z.boolean(),
   securityAuthOrCredentials: z.boolean(),
   migration: z.boolean(),
   irreversibleOrNoRollback: z.boolean(),
-  uncertainFileScope: z.boolean(),
-}).strict().superRefine((value, ctx) => {
-  if (new Set(value.files).size !== value.files.length) ctx.addIssue({ code: 'custom', message: 'Files must be unique' });
-});
+}).strict();
 
 export const workflowTierFieldsSchema = z.object({
   tier: z.enum(tiers).optional(),
@@ -28,57 +32,67 @@ function invalid(code, message) {
   throw Object.assign(new Error(message), { code });
 }
 
-export function validateWriteTier(input, requireTopic) {
+export function validateWriteTier(input, requireTopic, riskProfile = 'standard') {
   if (input?.access !== 'workspace-write') return null;
-  if (typeof requireTopic !== 'function') invalid('WORKFLOW_TIER_INVALID', 'A task-tiers receipt verifier is required');
-  requireTopic('task-tiers', input.workflowReceipt);
   if (!tiers.includes(input.tier) || input.tierDeclaration === undefined) {
     invalid('WORKFLOW_TIER_REQUIRED', 'workspace-write requires tier and tierDeclaration');
   }
   const parsed = tierDeclarationSchema.safeParse(input.tierDeclaration);
   if (!parsed.success) invalid('WORKFLOW_TIER_INVALID', parsed.error.issues[0]?.message ?? 'Invalid tier declaration');
   const declaration = parsed.data;
+  if (Object.hasOwn(input, 'riskProfile')) invalid('WORKFLOW_TIER_INVALID', 'riskProfile is host-configured only');
   let validated;
   try {
     validated = validateDeclaredWorkflowTier(declaration, input.tier, input.task?.writeScope);
   } catch (error) {
     invalid('WORKFLOW_TIER_INVALID', error.message);
   }
-  const minimum = validated.minimumLevel;
-  if (input.tier === 'T2' && (canonicalRole(input.task?.role) !== 'Chesed' || input.task?.handoff?.version !== 2
-      || input.task?.handoff?.stage !== 'implementing'
-      || !input.task.handoff.inputs?.some(ref => ref.stage === 'pre-review' && ref.role === 'Geburah'))) {
-    invalid('WORKFLOW_TIER_PRE_REVIEW_REQUIRED', 'T2 requires a linked v2 implementing task with a Geburah pre-review input');
+  const profileTier = riskProfile === 'critical' && validated.level === 'T0' ? 'T1'
+    : riskProfile === 'personal' && validated.level === 'T2' ? 'T1' : validated.level;
+  const minimum = riskProfile === 'critical' && validated.minimumLevel === 'T0' ? 'T1'
+    : riskProfile === 'personal' && validated.minimumLevel === 'T2' ? 'T1' : validated.minimumLevel;
+  if (!['standard','personal','critical'].includes(riskProfile)) invalid('WORKFLOW_TIER_INVALID', 'Unknown host risk profile');
+  if (['T0','T1','T2'].indexOf(input.tier) < ['T0','T1','T2'].indexOf(profileTier)) invalid('WORKFLOW_TIER_INVALID', `Declared tier ${input.tier} is below profile-adjusted minimum ${profileTier}`);
+  const effectiveDeclared = riskProfile === 'personal' && input.tier === 'T2' ? 'T1' : input.tier;
+  if (effectiveDeclared === 'T2') {
+    if (canonicalRole(input.task?.role) !== 'Chesed' || input.task?.handoff?.version !== 2
+        || input.task?.handoff?.stage !== 'implementing'
+        || !input.task.handoff.inputs?.some(ref => ref.stage === 'pre-review' && ref.role === 'Geburah')) {
+      invalid('WORKFLOW_TIER_PRE_REVIEW_REQUIRED', 'T2 requires a linked v2 implementing task with a Geburah pre-review input');
+    }
+    if (typeof requireTopic !== 'function') invalid('WORKFLOW_TIER_INVALID', 'A task-tiers receipt verifier is required for T2');
+    requireTopic('task-tiers', input.workflowReceipt);
   }
-  return { level: input.tier, minimumLevel: minimum, requiresPreReview: input.tier === 'T2', requiresPostReview: input.tier !== 'T0' };
+  return { level: effectiveDeclared, minimumLevel: minimum, requiresPreReview: effectiveDeclared === 'T2', requiresPostReview: effectiveDeclared !== 'T0' };
+}
+
+export function classifyPatchTier(patch, declaration, riskProfile = 'standard', trustedFiles = undefined) {
+  const parsed = parseUnifiedPatch(patch);
+  const parsedFiles = parsed.flatMap(section => section.files);
+  if (trustedFiles !== undefined) {
+    if (!Array.isArray(trustedFiles) || trustedFiles.length !== parsedFiles.length
+        || new Set(trustedFiles).size !== trustedFiles.length
+        || parsedFiles.some(path => !trustedFiles.includes(path))) invalid('PI_PATCH_INVALID', 'Trusted changed-file proof does not exactly match patch sections');
+  }
+  const files = parsedFiles;
+  const addedLines = parsed.reduce((sum, section) => sum + section.addedLines, 0);
+  const deletedLines = parsed.reduce((sum, section) => sum + section.deletedLines, 0);
+  const sharedPath = files.some(path => /(?:^|\/)(?:shared|common|core)(?:\/|$)/i.test(path));
+  return { ...classifyWorkflowTier({ files, addedLines, deletedLines, declaration, riskProfile, sharedPath }), semanticRisks: { publicApiOrProtocol:declaration.publicApiOrProtocol, dependencyOrLockfile:declaration.dependencyOrLockfile, securityAuthOrCredentials:declaration.securityAuthOrCredentials, migration:declaration.migration, irreversibleOrNoRollback:declaration.irreversibleOrNoRollback } };
 }
 
 export function validateT0Patch(patch) {
-  if (typeof patch !== 'string' || !patch.trim()) return false;
-  const lines = patch.split(/\r?\n/);
-  const git = lines.some(line => line.startsWith('diff --git '));
-  const starts = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (git ? lines[i].startsWith('diff --git ') : /^diff -ruN\s/.test(lines[i])) starts.push(i);
-  }
-  if (starts.length !== 1) return false;
-  const section = lines.slice(starts[0]);
-  if (!section.some(line => line.startsWith('--- ')) || !section.some(line => line.startsWith('+++ '))
-      || !section.some(line => line.startsWith('@@ '))) return false;
-  let changed = 0;
-  for (const line of section) {
-    if (line.startsWith('\\ No newline at end of file')) continue;
-    if ((line.startsWith('+') && !/^\+{3}(?: |\t)/.test(line))) changed++;
-    else if ((line.startsWith('-') && !/^-{3}(?: |\t)/.test(line))) changed++;
-  }
-  return changed >= 1 && changed <= 20;
+  try { return classifyPatchTier(patch, { publicApiOrProtocol:false, dependencyOrLockfile:false, securityAuthOrCredentials:false, migration:false, irreversibleOrNoRollback:false }).effective === 'T0'; }
+  catch { return false; }
 }
 
 export function tierResponseMetadata(tier) {
-  if (!tiers.includes(tier)) invalid('WORKFLOW_TIER_INVALID', 'Unknown tier');
-  return { tier, reviewPending: tier !== 'T0' };
+  const metadata = typeof tier === 'string' ? { effective:tier } : tier;
+  if (!tiers.includes(metadata.effective)) invalid('WORKFLOW_TIER_INVALID', 'Unknown tier');
+  return { tier:metadata.effective, reviewPending:metadata.effective !== 'T0', files:metadata.files, addedLines:metadata.addedLines, deletedLines:metadata.deletedLines, estimatedLines:metadata.estimatedLines, baseTier:metadata.base, riskProfile:metadata.riskProfile, semanticRisks:metadata.semanticRisks };
 }
 
 export function tierContractMetadata(tier) {
-  return { ...tierResponseMetadata(tier), reviewRequirement: tier === 'T0' ? 'none' : 'independent post-review required' };
+  const metadata = typeof tier === 'string' ? { effective:tier } : tier;
+  return { ...tierResponseMetadata(metadata), reviewRequirement: metadata.effective === 'T0' ? 'none' : 'independent post-review required' };
 }

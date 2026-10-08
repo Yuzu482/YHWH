@@ -99,6 +99,8 @@ test('production root functions block issued forms and emit verified bytes under
   const rootSource = readFileSync(rootPath, 'utf8');
   const helperSource = readFileSync(fileURLToPath(new URL('../scripts/patch-policy.mjs', import.meta.url)), 'utf8');
   const auditSource = readFileSync(fileURLToPath(new URL('../extensions/audit-log.js', import.meta.url)), 'utf8');
+  const artifactSource = readFileSync(fileURLToPath(new URL('../scripts/artifact-apply.mjs', import.meta.url)), 'utf8');
+  const guardSource = readFileSync(fileURLToPath(new URL('../extensions/write-scope-guard.js', import.meta.url)), 'utf8');
   const names = ['select_native_issued_token', 'select_api_issued_token', 'emit_checked_patch'];
   const functions = names.map(name => {
     const match = rootSource.match(new RegExp(`^${name}\\(\\) \\{[\\s\\S]*?^\\}`, 'm'));
@@ -114,7 +116,7 @@ test('production root functions block issued forms and emit verified bytes under
     command = [process.execPath, ['--input-type=module']];
   }
   const token = 'synthetic/' + '0123456789abcdef';
-  const input = Buffer.from(JSON.stringify({ functions, helperSource, auditSource, token })).toString('base64');
+  const input = Buffer.from(JSON.stringify({ functions, helperSource, auditSource, artifactSource, guardSource, token })).toString('base64');
   const child = String.raw`
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -127,18 +129,24 @@ try {
   fs.mkdirSync(path.join(dir,'scripts'));fs.mkdirSync(path.join(dir,'extensions'));
   const helper=path.join(dir,'scripts','patch-policy.mjs');
   fs.writeFileSync(helper,data.helperSource);fs.writeFileSync(path.join(dir,'extensions','audit-log.js'),data.auditSource);
+  fs.writeFileSync(path.join(dir,'scripts','artifact-apply.mjs'),data.artifactSource);fs.writeFileSync(path.join(dir,'extensions','write-scope-guard.js'),data.guardSource);
+  const baseline=path.join(dir,'baseline'),workspace=path.join(dir,'workspace');
+  fs.mkdirSync(baseline);fs.mkdirSync(workspace);
+  fs.writeFileSync(path.join(baseline,'x'),'old\r\n');fs.writeFileSync(path.join(workspace,'x'),'safe café\r\n');
   const funcs=data.functions.replaceAll('POLICY_HELPER_PATH',helper);
   const token=data.token, forms=[token,Buffer.from(token).toString('base64'),encodeURIComponent(token),encodeURIComponent(token).replace(/%[0-9A-F]{2}/g,m=>m.toLowerCase())];
   const execute=(patch,name,chosen=token)=>{
     const patchPath=path.join(dir,name);fs.writeFileSync(patchPath,patch);
-    const shell=funcs+'\nissued='+Buffer.from(chosen).toString('base64')+'; issued=$(printf %s "$issued" | base64 -d); emit_checked_patch "$issued" '+JSON.stringify(patchPath);
+    const shell=funcs+'\nissued='+Buffer.from(chosen).toString('base64')+'; issued=$(printf %s "$issued" | base64 -d); emit_checked_patch "$issued" '+JSON.stringify(patchPath)+' '+JSON.stringify(baseline)+' '+JSON.stringify(workspace);
     return cp.spawnSync('bash',['-c',shell],{encoding:'utf8',timeout:10000});
   };
   const blocked=forms.map((form,i)=>{
     const run=execute(Buffer.from('diff --git a/x b/x\n+context '+form+'\n'),'blocked-'+i);
     return {status:run.status,stdout:run.stdout,stderr:run.stderr};
   });
-  const good=Buffer.from('diff --git a/x b/x\r\n+safe café\r\n');
+  const difference=cp.spawnSync('diff',['-ruN',baseline,workspace]);
+  if(difference.status!==1)throw new Error('real GNU diff must capture changed file');
+  const good=difference.stdout;
   const success=execute(good,'success');
   const invalid=execute(good,'invalid','');
   const native=path.join(dir,'native.json');fs.writeFileSync(native,JSON.stringify({openaiAccess:{['access'+'Token']:token},model:'test'}));
@@ -172,6 +180,7 @@ try {
   assert.equal(observed.success.stdout, `\nPI_SANDBOX_PATCH_B64=${observed.bytes}\nPI_SANDBOX_PATCH_META=${JSON.stringify(metadata)}\n`);
   assert.equal(metadata.patchSha256, observed.hash);
   assert.equal(metadata.patchBytes, observed.size);
+  assert.deepEqual(metadata.fileStates,[{path:'x',before:true,after:true}]);
   assert.equal(observed.selected.status, 0, observed.selected.stderr);
   assert.deepEqual(observed.selected.stdout.trim().split('\n'), [token, token]);
   assert.notEqual(observed.malformed.status, 0);

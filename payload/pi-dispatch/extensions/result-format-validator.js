@@ -4,8 +4,31 @@ export const RESULT_PREFIX = 'KETHER_RESULT_JSON=';
 export const RESULT_STATUSES = Object.freeze(['completed', 'failed', 'blocked', 'unverified']);
 
 const HOST_EXECUTION_REASON = /(?:\bnot\s+run\b|\bunrun\b|\bnot\s+executed\b|\bunavailable\b).*(?:host|execution|command|test|build|install|check|verification)|(?:host|execution|command|test|build|install|check|verification).*(?:\bnot\s+run\b|\bunrun\b|\bnot\s+executed\b|\bunavailable\b)|host\s+(?:is\s+)?assigned\s+to\s+(?:execute|run|verify)/i;
+const EXECUTION_LIMITATION = /(?:\bnot\s+available\b|\bcannot\s+execute\b|\bnot\s+executable\b|未执行|不可用|无法执行)/i;
+const EXECUTION_CONTEXT = /\b(?:test|command|build|install|check|verification|execution)\b|测试|命令|构建|检查|验证/i;
+
+function isHostExecutionReason(evidence) {
+  return HOST_EXECUTION_REASON.test(evidence) ||
+    (EXECUTION_LIMITATION.test(evidence) && EXECUTION_CONTEXT.test(evidence));
+}
 const FILE_TOOL_ERROR = /(?:\b(?:read|edit|write)\b.*\b(?:error|fail(?:ed|ure)?|reject(?:ed)?|denied)\b|\b(?:error|fail(?:ed|ure)?|reject(?:ed)?|denied)\b.*\b(?:read|edit|write)\b)/i;
 const SHA256 = /^[a-f0-9]{64}$/;
+const EXECUTION_LIMITATION_KEYS = ['executor', 'reason'];
+
+function hasValidExecutionLimitation(check) {
+  if (!Object.hasOwn(check, 'executionLimitation')) return true;
+  let bytes, depth=0;
+  try { const metadata=check.executionLimitation; bytes=Buffer.byteLength(JSON.stringify(metadata),'utf8'); const visit=(node,d)=>{depth=Math.max(depth,d);if(node&&typeof node==='object')for(const child of Object.values(node))visit(child,d+1);};visit(metadata,0); }
+  catch { return false; }
+  return bytes<=4096 && depth<=8;
+}
+
+function hasCanonicalHostLimitation(check, value) {
+  const metadata=check?.executionLimitation;
+  return value.status==='completed' && value.errors.length===0 && check.outcome==='unverified' &&
+    !!metadata && typeof metadata==='object' && !Array.isArray(metadata) &&
+    Object.keys(metadata).length===2 && metadata.executor==='host' && metadata.reason==='worker-execution-unavailable';
+}
 const UUID_V4 = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const MAX_HOST_CHECKS = 32;
 
@@ -31,11 +54,11 @@ function sameStringSet(left, right) {
  * that could not run in the worker environment. patchProof must be created by
  * the gateway only after trustedPatchProof succeeds; it is not task/model input.
  */
-export function evaluateHostVerificationCandidate({task, access, raw, value, patchProof} = {}) {
+export function evaluateHostVerificationCandidate({task, access, raw, value, patchProof, forceHost = false} = {}) {
   const denied = rejectedHostVerificationCandidate();
   if (!task || task.role !== 'Chesed' || access !== 'workspace-write' ||
       typeof task.requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(task.requestId)) return denied;
-  if (!raw || !value || !['completed', 'unverified', 'blocked'].includes(value.status)) return denied;
+  if (typeof forceHost !== 'boolean' || !raw || !value || !(forceHost ? ['completed', 'unverified'].includes(value.status) : ['completed', 'unverified', 'blocked'].includes(value.status))) return denied;
   if (typeof value.result !== 'string' || !value.result.trim() || !Array.isArray(value.evidence) ||
       value.evidence.length === 0 || value.evidence.some(item => typeof item !== 'string' || !item.trim()) ||
       !exactUniqueStrings(value.changedFiles) || !Array.isArray(value.errors) ||
@@ -48,16 +71,24 @@ export function evaluateHostVerificationCandidate({task, access, raw, value, pat
   const names = new Set();
   const requiredCheckNames = [];
   for (const check of checks) {
-    if (!check || typeof check.name !== 'string' || !check.name.trim() || check.name.length > 128 || names.has(check.name) ||
+    if (!check || typeof check !== 'object' || Array.isArray(check) ||
+        !hasValidExecutionLimitation(check) ||
+        typeof check.name !== 'string' || !check.name.trim() || check.name.length > 128 || names.has(check.name) ||
         typeof check.evidence !== 'string' || !check.evidence.trim()) return denied;
     names.add(check.name);
     if (check.outcome === 'failed' || !['passed', 'unverified'].includes(check.outcome)) return denied;
-    if (check.outcome === 'unverified') {
-      if (!HOST_EXECUTION_REASON.test(check.evidence)) return denied;
+    const typedHostLimitation = hasCanonicalHostLimitation(check, value);
+    // Optional metadata is informational for compact host verification. Preserve
+    // the stricter typed-proof conditions of the non-forced T2 handoff.
+    if (!forceHost && Object.hasOwn(check,'executionLimitation') && !typedHostLimitation) return denied;
+    if (forceHost) {
+      requiredCheckNames.push(check.name);
+    } else if (check.outcome === 'unverified') {
+      if (!typedHostLimitation && !isHostExecutionReason(check.evidence)) return denied;
       requiredCheckNames.push(check.name);
     }
   }
-  if (!requiredCheckNames.length) return denied;
+  if (!requiredCheckNames.length || (forceHost && requiredCheckNames.length !== checks.length)) return denied;
 
   const requestId = task.requestId;
   const validation = raw.patchValidation;
@@ -71,7 +102,9 @@ export function evaluateHostVerificationCandidate({task, access, raw, value, pat
       typeof raw.patch !== 'string' || !raw.patch.trim() ||
       createHash('sha256').update(raw.patch, 'utf8').digest('hex') !== validation.patchSha256) return denied;
 
-  if (raw.exitCode !== 0 || raw.failureCode || raw.routeMismatch === true || raw.authFailure === true ||
+  const unrecoveredErrors = Number.isFinite(raw.unrecoveredErrors) ? raw.unrecoveredErrors : raw.toolErrors;
+  if ((forceHost && ((Number.isFinite(unrecoveredErrors) && unrecoveredErrors > 0) || value.errors.length > 0)) ||
+      raw.exitCode !== 0 || raw.failureCode || raw.routeMismatch === true || raw.authFailure === true ||
       raw.providerFailure === true || raw.transportError === true || raw.timeout === true || raw.agentError === true ||
       raw.truncated === true || raw.outputTruncated === true || raw.textTruncated === true ||
       raw.cleanupError === true || raw.cleanup?.ok === false) return denied;

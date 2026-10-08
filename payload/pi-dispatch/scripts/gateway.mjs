@@ -1,4 +1,4 @@
-import {validateRoleResult,ROLE_SCHEMAS} from '../extensions/role-contract.js';
+import {validateRoleResult,ROLE_SCHEMAS,resultDigest} from '../extensions/role-contract.js';
 import {prepareHandoff,completedContract,collectHandoffResults,HANDOFF_POLICY,runAnchor} from '../extensions/stage-handoff.js';
 import {checkClaudeAuth,CLAUDE_API_POLICY} from './claude-api-auth.mjs';
 import {OPENAI_AUTH_POLICY} from './openai-auth-store.mjs';
@@ -11,14 +11,17 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {registerHostWorkflow,workflowInstructions,workflowTopic} from './host-workflow.mjs';
 import {createWorkflowReceipts} from './workflow-receipts.mjs';
 import {projectMemory,PROJECT_MEMORY_POLICY} from './project-memory.mjs';
+import {createProjectMemoryContext} from './project-memory-context.mjs';
 import {codeGraph,CODE_GRAPH_POLICY} from './code-graph.mjs';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import * as z from 'zod/v4';
 import { dispatch, validateKetherInvocation } from './dispatch.mjs';
 import {runtimePreflight} from './runtime-preflight.mjs';
-import { publicCapabilities } from './provider-policy.mjs';
+import {TASK_PLANNING_POLICY} from './task-planning.mjs';
+import { PROVIDER_POLICY, publicCapabilities } from './provider-policy.mjs';
 import {LSP_METHODS,lspParameters,runDirectLsp} from './direct-lsp.mjs';
 import { probeWslSandbox } from './wsl-sandbox.mjs';
+import { applyArtifact, relativePatchFiles } from './artifact-apply.mjs';
 import { buildAuditRecord, createAuditLogger, ensureRequestId, redactSensitiveText } from '../extensions/audit-log.js';
 import { createModuleLifecycle } from '../extensions/module-lifecycle.js';
 import { classifyProviderResult, createMemoryProviderCircuitState, createProviderCircuitState } from '../extensions/provider-circuit-state.js';
@@ -27,13 +30,17 @@ import { evaluateHostVerificationCandidate, publicFormatValidation, recoverPrefa
 import {hostRecordDigest} from '../extensions/host-verification.js';
 import {exportResult} from '../extensions/result-export.js';
 import { createRequestLedger, RequestLedgerError } from '../extensions/request-ledger.js';
+import { createReviewAttemptLedger, REVIEW_QUOTA_POLICY, reviewBlockers } from './tier-review-policy.mjs';
+import { calculateExecutionBudget } from '../extensions/execution-budget.js';
 import { ResourceAwareExecutor, SCHEDULER_POLICY } from '../extensions/admission-scheduler.js';
 import { createWriteScopeLockManager } from '../extensions/write-scope-locks.js';
 import { createTaskMonitor } from '../extensions/task-monitor.js';
+import {projectTaskHandoff,TASK_HANDOFF_POLICY} from '../extensions/task-handoff.js';
 import { ROLE_MODELS, ROLE_ALIASES, ROLE_PROVIDERS, effectiveRoleProviders } from './role-policy.mjs';
-import {isReviewer,validateReviewDecision} from '../extensions/review-contract.js';
+import {isReviewer,validateReviewDecision,validateReviewPacket,missingReviewPatchMaterials,requireReviewMaterials} from '../extensions/review-contract.js';
 import {editorAuthorizationSchema,authorizeEditors,createEditorBroker,EDITOR_POLICY} from './editor-authorization.mjs';
-import { workflowTierFieldsSchema, validateWriteTier, validateT0Patch, tierResponseMetadata, tierContractMetadata } from './workflow-tier-gate.mjs';
+import { buildReviewPacket } from './review-materials.mjs';
+import { workflowTierFieldsSchema, validateWriteTier, classifyPatchTier, tierResponseMetadata, tierContractMetadata, tierObservation } from './workflow-tier-gate.mjs';
 import { validateDeclaredWorkflowTier } from '../extensions/workflow-tier.js';
 import { compileWriteScope, isAllowedPath, normalizeScopedPath, validateUnifiedPatch } from '../extensions/write-scope-guard.js';
 
@@ -51,8 +58,13 @@ export function trustedPatchProof(response, requestId, writeScope) {
   let scope;
   try { scope = compileWriteScope(writeScope); } catch { return false; }
   try {
-    const base = `/var/lib/pi-kether/jobs/${proof.jobId}`;
-    const actual = validateUnifiedPatch(response.patch, writeScope, `${base}/baseline`, `${base}/workspace`).sort();
+    let actual;
+    if (proof.format === 'relative-a-b-v1') {
+      actual=relativePatchFiles(response.patch);
+    } else {
+      const base = `/var/lib/pi-kether/jobs/${proof.jobId}`;
+      actual = validateUnifiedPatch(response.patch, writeScope, `${base}/baseline`, `${base}/workspace`).sort();
+    }
     return JSON.stringify(actual) === JSON.stringify([...proof.changedFiles].sort()) && proof.changedFiles.every(path => typeof path === 'string' && isAllowedPath(normalizeScopedPath(path).path, scope));
   } catch { return false; }
 }
@@ -94,6 +106,20 @@ function withinRoot(candidate, root) {
   return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
 }
 
+function validateRiskProfiles(entries, roots) {
+  if (!Array.isArray(entries)) throw new Error('riskProfiles must be an array');
+  const seen = new Set();
+  return entries.map(entry => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || Object.keys(entry).sort().join(',') !== 'cwd,riskProfile' || typeof entry.cwd !== 'string' || !isAbsolute(entry.cwd) || !['personal','standard','critical'].includes(entry.riskProfile)) throw new Error('Invalid riskProfiles entry');
+    const cwd = realpathSync(entry.cwd);
+    if (!statSync(cwd).isDirectory() || !roots.some(root => withinRoot(cwd, root))) throw new Error('riskProfiles cwd must be an existing directory inside configured roots');
+    const key = process.platform === 'win32' ? cwd.toLowerCase() : cwd;
+    if (seen.has(key)) throw new Error('Duplicate canonical riskProfiles cwd');
+    seen.add(key);
+    return {cwd,riskProfile:entry.riskProfile};
+  });
+}
+
 export function resolveAllowedCwd(cwd, roots) {
   if (typeof cwd !== 'string' || !isAbsolute(cwd) || !statSync(cwd).isDirectory()) throw new Error('cwd must be an existing absolute directory');
   const candidate = realpathSync(cwd);
@@ -110,6 +136,34 @@ export function resolveAllowedFile(file, cwd) {
 }
 
 export { ResourceAwareExecutor as BoundedExecutor };
+
+function reviewMaterial(task) {
+  const sections = {};
+  const packet = task.reviewPacket;
+  for (const name of ['requirements', 'changes']) {
+    const content = packet?.[name]?.content;
+    if (!Array.isArray(content)) continue;
+    sections[name] = createHash('sha256').update(JSON.stringify(content), 'utf8').digest('hex');
+    if (name !== 'changes') continue;
+    const occurrences = new Map();
+    for (const paragraph of content) {
+      const chunks = String(paragraph).split(/\n\s*\n|(?=^#{1,6}\s)/m).map(value => value.trim()).filter(Boolean);
+      for (const text of chunks) {
+        const keys = new Set();
+        for (const path of text.match(/\b[\w.-]+\/[\w./-]+(?::\d+(?::\d+)?)?/g) ?? []) keys.add(path.replace(/:\d+(?::\d+)?\b/g, '').toLowerCase());
+        for (const match of text.matchAll(/\bsection\s+["'`]?([\w.-]+)/gi)) keys.add(match[1].toLowerCase());
+        const digest = createHash('sha256').update(text, 'utf8').digest('hex');
+        for (const key of keys) {
+          if (!occurrences.has(key)) occurrences.set(key, []);
+          occurrences.get(key).push(digest);
+        }
+      }
+    }
+    for (const [key, values] of occurrences) sections[key] = createHash('sha256').update(JSON.stringify(values.sort()), 'utf8').digest('hex');
+  }
+  const materialDigest = createHash('sha256').update(JSON.stringify({ requirements: packet?.requirements?.content, changes: packet?.changes?.content }), 'utf8').digest('hex');
+  return { materialDigest, materialSections: sections };
+}
 
 export function registerMcpResponseCleanup(res, transport, server) {
   let cleanupPromise;
@@ -149,7 +203,9 @@ const taskSchema = z.object({
   context: stringList, readScope: stringList, writeScope: stringList, fixtureScope:stringList,
   forbidden: stringList, dependencies: stringList, acceptance: stringList,
   returnFields: z.array(z.string().min(1).max(64)).max(32).optional(), assumptions: stringList,
-  reviewPacket: reviewPacketSchema.optional(),
+  // Recognize an empty packet only to return the explicit material error before
+  // admission. validateReviewPacket still rejects it; valid packets remain v1.
+  reviewPacket: reviewPacketSchema.or(z.object({}).strict()).optional(),
 }).strict();
 const routeSchema = {
   provider: z.enum(['openai-codex', 'anthropic', 'yhwh-worker-api', 'yhwh-reviewer-api', 'claude-code-cli']),
@@ -170,7 +226,7 @@ const hostCommandSchema=z.object({
 const hostVerificationSchema=z.object({
   requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
   artifactSha256:z.string().regex(/^[a-f0-9]{64}$/),commands:z.array(hostCommandSchema).min(1).max(32),
-  workflowReceipt:z.string().max(128),
+  workflowReceipt:z.string().max(128).optional(),
 }).strict();
 const schedulingSchema = {
   priority: z.number().int().min(0).max(9).default(5),
@@ -181,10 +237,16 @@ export function createGatewayRuntime(options) {
   const gatewayInstanceId = options.gatewayInstanceId ?? randomUUID();
   const workflowReceipts=createWorkflowReceipts(options.workflowReceiptOptions);
   const roots = options.roots.map(root => realpathSync(resolve(root)));
+  const riskProfiles = validateRiskProfiles(options.riskProfiles ?? [], roots);
+  const riskProfileFor = cwd => {
+    const candidate = realpathSync(cwd);
+    const matches = riskProfiles.filter(entry => { const rel=relative(entry.cwd,candidate); const value=process.platform==='win32'?rel.toLowerCase():rel; return value===''||(!value.startsWith(`..${sep}`)&&value!=='..'&&!isAbsolute(value)); }).sort((a,b)=>b.cwd.length-a.cwd.length);
+    return matches[0]?.riskProfile ?? 'standard';
+  };
   const sandbox = options.sandboxStatus ?? probeWslSandbox();
   const factories = options.moduleFactories ?? {};
   const owned = new Set(options.ownedModules ?? []);
-  const keys = { audit:'auditLogger', circuit:'circuitState', ledger:'requestLedger', writeLocks:'writeLocks', taskMonitor:'taskMonitor', executor:'executor', dispatch:'dispatchFn', lsp:'lspFn' };
+  const keys = { audit:'auditLogger', circuit:'circuitState', ledger:'requestLedger', writeLocks:'writeLocks', taskMonitor:'taskMonitor', memoryContext:'projectMemoryContext', executor:'executor', dispatch:'dispatchFn', lsp:'lspFn' };
   for (const id of [...Object.keys(factories), ...owned]) {
     if (!Object.hasOwn(keys, id)) throw new Error(`Unknown gateway module: ${id}`);
   }
@@ -206,13 +268,21 @@ export function createGatewayRuntime(options) {
     definition('circuit', () => options.providerCircuitFile ? createProviderCircuitState(options.providerCircuitFile, options.providerCircuitOptions) : createMemoryProviderCircuitState(options.providerCircuitOptions), ['audit']),
     definition('ledger', () => options.requestLedgerDir ? createRequestLedger(options.requestLedgerDir, { retention: options.ledgerRetention }) : null, ['audit']),
     definition('writeLocks', () => options.requestLedgerDir ? createWriteScopeLockManager(resolve(options.requestLedgerDir, 'write-scope-locks')) : null, ['ledger']),
-    definition('taskMonitor', () => createTaskMonitor({ gatewayInstanceId, maxEntries: options.monitorMaxEntries ?? 512 }), ['ledger']),
+    definition('taskMonitor', () => createTaskMonitor({ gatewayInstanceId, maxEntries: options.monitorMaxEntries ?? 512,
+      maxResultBytes:options.monitorMaxResultBytes??134217728,terminalTtlMs:options.monitorTerminalTtlMs??3600000,maintenanceIntervalMs:options.monitorMaintenanceIntervalMs??60000,
+      persistResult:(id,value)=>ledger?.saveMonitorResult(id,value)===true,loadResult:id=>ledger?.readMonitorResult(id)??null }), ['ledger']),
+    definition('memoryContext', () => createProjectMemoryContext({roots}), ['ledger']),
     definition('dispatch', () => dispatch),
     definition('lsp', () => runDirectLsp),
-    definition('executor', () => new ResourceAwareExecutor(options.maxConcurrency ?? 4, options.maxQueue ?? 16, options.schedulerOptions), ['audit','circuit','ledger','writeLocks','taskMonitor'], value => stopExecutor(value, { graceMs:0, abortWaitMs:0 })),
+    definition('executor', () => new ResourceAwareExecutor(options.maxConcurrency ?? 4, options.maxQueue ?? 16, options.schedulerOptions), ['audit','circuit','ledger','writeLocks','taskMonitor','memoryContext'], value => stopExecutor(value, { graceMs:0, abortWaitMs:0 })),
   ]);
   const executor = modules.get('executor'), audit = modules.get('audit'), circuit = modules.get('circuit');
   const ledger = modules.get('ledger'), writeLocks = modules.get('writeLocks'), taskMonitor = modules.get('taskMonitor');
+  const handoffWaiters=new Map();let handoffClosed=false;
+  const publishHandoff=requestId=>{for(const waiter of [...(handoffWaiters.get(requestId)??[])])waiter.wake();};
+  const unsubscribeHandoff=ledger?.subscribe?.(publishHandoff)??(()=>{});
+  const finishHandoffWaiter=(waiter,value)=>{if(waiter.done)return;waiter.done=true;clearTimeout(waiter.timer);waiter.signal?.removeEventListener('abort',waiter.abort);const set=handoffWaiters.get(waiter.requestId);set?.delete(waiter);if(set?.size===0)handoffWaiters.delete(waiter.requestId);waiter.resolve(value);};
+  const reviewAttempts = options.requestLedgerDir ? createReviewAttemptLedger(resolve(options.requestLedgerDir, 'review-attempts')) : null;
   let phase = 'running', inFlight = 0, replacing, shutdownPromise;
   const idleWaiters = new Set();
   const pendingTasks = () => taskMonitor.list({ limit: taskMonitor.size }).filter(task => !['completed','failed','blocked','cancelled','awaiting-host-verification'].includes(task.state)).length;
@@ -241,6 +311,8 @@ export function createGatewayRuntime(options) {
     idleWaiters.add(done);
     timer = setTimeout(done, timeoutMs);
   });
+  const hostExecutionAvailable = options.hostExecutionAvailable === undefined ? true : options.hostExecutionAvailable;
+  if (typeof hostExecutionAvailable !== 'boolean') throw new Error('hostExecutionAvailable must be a boolean');
   const writeEnabled = sandbox.ok === true;
   const resourceLimitsEnforced = sandbox.ok === true && sandbox.resourceLimits === true;
   const osSandbox = writeEnabled ? sandbox.backend : 'unavailable';
@@ -258,13 +330,14 @@ export function createGatewayRuntime(options) {
     ...executor.state,
     accepting: phase === 'running' && executor.state.accepting,
     roots,
+    riskProfiles: riskProfiles.map(({cwd,riskProfile})=>({cwd,riskProfile})),
     bind: options.bind ?? `${options.host}:${options.port}`,
     protocol: options.protocol ?? 'MCP Streamable HTTP',
     access: writeEnabled ? ['none', 'read', 'workspace-write'] : ['none', 'read'],
     writeEnabled,
     osSandbox,
     sandbox,
-    resourceLimits: { enforced: resourceLimitsEnforced, defaultProfile: DEFAULT_RESOURCE_PROFILE, callerMayOnlyTightenTimeout: true, profiles: publicResourceProfiles() },
+    resourceLimits: { enforced: resourceLimitsEnforced, defaultProfile: DEFAULT_RESOURCE_PROFILE, callerMayOnlyTightenTimeout: false, profiles: publicResourceProfiles() },
     writeScopeEnforced: writeEnabled,
     writeScopeSyntax: { exactFile: 'path/to/file', directoryTree: 'path/to/directory/**', shellWrites: false },
     audit: { enabled: audit?.enabled === true, format: 'jsonl', rawTaskStored: false, rawPatchStored: false, sensitiveTextStored: false },
@@ -326,13 +399,14 @@ export function createGatewayRuntime(options) {
       providerMismatchRejected: true, claudeReviewAccess: 'none',
       reviewExecution:{recommendedProfile:'standard',recommendedTimeoutSeconds:300,thinkingUnchanged:true,materialStrategy:'one independently reviewable change per packet; Tifereth chooses the budget'},
       reviewContract: {version:1,requiredFor:['Geburah','reviewer'],sections:['requirements','changes','context','verification'],missingMaterials:'blocked-before-model',semanticCompleteness:'reviewer-and-primary'},
-      timeouts: {independent:true,queueDefaultSeconds:120,queueMaximumSeconds:900,execution:'timeoutSeconds bounded by resourceProfile'},
+      timeouts: {independent:true,queueDefaultSeconds:120,queueMaximumSeconds:900,execution:'timeoutSeconds bounded by resourceProfile',completionWait:{tool:'wait_subagent',maxTimeoutMs:55000}}, 
       modelMismatchRejected: true, thinkingUnchanged: true, probeTargetExemptFromRoleBinding: true,
-      acceptanceRequired: true, explicitReadScopeRequired: true,
-      workflowTiers:{levels:['T0','T1','T2'],enforcementBoundary:'T2 pre-review checked before execution via linked ledger; T1/T2 post-review remains host acceptance'},
+      acceptanceRequired: true, explicitReadScopeRequired: true, adaptiveThinking:TASK_PLANNING_POLICY,
+      workflowTiers:{version:2,reviewQuota:{version:REVIEW_QUOTA_POLICY.version,T1:{basePerStage:REVIEW_QUOTA_POLICY.T1.base,stageCap:REVIEW_QUOTA_POLICY.T1.stage,totalCap:REVIEW_QUOTA_POLICY.T1.total,timeMs:REVIEW_QUOTA_POLICY.T1.time},T2:{basePerStage:REVIEW_QUOTA_POLICY.T2.base,stageCap:REVIEW_QUOTA_POLICY.T2.stage,totalCap:REVIEW_QUOTA_POLICY.T2.total,timeMs:REVIEW_QUOTA_POLICY.T2.time,sharedExtensions:REVIEW_QUOTA_POLICY.T2.sharedExtensions}},levels:['T0','T1','T2'],semanticRisks:['publicApiOrProtocol','dependencyOrLockfile','securityAuthOrCredentials','migration','irreversibleOrNoRollback'],counts:'trusted unified patch files, added and deleted lines',t0:{files:3,lines:100,testsDocsFixturesExempt:true},t1:{postReviewAttempts:1,highThinking:false,reviewPacketMaxUtf8Bytes:10240},t2:{attemptsPerStage:2},riskProfiles:{canonicalCwd:true,longestAncestor:true,default:'standard'},hostExecutionAvailable,primaryDirectEnabled:false,enforcementBoundary:'actual patch classification before host-pending registration'},
       enforcementBoundary: 'Pi invocation validation; host-agent review stages are not attested',
       primaryHost: {protocol:'MCP',policyTool:'get_workflow',primaryModel:'host-selected',enforcement:'Pi invocation checks; host compliance is not attested',runtimePlatform:'Windows + WSL2'},
-      requiredConnectorTools: ['get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth'],
+      requiredConnectorTools: ['get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','wait_subagent','get_task_handoff','wait_task_handoff','probe_model','lsp_request','check_claude_auth'],
+      taskHandoff:TASK_HANDOFF_POLICY,
     },
   });
 
@@ -347,12 +421,37 @@ export function createGatewayRuntime(options) {
     throw Object.assign(error, { cleanup });
   }
 
+  async function emitFinalAcceptance({implementationRequestId, source, artifactSha256, recordSha256, template, pending, acceptedAt = new Date().toISOString(), trustedT2Verifier = false, implementationRequestIds = [implementationRequestId]}) {
+    const anchor=template?.runAnchorSha256??template?.taskAnchorSha256;
+    const workspaceSha256=createHash('sha256').update(pending?.workspace??'').digest('hex');
+    if (!audit || template?.role!=='Chesed' || template?.stage!=='implementing' || !['host','netzach'].includes(source) || !/^([a-f0-9]{64})$/.test(artifactSha256??'') || !/^([a-f0-9]{64})$/.test(recordSha256??'') || !/^([a-f0-9]{64})$/.test(anchor??'') || !pending?.parentRunId || !pending?.workspace || template?.tierPolicyVersion!==1 || !['T0','T1','T2'].includes(template.tier) || (template.tier==='T2'&&!trustedT2Verifier)) return false;
+    const task={role:'Chesed',objective:pending.goal,access:'workspace-write',parentRunId:pending.parentRunId,workspace:pending.workspace,runAnchorSha256:anchor,taskAnchorSha256:template.taskAnchorSha256};
+    if (!ledger?.enabled) return false;
+    const acceptanceId=`acceptance-${createHash('sha256').update(`${implementationRequestId}\n${template.mode==='linked'?template.runAnchorSha256:template.taskAnchorSha256}\ntask_accepted`,'utf8').digest('hex')}`;
+    const input={parentRunId:pending.parentRunId,workspaceSha256,anchor,artifactSha256,recordSha256,tier:template.tier};
+    const execution=await ledger.execute({requestId:acceptanceId,operation:'task_accepted',input},async()=>{
+      audit.record(buildAuditRecord({requestId:implementationRequestId,operation:'task_accepted',input:{access:'workspace-write'},task,result:{ok:true,status:'completed',hostVerification:source==='host'?{state:'completed',artifactSha256,recordSha256}:undefined},durationMs:0,telemetry:{taskAccepted:true,acceptedAt,parentRunId:pending.parentRunId,workspaceSha256,runAnchorSha256:anchor,tier:template.tier,counts:{files:template.files,addedLines:template.addedLines,deletedLines:template.deletedLines,estimatedLines:template.estimatedLines},baseTier:template.baseTier,riskProfile:template.riskProfile,semanticRisks:template.semanticRisks,implementationRequestIds,verification:{state:'completed',source,artifactSha256,recordSha256},hostVerification:source==='host'?{state:'completed',artifactSha256,recordSha256}:undefined}}));
+      return {ok:true,acceptedAt};
+    });
+    if(execution.value?.ok===true)publishHandoff(implementationRequestId);
+    return execution.value?.ok===true;
+  }
+
   async function runInvocation(input, signal, forcedTask = null, operation = 'dispatch_subagent', deferRecords = false, lifecycle = null, trustedProbeToken = null) {
+    input = { ...input, task: input.task ? { ...input.task, reviewPacket: input.task.reviewPacket ? structuredClone(input.task.reviewPacket) : undefined } : input.task };
     const preflight=operation==='probe_model'?undefined:runtimePreflight(forcedTask??input.task);
     const requestId = ensureRequestId(input.requestId);
     const started = Date.now();
-    const task = forcedTask ?? input.task;
+    let task = forcedTask ?? input.task;
+    if (task && typeof task.role === 'string') {
+      const role = task.role.trim();
+      task = { ...task, role: ROLE_ALIASES[role] ?? role };
+    }
+    let verifierSource = null;
     let dispatched = false;
+    let modelExecutionState = false;
+    let reviewOutputSuccessful = false;
+    let executionStartedAt = null;
     let timings = {queueWaitMs:0,executionMs:0};
     let phaseTimings=null;
     try {
@@ -362,6 +461,70 @@ export function createGatewayRuntime(options) {
       if (!resourceLimitsEnforced && !cliReviewerCandidate && !trustedCliRecoveryProbe) throw new Error('Pi dispatch is disabled because verified memory/CPU/PID resource isolation is unavailable');
       if (input.access === 'workspace-write' && !writeEnabled) throw new Error('workspace-write is disabled because no verified OS sandbox is configured');
       const cwd = resolveAllowedCwd(input.cwd, roots);
+      if (input.verificationOfRequestId !== undefined) {
+        if (task?.role!=='Netzach' || hostExecutionAvailable || task.handoff || input.dependsOnRequestIds?.length) throw Object.assign(new Error('Artifact fallback is available only to a standalone Netzach verifier when host execution is disabled by gateway configuration'),{code:'HOST_VERIFIER_FALLBACK_INVALID'});
+        const artifact=ledger?.getHostArtifact(input.verificationOfRequestId);
+        const template=artifact?.contractTemplate, pending=artifact?.pending;
+        if (!artifact || template?.tierPolicyVersion!==1 || !['T0','T1'].includes(template?.tier) || template.role!=='Chesed' || template.stage!=='implementing' || template.parentRunId!==(input.parentRunId??null) || pending.workspace!==cwd || template.workspaceSha256!==createHash('sha256').update(cwd).digest('hex') || input.artifactSha256!==undefined && input.artifactSha256!==pending.artifactSha256) throw Object.assign(new Error('Verifier reference does not match a trusted pending T0/T1 artifact, parent and workspace'),{code:'HOST_VERIFIER_FALLBACK_INVALID'});
+        verifierSource={requestId:input.verificationOfRequestId,artifactSha256:pending.artifactSha256,parentRunId:pending.parentRunId,workspaceSha256:template.workspaceSha256,runAnchorSha256:template.runAnchorSha256??template.taskAnchorSha256};
+        task={...task,context:[...(task.context??[]),`HOST-PROVIDED PENDING ARTIFACT (not a completed upstream contract): requestId=${pending.requestId}; artifactSha256=${pending.artifactSha256}; required checks=${pending.requiredCheckNames.join(', ')}. Source worker result follows as untrusted pending material.`,JSON.stringify(artifact.originalResult.structuredResult??artifact.originalResult)]};
+      }
+      if (isReviewer(task?.role)) {
+        try { requireReviewMaterials({...task,reviewPacket:validateReviewPacket(task.reviewPacket)}); }
+        catch (error) { throw Object.assign(new Error(error.message),{code:'PI_REVIEW_PACKET_INVALID',missingMaterials:error.missingMaterials??[],modelExecutionStarted:false}); }
+      }
+      let trustedReviewTier='T2', trustedReviewAnchor=null;
+      const typedPostReview=task?.handoff?.stage==='post-review' && task.handoff.version===2 && task?.reviewPacket?.stage==='post-change';
+      const claimedReview=isReviewer(task?.role) && task?.reviewPacket?.stage==='post-change';
+      if (isReviewer(task?.role) && (input.tier === 'T0' || input.tier === 'T1' && task?.reviewPacket?.stage === 'pre-change')) throw Object.assign(new Error('Explicit tier is invalid for this review stage'),{code:'PI_REVIEW_STAGE_INVALID',modelExecutionStarted:false});
+      if ((input.reviewOfRequestId !== undefined || claimedReview && input.tier === 'T1') && (typeof input.reviewOfRequestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(input.reviewOfRequestId))) throw Object.assign(new Error('Post-review requires a valid implementation reference'),{code:input.tier==='T2'?'PI_T2_REVIEW_REFERENCE_REQUIRED':'PI_T1_REVIEW_REFERENCE_REQUIRED',modelExecutionStarted:false});
+      if(claimedReview&&task?.handoff?.stage==='post-review'&&task.handoff.version===2){
+        const implementationRef=task.handoff.inputs?.find(ref=>ref.role==='Chesed'&&ref.stage==='implementing');
+        if(implementationRef){
+          if(typeof implementationRef.requestId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(implementationRef.requestId)) throw Object.assign(new Error('Typed implementation reference is invalid'),{code:'PI_T2_REVIEW_REFERENCE_REQUIRED',modelExecutionStarted:false});
+          if(input.reviewOfRequestId!==undefined&&input.reviewOfRequestId!==implementationRef.requestId) throw Object.assign(new Error('Post-review reference does not match typed implementation input'),{code:'PI_T2_REVIEW_REFERENCE_REQUIRED'});
+          const effective=ledger?.getEffectiveResult(implementationRef.requestId)??ledger?.getOutcome(implementationRef.requestId);
+          const effectiveContract=effective?.contract??ledger?.getOutcome(implementationRef.requestId)?.contract??ledger?.getHostArtifact(implementationRef.requestId)?.contractTemplate;
+          if(effectiveContract?.tier==='T2'){input.reviewOfRequestId=implementationRef.requestId;input.tier='T2';}
+        }
+      }
+      const hasNetzachPredecessor=typedPostReview&&task.handoff.inputs?.some(ref=>ref.role==='Netzach'&&ref.stage==='verifying');
+      if (input.reviewOfRequestId !== undefined && input.tier === 'T2' && typedPostReview && !hasNetzachPredecessor) {
+        const source=ledger?.getEffectiveResult(input.reviewOfRequestId) ?? ledger?.getOutcome(input.reviewOfRequestId);
+        const prior=ledger?.getOutcome(input.reviewOfRequestId), contract=source?.contract ?? prior?.contract;
+        const refs=task?.handoff?.inputs??[], pre=refs.find(ref=>ref.stage==='pre-review'&&ref.role==='Geburah');
+        const impl=refs.find(ref=>ref.requestId===input.reviewOfRequestId&&ref.stage==='implementing'&&ref.role==='Chesed');
+        const anchor=task?.handoff?.version===2?runAnchor(task.handoff):null;
+        const pending=ledger?.getHostArtifact(input.reviewOfRequestId)?.pending;
+        const trusted=source?.state==='completed'&&['host','netzach'].includes(source.verificationSource)&&/^[a-f0-9]{64}$/.test(source.verifiedArtifactSha256??'')&&source.verifiedArtifactSha256===source.patchValidation?.patchSha256&&/^[a-f0-9]{64}$/.test(source.verificationRecordSha256??source.verifierProofSha256??'');
+        const preOutcome=pre&&ledger?.getOutcome(pre.requestId);
+        const preValid=preOutcome?.state==='completed'&&preOutcome.contract?.mode==='linked'&&preOutcome.contract?.role==='Geburah'&&preOutcome.contract?.stage==='pre-review'&&preOutcome.contract?.reviewDecision==='approve'&&preOutcome.contract?.resultSha256===pre.resultSha256&&preOutcome.contract?.parentRunId===(input.parentRunId??null)&&preOutcome.contract?.workspaceSha256===createHash('sha256').update(cwd).digest('hex')&&preOutcome.contract?.runAnchorSha256===anchor&&preOutcome.contract?.phaseIndex===task.handoff.phaseIndex;
+        if(task?.handoff?.stage!=='post-review'||task.handoff.version!==2||!impl||!preValid||!trusted||prior?.state!=='completed'||contract?.mode!=='linked'||contract?.handoffVersion!==2||contract?.role!=='Chesed'||contract?.stage!=='implementing'||contract?.tier!=='T2'||contract?.tierPolicyVersion!==1||contract?.parentRunId!==(input.parentRunId??null)||contract?.workspaceSha256!==createHash('sha256').update(cwd).digest('hex')||contract?.runAnchorSha256!==anchor||contract?.phaseIndex!==task.handoff.phaseIndex||contract?.resultSha256!==impl.resultSha256||pending?.parentRunId!==(input.parentRunId??null)||pending?.workspace!==cwd||pending?.goal!==task.handoff.runGoal) throw Object.assign(new Error('T2 post-review requires the exact approved pre-review and current host-verified implementation'),{code:'PI_T2_REVIEW_REFERENCE_REQUIRED'});
+        const files=source.patchValidation?.changedFiles??source.originalResult?.patchValidation?.changedFiles;
+        try { task.reviewPacket=buildReviewPacket({stage:'post-change',requirements:task.reviewPacket?.requirements?.content,changes:task.reviewPacket?.changes?.content,context:task.reviewPacket?.context?.content,verification:task.reviewPacket?.verification?.content,tier:'T2',changedFiles:files}); }
+        catch(error) { throw Object.assign(error,{code:'REVIEW_MATERIALS_MISSING'}); }
+        trustedReviewTier='T2';trustedReviewAnchor=anchor;
+      }
+      if ((input.reviewOfRequestId !== undefined || claimedReview && input.tier === 'T1') && input.tier !== 'T2') {
+        const source=ledger?.getEffectiveResult(input.reviewOfRequestId) ?? (ledger?.getHostArtifact(input.reviewOfRequestId)?.originalResult);
+        const prior=ledger?.getOutcome(input.reviewOfRequestId);
+        const contract=source?.contract ?? prior?.contract;
+        const workspaceSha256=createHash('sha256').update(cwd).digest('hex');
+        let sourceAnchor=null, linkedAnchor=null;
+        try { sourceAnchor=contract?.runAnchorSha256 ?? contract?.taskAnchorSha256; if(task?.handoff?.version===2) linkedAnchor=runAnchor(task.handoff); } catch {}
+        const linked=task?.handoff?.stage==='post-review' && task.handoff.inputs?.some(ref=>ref.requestId===input.reviewOfRequestId&&ref.role==='Chesed'&&ref.stage==='implementing'&&ref.resultSha256===contract?.resultSha256);
+        const verified=source?.state==='completed' && ['host','netzach'].includes(source.verificationSource) && /^[a-f0-9]{64}$/.test(source.verifiedArtifactSha256??source.patchValidation?.patchSha256??'') && /^[a-f0-9]{64}$/.test(source.verificationRecordSha256??source.verifierProofSha256??'');
+        const standalone=contract?.mode==='standalone' && contract.taskAnchorSha256===sourceAnchor;
+        const linkedValid=contract?.mode==='linked' && linked && contract.handoffVersion===2 && contract.runAnchorSha256===linkedAnchor && contract.phaseIndex===task.handoff.phaseIndex;
+        if (claimedReview && input.reviewOfRequestId && contract?.tierPolicyVersion!==1) throw Object.assign(new Error('Legacy review state lacks tier policy proof'),{code:'PI_LEGACY_REVIEW_STATE_UNKNOWN'});
+        if (!claimedReview || !input.reviewOfRequestId || contract?.tierPolicyVersion!==1 || !/^[a-f0-9]{64}$/.test(sourceAnchor??'') || prior?.state!=='completed' || !verified || contract?.role!=='Chesed' || contract?.stage!=='implementing' || contract?.tier!=='T1' || contract.parentRunId!==(input.parentRunId??null) || contract.workspaceSha256!==workspaceSha256 || !(standalone || linkedValid)) throw Object.assign(new Error('T1 post-review requires a trusted completed T1 implementation reference in the same workspace, parent and anchor'),{code:'PI_T1_REVIEW_REFERENCE_REQUIRED'});
+        if (task.reviewPacket.stage!=='post-change' || !['medium','high','xhigh'].includes(input.thinking ?? PROVIDER_POLICY[input.provider]?.defaultThinking ?? 'medium') || Buffer.byteLength(JSON.stringify(task.reviewPacket),'utf8')>10240) throw Object.assign(new Error('T1 post-review requires medium/high/xhigh thinking and a review packet of at most 10240 UTF-8 bytes'),{code:'PI_T1_REVIEW_PACKET_INVALID'});
+        const changedFiles=source?.patchValidation?.changedFiles ?? source?.originalResult?.patchValidation?.changedFiles;
+        const missingPatchFiles=missingReviewPatchMaterials(changedFiles,task?.reviewPacket?.changes?.content);
+        if (missingPatchFiles.length) throw Object.assign(new Error(`T1 review packet omits changed-file patch material: ${missingPatchFiles.slice(0,16).join(', ')}`),{code:'REVIEW_MATERIALS_MISSING',missingMaterials:missingPatchFiles.slice(0,16)});
+        trustedReviewTier='T1';
+        trustedReviewAnchor=sourceAnchor;
+      }
       const invocation = validateKetherInvocation({
         cwd,
         access: input.access,
@@ -371,14 +534,25 @@ export function createGatewayRuntime(options) {
         timeoutSeconds: input.timeoutSeconds,
         resourceProfile: input.resourceProfile,
         task,
-      }, writeEnabled, cwd, { probe: operation === 'probe_model', probeToken: operation === 'probe_model' ? trustedProbeToken : undefined });
+      }, writeEnabled, cwd, { probe: operation === 'probe_model', probeToken: operation === 'probe_model' ? trustedProbeToken : undefined, reviewTier: trustedReviewTier });
       if (cliReviewerCandidate && (invocation.task.role !== 'Geburah' || invocation.request.provider !== 'claude-code-cli' || invocation.request.model !== ROLE_MODELS.Geburah || invocation.request.access !== 'none')) throw new Error('Claude Code CLI is restricted to the validated Geburah reviewer route');
       if (input.requestId && input.dependsOnRequestIds?.includes(input.requestId)) throw new Error('a task cannot depend on its own requestId');
       if (input.dependsOnRequestIds?.length && !ledger?.enabled) throw new Error('task dependencies require the persistent request ledger');
+      const trustedRiskProfile = input.access === 'workspace-write' ? riskProfileFor(cwd) : 'standard';
       const tierDecision = input.access === 'workspace-write'
         ? validateDeclaredWorkflowTier(input.tierDeclaration, input.tier, invocation.task.writeScope)
         : null;
+      if (tierDecision && trustedRiskProfile === 'personal' && tierDecision.level === 'T2') { tierDecision.level='T1'; tierDecision.requiresPreReview=false; }
+      if (tierDecision && trustedRiskProfile === 'critical' && tierDecision.level === 'T0') { tierDecision.level='T1'; tierDecision.requiresPostReview=true; }
       const typedHandoffGate=prepareHandoff(invocation.task,input,cwd,ledger);
+      if (operation!=='probe_model' && invocation.task.role==='Netzach' && input.verificationOfRequestId===undefined) {
+        const ref=invocation.task.handoff?.inputs?.find(item=>item.role==='Chesed'&&item.stage==='implementing');
+        const source=ref&&(ledger?.getEffectiveResult(ref.requestId)??ledger?.getOutcome(ref.requestId)), pending=ref&&ledger?.getHostArtifact(ref.requestId)?.pending;
+        const anchor=invocation.task.handoff?.version===2?runAnchor(invocation.task.handoff):null;
+        const contract=source?.contract;
+        const observed=contract&&Number.isInteger(contract.files)&&Number.isInteger(contract.addedLines)&&Number.isInteger(contract.deletedLines)&&contract.semanticRisks&&['publicApiOrProtocol','dependencyOrLockfile','securityAuthOrCredentials','migration','irreversibleOrNoRollback'].every(key=>typeof contract.semanticRisks[key]==='boolean');
+        if (invocation.task.handoff?.stage!=='verifying' || !ref || !source || source.state!=='completed' || contract?.tierPolicyVersion!==1 || contract?.tier!=='T2' || contract.role!=='Chesed' || contract.stage!=='implementing' || !observed || contract.parentRunId!==(input.parentRunId??null) || contract.workspaceSha256!==createHash('sha256').update(cwd).digest('hex') || contract.runAnchorSha256!==anchor || contract.resultSha256!==ref.resultSha256 || (pending && (pending.parentRunId!==(input.parentRunId??null) || pending.workspace!==cwd || pending.goal!==invocation.task.handoff.runGoal)) || !Array.isArray(invocation.task.handoff.runAcceptance) || invocation.task.handoff.runAcceptance.length===0) throw Object.assign(new Error('Netzach requires a typed verifying handoff and trusted completed T2 Chesed implementation in the same run'),{code:'NETZACH_T2_REFERENCE_REQUIRED'});
+      }
       const editorGrant=authorizeEditors(input.editorAuthorization,{requestId:input.requestId,parentRunId:input.parentRunId,provider:input.provider,role:invocation.task.role,ledgerEnabled:ledger?.enabled});
       const dependencyGate = () => {
         for (const dependencyId of input.dependsOnRequestIds || []) {
@@ -396,18 +570,63 @@ export function createGatewayRuntime(options) {
         writeScope: invocation.task.writeScope,
         timeoutSeconds: invocation.request.timeoutSeconds,
       } : null;
+      let reviewTicket=null, reviewStarted=false, reviewStartedAt=null, reviewDispatchAt=null, reviewTimingKnown=false;
       const result = await executor.run(async (runSignal, remainingSeconds) => {
-        dispatched = true;
-        lifecycle?.onRunning?.({executionTimeoutSeconds:invocation.request.timeoutSeconds});
-        const request = { ...invocation.request, gatewayRequestId: requestId, timeoutSeconds: Math.min(invocation.request.timeoutSeconds, remainingSeconds) };
+        runSignal.throwIfAborted();
+        executionStartedAt=new Date().toISOString();
+        lifecycle?.onRunning?.({executionTimeoutSeconds:reviewTicket?.timeoutSeconds??invocation.request.timeoutSeconds});
+        if (isReviewer(invocation.task.role)) {
+          if (!reviewAttempts) throw Object.assign(new Error('Durable review attempt accounting is unavailable'),{code:'PI_REVIEW_ATTEMPTS_INVALID'});
+          const reviewLinked=invocation.task.handoff?.version===2;
+          if (reviewLinked && (invocation.task.handoff.inputs??[]).some(ref=>ledger.getOutcome(ref.requestId).contract?.tierPolicyVersion!==1) && trustedReviewTier==='T2') throw Object.assign(new Error('PI_LEGACY_REVIEW_STATE_UNKNOWN: review attempt history cannot be proved for an unmarked predecessor chain'),{code:'PI_LEGACY_REVIEW_STATE_UNKNOWN'});
+          const reviewAnchor=trustedReviewAnchor??(reviewLinked?runAnchor(invocation.task.handoff):runAnchor({runGoal:invocation.task.objective,runAcceptance:invocation.task.acceptance}));
+          const reviewStage=invocation.task.reviewPacket?.stage==='pre-change'?'pre-review':'post-review';
+          const {materialDigest,materialSections}=reviewMaterial(invocation.task);
+          const overallSeconds=Math.floor(Math.min(invocation.request.timeoutSeconds,remainingSeconds));
+          const reviewBudget=calculateExecutionBudget({overallTimeoutSeconds:overallSeconds});
+          if(!reviewBudget.ok)throw Object.assign(new Error(`Review execution budget insufficient; sandboxSeconds=${reviewBudget.sandboxSeconds}`),{code:'PI_REVIEW_LIMIT_EXCEEDED',remainingMs:Math.max(0,Math.floor((overallSeconds-reviewBudget.reserveSeconds)*1000)),modelExecutionStarted:false});
+          let artifactDigest,hostRecordDigest,changedPaths=[];
+          if(input.reviewOfRequestId){
+            const trusted=ledger?.getEffectiveResult(input.reviewOfRequestId)??ledger?.getOutcome(input.reviewOfRequestId);
+            const artifact=trusted?.verifiedArtifactSha256, patchDigest=trusted?.patchValidation?.patchSha256;
+            const record=trusted?.verificationRecordSha256??trusted?.verifierProofSha256;
+            const matchingProof=trusted?.state==='completed'&&['host','netzach'].includes(trusted.verificationSource)&&/^([a-f0-9]{64})$/.test(artifact??'')&&/^([a-f0-9]{64})$/.test(patchDigest??'')&&artifact===patchDigest&&/^([a-f0-9]{64})$/.test(record??'');
+            const genericT2BaseOnly=trustedReviewTier==='T2'&&hasNetzachPredecessor;
+            if(!matchingProof&&!genericT2BaseOnly) throw Object.assign(new Error('Review reference lacks current matching host verification proof'),{code:trustedReviewTier==='T1'?'PI_T1_REVIEW_REFERENCE_REQUIRED':'PI_T2_REVIEW_REFERENCE_REQUIRED',modelExecutionStarted:false});
+            if(matchingProof){artifactDigest=artifact;hostRecordDigest=record;changedPaths=trusted.patchValidation.changedFiles??trusted.originalResult?.patchValidation?.changedFiles??[];}
+          }
+          const progressValues=(invocation.task.context??[]).filter(x=>typeof x==='string'&&x.startsWith('REVIEW_PROGRESS_JSON='));
+          let progress; if(progressValues.length===1){try{progress=JSON.parse(progressValues[0].slice('REVIEW_PROGRESS_JSON='.length));}catch{throw Object.assign(new Error('Malformed REVIEW_PROGRESS_JSON'),{code:'PI_REVIEW_ATTEMPTS_INVALID'});}}else if(progressValues.length>1)throw Object.assign(new Error('Duplicate REVIEW_PROGRESS_JSON'),{code:'PI_REVIEW_ATTEMPTS_INVALID'});
+          reviewTicket=reviewAttempts.reserve({workspaceSha256:createHash('sha256').update(cwd).digest('hex'),runAnchorSha256:reviewAnchor,stage:reviewStage,tier:trustedReviewTier,requestId,parentRunId:input.parentRunId,phaseIndex:invocation.task.handoff?.phaseIndex??1,timeoutSeconds:overallSeconds,materialDigest,materialSections,artifactDigest,hostRecordDigest,changedPaths,progress});
+          if (reviewTicket.replayed) throw Object.assign(new Error('Review request replay is not allowed to launch a second model call'),{code:'PI_REVIEW_REPLAY_BLOCKED'});
+          const admittedBudget=calculateExecutionBudget({overallTimeoutSeconds:reviewTicket.timeoutSeconds});
+          if(!admittedBudget.ok){reviewAttempts.finish(reviewTicket,{started:false,outcome:'insufficient-execution-budget'});throw Object.assign(new Error(`Review execution budget insufficient after quota admission; sandboxSeconds=${admittedBudget.sandboxSeconds}`),{code:'PI_REVIEW_LIMIT_EXCEEDED',remainingMs:reviewTicket.timeoutSeconds*1000,modelExecutionStarted:false});}
+        }
+        const request = { ...invocation.request, gatewayRequestId: requestId, timeoutSeconds: reviewTicket ? reviewTicket.timeoutSeconds : Math.min(invocation.request.timeoutSeconds, remainingSeconds) };
         const editorBroker=editorGrant?(options.editorBrokerFactory??createEditorBroker)(editorGrant,{requestId,parentRunId:input.parentRunId,signal:runSignal,audit}):null;
         try {
-          const dispatchOptions = { editorBroker, upstreamResults:collectHandoffResults(invocation.task,ledger), resultFormat: operation === 'probe_model' ? 'plain' : 'json', onProgress:value=>{phaseTimings=value;lifecycle?.onProgress?.(value);} };
+          const dispatchTask=operation==='probe_model'?invocation.task:await modules.get('memoryContext').inject({cwd,task:invocation.task,access:input.access,operation,signal:runSignal});
+          runSignal.throwIfAborted();
+          const dispatchOptions = { editorBroker, upstreamResults:collectHandoffResults(dispatchTask,ledger), resultFormat: operation === 'probe_model' ? 'plain' : 'json', onProgress:value=>{phaseTimings=value;lifecycle?.onProgress?.(value);} };
+          if (reviewTicket) dispatchOptions.onModelStart=()=>{modelExecutionState=true;if(!reviewStarted){reviewAttempts.markStarted(reviewTicket);reviewStarted=true;reviewTimingKnown=true;reviewStartedAt=Date.now();}};
           if (operation === 'probe_model') Object.assign(dispatchOptions, { probe: true, probeToken: trustedProbeToken });
-          const result=await modules.get('dispatch')({ ...request, gatewayInstanceId, gatewayWindowsPid: process.pid }, runSignal, invocation.task, dispatchOptions);
+          let result;
+          reviewDispatchAt=Date.now();
+          dispatched=true;
+          modelExecutionState=null;
+          try { result=await modules.get('dispatch')({ ...request, gatewayInstanceId, gatewayWindowsPid: process.pid }, runSignal, dispatchTask, dispatchOptions); }
+          catch(error) { if(reviewTicket&&!reviewStarted&&error?.modelExecutionStarted!==false){reviewAttempts.markStarted(reviewTicket);reviewStarted=true;reviewStartedAt=reviewDispatchAt;} if(!modelExecutionState&&error?.modelExecutionStarted===false)modelExecutionState=false; else if(!modelExecutionState)modelExecutionState=null; throw error; }
+          if(result?.modelExecutionStarted===true)modelExecutionState=true;
+          else if(result?.modelExecutionStarted===false&&!modelExecutionState)modelExecutionState=false;
+          else if(!modelExecutionState)modelExecutionState=null;
+          if(result?.modelExecutionStarted!==false&&reviewTicket&&!reviewStarted){reviewAttempts.markStarted(reviewTicket);reviewStarted=true;reviewStartedAt=reviewDispatchAt;}
           if(editorBroker){await editorBroker.close();result.editorExecution=editorBroker.report();if(!result.editorExecution.ok){result.ok=false;result.failure='EDITOR_OPERATION_FAILED_OR_UNCERTAIN';}}
+          reviewOutputSuccessful=result?.ok===true&&result?.modelExecutionStarted!==false&&!result?.transportError&&!result?.cleanupError&&!result?.timedOut&&!result?.failureCode&&!result?.authFailure&&result?.cleanup?.ok!==false&&!(result?.unrecoveredErrors>0)&&(!Number.isInteger(result?.exitCode)||result.exitCode===0);
           return result;
-        } finally {await editorBroker?.close();}
+        } finally {
+          await editorBroker?.close();
+          if (reviewTicket) {const elapsed=reviewTimingKnown?Math.max(0,Date.now()-(reviewStartedAt??Date.now())):undefined;reviewAttempts.finish(reviewTicket,{started:reviewStarted,outcome:reviewStarted?'execution-finished':'preflight-or-zero-launch',...(elapsed===undefined?{}:{executionMs:elapsed}),executionKnown:reviewStarted?reviewTimingKnown:true});}
+        }
       }, invocation.request.timeoutSeconds * 1000, signal, {
         queueTimeoutMs:(input.queueTimeoutSeconds??120)*1000,
         onWaiting:value=>lifecycle?.onWaiting?.(value),
@@ -420,7 +639,9 @@ export function createGatewayRuntime(options) {
         acquire: lockRequest ? () => writeLocks?.tryAcquire(lockRequest) : undefined,
         release: lockRequest ? lock => writeLocks?.release(lock) : undefined,
       });
-      const response = { ...result, preflight, timings, requestId, parentRunId: input.parentRunId, resourceLimits: invocation.request.resourceLimits, osSandbox: result.osSandbox ?? (cliReviewerCandidate || trustedCliRecoveryProbe ? 'none' : osSandbox), writeEnabled, writeScopeEnforced: input.access === 'workspace-write' };
+      const response = { ...result, thinkingDecision:invocation.request.thinkingDecision, preflight, timings, requestId, parentRunId: input.parentRunId, resourceLimits: invocation.request.resourceLimits, osSandbox: result.osSandbox ?? (cliReviewerCandidate || trustedCliRecoveryProbe ? 'none' : osSandbox), writeEnabled, writeScopeEnforced: input.access === 'workspace-write' };
+      if(reviewTicket){const snapshot=reviewAttempts.snapshot({workspaceSha256:reviewTicket.workspaceSha256,runAnchorSha256:reviewTicket.runAnchorSha256,stage:reviewTicket.stage,tier:reviewTicket.tier,requestId}),lim=REVIEW_QUOTA_POLICY[reviewTicket.tier],used=snapshot.attempts.filter(a=>a.status!=='released'),stageUsed=used.filter(a=>a.stage===reviewTicket.stage).length;response.reviewQuota={available:true,version:REVIEW_QUOTA_POLICY.version,tier:reviewTicket.tier,stage:reviewTicket.stage,used:used.length,stageUsed,base:lim.base,remainingBase:Math.max(0,lim.base-stageUsed),elasticSharedRemaining:Math.max(0,(lim.sharedExtensions??1)-(snapshot.extensionUsed?1:0)),stageCap:lim.stage,totalCap:lim.total,extensionUsed:snapshot.extensionUsed,extensionEligible:stageUsed>=lim.base&&!snapshot.extensionUsed&&snapshot.attempts.at(-1)?.progressVerified===true,nextAction:'review the validated decision and trusted progress before requesting another review',extensionEligibilityReason:snapshot.extensionUsed?'shared extension consumed':stageUsed<lim.base?'base quota remains':snapshot.attempts.at(-1)?.progressVerified===true?'deterministic eligibility only; semantic relevance remains reviewer judgment':'requires trusted relevant blocker correction and matching host proof',timeChargedMs:snapshot.timeUsedMs,measuredExecutionMs:snapshot.attempts.filter(a=>a.started).every(a=>a.timeKnown===true)?snapshot.attempts.filter(a=>a.started).reduce((sum,a)=>sum+(a.elapsedMs??0),0):null,timeRemainingMs:Math.max(0,lim.time-snapshot.timeUsedMs),timeKnown:snapshot.attempts.filter(a=>a.started).every(a=>a.timeKnown===true),unknownTimingCount:snapshot.attempts.filter(a=>a.started&&a.timeKnown!==true).length,tokens:null,admittedTimeoutSeconds:reviewTicket.timeoutSeconds};}
+      let actualTier = null;
       delete response.contract;
       if (operation !== 'probe_model') {
         let validation;
@@ -457,24 +678,60 @@ export function createGatewayRuntime(options) {
         if (validation.ok) response.structuredResult = validation.value;
         else {
           response.ok = false;
-          response.failure ??= `result_format_invalid:${validation.code}`;
+          const reason=`result_format_invalid:${validation.code}`;
+          if(response.failureCode) response.secondaryValidation=[...(response.secondaryValidation??[]),reason];
+          response.failure ??= reason;
         }
         if (validation.ok) {
           const hostEvidenceResolver=ref=>resolveBoundHostEvidence(ref,{task:invocation.task,parentRunId:input.parentRunId,cwd,ledger});
           response.roleValidation=validateRoleResult(validation.value,invocation.task.role,{hostEvidenceResolver});
-          if (!response.roleValidation.ok) { response.ok=false; response.failure=`role_schema_invalid:${response.roleValidation.message}`; }
+          if (response.roleValidation.ok && response.roleValidation.warnings?.length) {
+            const safeWarnings=response.roleValidation.warnings.filter(code=>code==='execution-limitation-invalid');
+            const codes=[...new Set(safeWarnings)];
+            if (codes.length) response.metadataWarnings={codes,count:safeWarnings.length};
+          }
+          if (!response.roleValidation.ok) {
+            response.ok=false;
+            const reason=`role_schema_invalid:${response.roleValidation.message}`;
+            if(response.failureCode) response.secondaryValidation=[...(response.secondaryValidation??[]),reason];
+            response.failure ??=reason;
+          }
           else {
             const trustedPatch=trustedPatchProof(response,requestId,invocation.task.writeScope);
-            const candidate=evaluateHostVerificationCandidate({
+            let tierGateFailed = false;
+            if (tierDecision) {
+              try {
+                if (!trustedPatch) throw Object.assign(new Error('A trusted, non-empty scoped patch is required'), { code:'PI_PATCH_INVALID' });
+                actualTier = classifyPatchTier(response.patch, input.tierDeclaration, trustedRiskProfile, response.patchValidation.changedFiles);
+                Object.assign(response,tierObservation(input.tier,actualTier,invocation.task.context));
+                if (['T0','T1','T2'].indexOf(actualTier.effective) > ['T0','T1','T2'].indexOf(tierDecision.level)) {
+                  response.ok=false; response.status='failed'; response.code='PI_TIER_EXCEEDED'; response.failure='PI_TIER_EXCEEDED';
+                  response.requiredTier=actualTier.effective; response.files=actualTier.files; response.addedLines=actualTier.addedLines; response.deletedLines=actualTier.deletedLines;
+                  tierGateFailed=true;
+                }
+              } catch (error) {
+                response.ok=false; response.status='failed'; response.code=error.code==='PI_TIER_EXCEEDED'?'PI_TIER_EXCEEDED':'PI_PATCH_INVALID'; response.failure=response.code;
+                response.requiredTier=error.requiredTier; tierGateFailed=true;
+              }
+            }
+            if (tierDecision && actualTier) {
+              const effective = ['T0','T1','T2'].indexOf(actualTier.effective) < ['T0','T1','T2'].indexOf(tierDecision.level) ? tierDecision.level : actualTier.effective;
+              Object.assign(response, tierResponseMetadata({...actualTier,effective}));
+            }
+            const candidate=tierGateFailed ? {eligible:false} : evaluateHostVerificationCandidate({
               task:{...invocation.task,requestId,provider:input.provider,model:input.model},
               access:input.access,
               raw:response,
               value:validation.value,
               patchProof:trustedPatch?{...response.patchValidation,trusted:true}:null,
+              forceHost:!!tierDecision && ['T0','T1'].includes(tierDecision.level),
             });
-            if (candidate.eligible) {
+            if (candidate.eligible && !tierGateFailed) {
               if (!ledger?.enabled) throw Object.assign(new Error('Host verification is unavailable because the durable request ledger is disabled'),{code:'HOST_VERIFICATION_LEDGER_REQUIRED'});
-              const originalResult={...response,structuredResult:validation.value,hostVerification:{state:'awaiting-host-verification',artifactSha256:response.patchValidation.patchSha256,requiredCheckNames:[...candidate.requiredCheckNames]}};
+              const recoverableFileOnly=response.recoverableToolFailure===true && response.recoverableFileToolFailure===true && response.toolErrors>0 && response.unrecoveredErrors>0 && response.unrecoveredFileToolErrors===response.unrecoveredErrors && trustedPatch;
+              const originalResult={...response,trustedWriteScope:[...invocation.task.writeScope],structuredResult:validation.value,hostVerification:{state:'awaiting-host-verification',artifactSha256:response.patchValidation.patchSha256,requiredCheckNames:[...candidate.requiredCheckNames]},...(recoverableFileOnly?{artifactRecovery:true,recoveredErrors:response.toolErrors,unrecoveredErrors:0}:{})};
+              const contractTemplate=completedContract(invocation.task,input,cwd,validation.value);
+              if (tierDecision && actualTier) Object.assign(contractTemplate,tierContractMetadata({...actualTier,effective:response.tier}),{tierPolicyVersion:1});
               const pending=ledger.registerHostPending({
                 requestId,
                 artifactSha256:response.patchValidation.patchSha256,
@@ -484,12 +741,18 @@ export function createGatewayRuntime(options) {
                 goal:invocation.task.handoff?.runGoal??invocation.task.objective,
                 phase:invocation.task.handoff?.version===2?invocation.task.handoff.phaseIndex:1,
                 requiredCheckNames:candidate.requiredCheckNames,
-              },{originalResult,contractTemplate:completedContract(invocation.task,input,cwd,validation.value)});
+              },{originalResult,contractTemplate});
               response.status='awaiting-host-verification';
               response.ok=false;
               response.failure='awaiting-host-verification';
               response.hostVerification={state:'awaiting-host-verification',artifactSha256:pending.artifactSha256,requiredCheckNames:[...pending.requiredCheckNames]};
-            } else if (validation.value.status!=='completed') { response.status=validation.value.status; response.ok=false; response.failure=`agent_status:${validation.value.status}`; }
+            } else if (tierGateFailed) { /* preserve the authoritative patch/tier failure */ }
+            else if (validation.value.status!=='completed') {
+              response.ok=false;
+              if (!response.failure && !response.failureCode && !response.code) response.failure=`agent_status:${validation.value.status}`;
+              response.status=validation.value.status;
+            }
+            else if (tierDecision && ['T0','T1'].includes(tierDecision.level)) { response.ok=false; response.status='failed'; if (!response.failure && !response.failureCode && !response.code) { response.failure='PI_HOST_VERIFICATION_REQUIRED'; response.code='PI_HOST_VERIFICATION_REQUIRED'; } }
             else if (response.recoverableToolFailure === true && response.recoverableFileToolFailure === true && response.toolErrors > 0 && response.unrecoveredErrors > 0 && response.unrecoveredFileToolErrors===response.unrecoveredErrors && trustedPatch) {
               response.ok=true;
               response.failure=null;
@@ -501,29 +764,79 @@ export function createGatewayRuntime(options) {
           }
         }
         if (validation.ok && isReviewer(invocation.task.role)) {
-          response.reviewValidation=validateReviewDecision(validation.value);
+          response.reviewValidation=validateReviewDecision(validation.value,{tier:trustedReviewTier});
+          if(reviewTicket&&reviewStarted&&response.roleValidation?.ok===true&&response.reviewValidation.ok&&reviewOutputSuccessful){const v=validation.value;const rawFindings=v.deliverable?.findings??[];const findings=rawFindings;reviewAttempts.recordDecision(reviewTicket,{reviewDecision:response.reviewValidation.conditional?'conditional-approve':response.reviewValidation.decision,findings,missingMaterials:response.reviewValidation.missingMaterials??[]});const snapshot=reviewAttempts.snapshot({workspaceSha256:reviewTicket.workspaceSha256,runAnchorSha256:reviewTicket.runAnchorSha256,stage:reviewTicket.stage,tier:reviewTicket.tier,requestId});const decision=snapshot.decisions[requestId]?.decision;const blockers=decision?reviewBlockers(decision):[];Object.assign(response.reviewQuota,{used:snapshot.attempts.filter(a=>a.status!=='released').length,stageUsed:snapshot.attempts.filter(a=>a.status!=='released'&&a.stage===reviewTicket.stage).length,extensionUsed:snapshot.extensionUsed,extensionEligible:!['approve','conditional-approve'].includes(decision?.reviewDecision)&&snapshot.attempts.filter(a=>a.status!=='released'&&a.stage===reviewTicket.stage).length>=REVIEW_QUOTA_POLICY[reviewTicket.tier].base&&!snapshot.extensionUsed&&snapshot.attempts.at(-1)?.progressVerified===true,extensionEligibilityReason:['approve','conditional-approve'].includes(decision?.reviewDecision)?'review complete':response.reviewQuota.extensionEligibilityReason,timeChargedMs:snapshot.timeUsedMs,timeRemainingMs:Math.max(0,REVIEW_QUOTA_POLICY[reviewTicket.tier].time-snapshot.timeUsedMs),timeKnown:snapshot.attempts.filter(a=>a.started).every(a=>a.timeKnown===true),unknownTimingCount:snapshot.attempts.filter(a=>a.started&&a.timeKnown!==true).length,blockerKeys:blockers.map(item=>item.key),blockerPaths:[...new Set(blockers.flatMap(item=>item.paths))].sort(),nextAction:['approve','conditional-approve'].includes(decision?.reviewDecision)?'review complete; no additional review is admitted for unchanged material or artifact':'review the validated decision and trusted progress before requesting another review'});}
           if (!response.reviewValidation.ok || !response.reviewValidation.approved) {
             response.ok=false;
-            response.failure=response.reviewValidation.ok?(response.reviewValidation.decision==='insufficient-materials'?'review_materials_insufficient':'review_changes_requested'):`review_result_invalid:${response.reviewValidation.code}`;
+            const reason=response.reviewValidation.ok?(response.reviewValidation.decision==='insufficient-materials'?'review_materials_insufficient':'review_changes_requested'):`review_result_invalid:${response.reviewValidation.code}`;
+            if(response.failureCode) response.secondaryValidation=[...(response.secondaryValidation??[]),reason];
+            response.failure ??=reason;
           }
         }
       }
-      if (response.ok === true && tierDecision?.level === 'T0' && !validateT0Patch(response.patch)) {
-        response.ok = false;
-        response.code = 'WORKFLOW_TIER_EXCEEDED';
-        response.failure = 'WORKFLOW_TIER_EXCEEDED';
+      if (response.ok === true && tierDecision) {
+        const metadata = actualTier ? { ...actualTier, effective: ['T0','T1','T2'].indexOf(actualTier.effective) < ['T0','T1','T2'].indexOf(tierDecision.level) ? tierDecision.level : actualTier.effective } : tierDecision.level;
+        Object.assign(response, tierResponseMetadata(metadata));
       }
-      if (response.ok === true && tierDecision) Object.assign(response, tierResponseMetadata(tierDecision.level));
       if (operation!=='probe_model' && response.ok===true && response.roleValidation?.ok) {
         response.contract=completedContract(invocation.task,input,cwd,response.structuredResult);
-        if (tierDecision) Object.assign(response.contract, tierContractMetadata(tierDecision.level));
+        response.contract.tierPolicyVersion=1;
+        if (tierDecision) {
+          const metadata = actualTier ? { ...actualTier, effective: ['T0','T1','T2'].indexOf(actualTier.effective) < ['T0','T1','T2'].indexOf(tierDecision.level) ? tierDecision.level : actualTier.effective } : tierDecision.level;
+          Object.assign(response.contract, tierContractMetadata(metadata), {tierPolicyVersion:1});
+        }
+        if (response.ok===true && invocation.task.role==='Chesed' && response.contract.tier==='T2' && response.contract.mode==='linked' && trustedPatchProof(response,requestId,invocation.task.writeScope)) {
+          response.contract.artifactSha256=response.patchValidation.patchSha256;
+        }
+      }
+      if (verifierSource && response.ok===true && response.contract) {
+        try {
+          const record=ledger.recordVerifierVerification({implementationRequestId:verifierSource.requestId,verifierRequestId:requestId,parentRunId:verifierSource.parentRunId,workspaceSha256:verifierSource.workspaceSha256,artifactSha256:verifierSource.artifactSha256,verifierContract:{...response.contract,verificationOfRequestId:verifierSource.requestId,artifactSha256:verifierSource.artifactSha256},verifierResult:response.structuredResult});
+          response.verifierProofSha256=record.recordSha256;
+          if (response.contract) Object.assign(response.contract,{verificationOfRequestId:verifierSource.requestId,artifactSha256:verifierSource.artifactSha256});
+          const projected=ledger.getEffectiveResult(verifierSource.requestId);
+          if (!projected || projected.state!=='completed') throw Object.assign(new Error('Verifier completion could not be projected from durable proof'),{code:'HOST_VERIFICATION_PROJECTION_FAILED'});
+          taskMonitor.resolveHostVerification(verifierSource.requestId,projected);
+          const sourceArtifact=ledger.getHostArtifact(verifierSource.requestId);
+          if (projected.contract?.tier==='T0' && sourceArtifact) await emitFinalAcceptance({implementationRequestId:verifierSource.requestId,source:'netzach',artifactSha256:projected.verifiedArtifactSha256,recordSha256:projected.verifierProofSha256,template:sourceArtifact.contractTemplate,pending:sourceArtifact.pending});
+        } catch(error) { response.ok=false; response.status='failed'; response.failure=error.code??'HOST_VERIFIER_PROOF_REJECTED'; response.code=response.failure; }
       }
       const durationMs = Date.now() - started;
       if (deferRecords) return { response, durationMs, task: invocation.task };
       // Assess the execution outcome before gateway-only format validation changes it.
       const assessment = result.editorExecution?.ok===false ? {impact:false} : classifyProviderResult(result);
       if (assessment.impact) response.providerCircuit = circuit.record({ provider: input.provider, model: input.model, ...assessment, actualProvider: response.provider, actualModel: response.model, durationMs, usage: response.usage });
-      audit?.record(buildAuditRecord({ requestId, operation, input, task: invocation.task, result: response, durationMs }));
+      let auditAnchor=trustedReviewAnchor??verifierSource?.runAnchorSha256??null;
+      try { auditAnchor??=invocation.task.handoff?.version===2?runAnchor(invocation.task.handoff):runAnchor({runGoal:invocation.task.objective,runAcceptance:invocation.task.acceptance}); } catch {}
+      const stream={...(response.phaseTimings?.stream??{}),...(phaseTimings?.stream??{})};
+      const observedStreamExecution=['thinkingDeltas','textDeltas','completedMessages','completedMessage'].some(key=>typeof stream[key]==='number'?stream[key]>0:stream[key]===true||Array.isArray(stream[key])&&stream[key].length>0);
+      const modelExecution=response.modelExecutionStarted===true ? true : response.modelExecutionStarted===false ? false : response.authFailure===true||response.failureCode?.startsWith('PI_AUTH_') ? false : observedStreamExecution ? true : modelExecutionState;
+      if(modelExecution!==null)response.modelExecutionStarted=modelExecution;
+      audit?.record(buildAuditRecord({ requestId, operation, input, task: invocation.task, result: response, durationMs, telemetry:{parentRunId:input.parentRunId,workspaceSha256:createHash('sha256').update(cwd).digest('hex'),runAnchorSha256:auditAnchor,thinking:invocation.request.thinking,...tierObservation(input.tier,actualTier,invocation.task.context),baseTier:actualTier?.base,tier:response.tier,riskProfile:response.riskProfile,counts:actualTier?{files:actualTier.files,addedLines:actualTier.addedLines,deletedLines:actualTier.deletedLines,estimatedLines:actualTier.estimatedLines}:undefined,semanticRisks:actualTier?.semanticRisks,modelExecution,submittedAt:new Date(started).toISOString(),startedAt:executionStartedAt??undefined,completedAt:new Date().toISOString(),reviewStage:isReviewer(invocation.task.role)?invocation.task.reviewPacket?.stage==='pre-change'?'pre-review':'post-review':undefined,conditionalApproval:response.reviewValidation?.conditional===true} }));
+      if (operation==='dispatch_subagent' && response.ok===true && response.reviewValidation?.approved===true && invocation.task.role==='Geburah' && invocation.task.reviewPacket?.stage==='post-change') {
+        const implementationRef=invocation.task.handoff?.inputs?.find(ref=>ref.role==='Chesed'&&ref.stage==='implementing') ?? (input.reviewOfRequestId?{requestId:input.reviewOfRequestId,role:'Chesed',stage:'implementing'}:null);
+        const implementation=implementationRef&&ledger?.getEffectiveResult(implementationRef.requestId);
+        const source=implementation?.verificationSource, artifactSha256=implementation?.verifiedArtifactSha256??implementation?.patchValidation?.patchSha256, recordSha256=implementation?.verificationRecordSha256??implementation?.verifierProofSha256;
+        const artifact=implementationRef&&ledger?.getHostArtifact(implementationRef.requestId);
+        if (implementation?.state==='completed' && implementation.contract?.tier==='T1' && implementation.contract?.tierPolicyVersion===1 && ['host','netzach'].includes(source) && /^[a-f0-9]{64}$/.test(artifactSha256??'') && /^[a-f0-9]{64}$/.test(recordSha256??'') && implementation.contract.parentRunId===input.parentRunId && implementation.contract.workspaceSha256===createHash('sha256').update(cwd).digest('hex') && (implementation.contract.runAnchorSha256??implementation.contract.taskAnchorSha256)===(artifact?.contractTemplate?.runAnchorSha256??artifact?.contractTemplate?.taskAnchorSha256)) {
+          await emitFinalAcceptance({implementationRequestId:implementationRef.requestId,source,artifactSha256,recordSha256,template:artifact.contractTemplate,pending:artifact.pending});
+        }
+        const t2Ref=invocation.task.handoff?.inputs?.find(ref=>ref.role==='Chesed'&&ref.stage==='implementing');
+        const netzachRef=invocation.task.handoff?.inputs?.find(ref=>ref.role==='Netzach'&&ref.stage==='verifying');
+        const t2=t2Ref&&(ledger?.getEffectiveResult(t2Ref.requestId)??ledger?.getOutcome(t2Ref.requestId)), t2Artifact=t2Ref&&ledger?.getHostArtifact(t2Ref.requestId);
+        const netzach=netzachRef&&ledger?.getOutcome(netzachRef.requestId);
+        const nAnchor=netzach?.contract?.runAnchorSha256??netzach?.contract?.taskAnchorSha256;
+        const hostProof=['host','netzach'].includes(t2?.verificationSource)&&/^[a-f0-9]{64}$/.test(t2.verifiedArtifactSha256??t2.patchValidation?.patchSha256??'')&&/^[a-f0-9]{64}$/.test(t2.verificationRecordSha256??t2.verifierProofSha256??'');
+        const genericChecks=t2?.handoffResult?.deliverable?.checks;
+        const genericProof=/^[a-f0-9]{64}$/.test(t2?.contract?.artifactSha256??'')&&t2.contract.mode==='linked'&&t2.contract.handoffVersion===2&&t2.contract.phaseIndex===invocation.task.handoff?.phaseIndex&&t2.contract.resultSha256===resultDigest(t2.handoffResult)&&t2.handoffResult?.status==='completed'&&Array.isArray(genericChecks)&&genericChecks.length>0&&genericChecks.every(check=>check.outcome==='passed');
+        const validNetzach=netzach?.state==='completed'&&netzach.contract?.role==='Netzach'&&netzach.contract?.stage==='verifying'&&netzach.contract?.handoffVersion===2&&netzach.contract?.phaseIndex===invocation.task.handoff.phaseIndex&&netzach.contract?.parentRunId===input.parentRunId&&netzach.contract?.workspaceSha256===t2?.contract?.workspaceSha256&&nAnchor===auditAnchor&&netzachRef?.resultSha256===netzach.contract?.resultSha256&&netzach.handoffResult?.status==='completed'&&netzach.handoffResult?.deliverable?.verdict==='passed'&&Array.isArray(netzach.handoffResult.deliverable.checks)&&netzach.handoffResult.deliverable.checks.length>0&&netzach.handoffResult.deliverable.checks.every(check=>check.outcome==='passed'&&check.evidence.trim());
+        const validT2=invocation.task.handoff?.stage==='post-review'&&t2?.state==='completed'&&t2.contract?.role==='Chesed'&&t2.contract?.stage==='implementing'&&t2.contract?.tier==='T2'&&t2.contract?.tierPolicyVersion===1&&t2.contract?.parentRunId===input.parentRunId&&t2.contract?.workspaceSha256===createHash('sha256').update(cwd).digest('hex')&&t2.contract?.runAnchorSha256===auditAnchor&&t2.contract?.resultSha256===t2Ref?.resultSha256&&(hostProof?t2Artifact?.contractTemplate?.tier==='T2'&&t2Artifact.contractTemplate.tierPolicyVersion===1:genericProof)&&(hostProof||genericProof)&&(hostProof||validNetzach)&&Array.isArray(invocation.task.handoff.runAcceptance)&&invocation.task.handoff.runAcceptance.length>0;
+        if(validT2) {
+          const template=hostProof?t2Artifact.contractTemplate:t2.contract;
+          const pending=hostProof?t2Artifact.pending:{workspace:cwd,parentRunId:t2.contract.parentRunId,goal:invocation.task.handoff.runGoal};
+          await emitFinalAcceptance({implementationRequestId:t2Ref.requestId,source:hostProof?t2.verificationSource:'netzach',artifactSha256:hostProof?(t2.verifiedArtifactSha256??t2.patchValidation.patchSha256):t2.contract.artifactSha256,recordSha256:hostProof?(t2.verificationRecordSha256??t2.verifierProofSha256):netzach.contract.resultSha256,template,pending,trustedT2Verifier:true,implementationRequestIds:invocation.task.handoff.inputs.filter(ref=>ref.role==='Chesed'&&ref.stage==='implementing').map(ref=>ref.requestId)});
+        }
+      }
       return response;
     } catch (error) {
       const durationMs = Date.now() - started;
@@ -532,22 +845,46 @@ export function createGatewayRuntime(options) {
         if (assessment.impact) error.providerCircuit = circuit.record({ provider: input.provider, model: input.model, ...assessment, durationMs, probe: operation === 'probe_model' });
       }
       error.timings=timings;error.phaseTimings=phaseTimings;
-      audit?.record(buildAuditRecord({ requestId, operation, input, task, result:{preflight,timings,phaseTimings}, durationMs, failure: error.message }));
+      let failureAnchor=null, failureProfile; try { failureAnchor=task?.handoff?.version===2?runAnchor(task.handoff):runAnchor({runGoal:task?.objective,runAcceptance:task?.acceptance}); } catch {}
+      try { if(typeof input.cwd==='string') failureProfile=riskProfileFor(input.cwd); } catch {}
+      audit?.record(buildAuditRecord({ requestId, operation, input, task, result:{preflight,timings,phaseTimings}, durationMs, failure: error.message, telemetry:{parentRunId:input.parentRunId,workspaceSha256:typeof input.cwd==='string'?createHash('sha256').update(input.cwd).digest('hex'):undefined,runAnchorSha256:failureAnchor,declaredTier:input.tier,riskProfile:failureProfile,modelExecution:modelExecutionState,submittedAt:new Date(started).toISOString(),startedAt:executionStartedAt??undefined,completedAt:new Date().toISOString()} }));
       error.preflight=preflight;
+      error.modelExecutionStarted=modelExecutionState;
       error.requestId = requestId;
       throw error;
     }
   }
 
+  function newReviewInputFailure(input) {
+    const requestedRole=typeof input.task?.role==='string'?input.task.role.trim():input.task?.role;
+    const role=ROLE_ALIASES[requestedRole]??requestedRole;
+    if (!isReviewer(role)) return null;
+    // Preserve immutable replay/conflict resolution for existing identities.
+    // Only a genuinely new invocation is rejected before a monitor/ledger claim.
+    if (input.requestId) {
+      const existing=ledger?.enabled?ledger.getExecutionRecord(input.requestId,'dispatch_subagent',input):null;
+      if (taskMonitor.get(input.requestId) || existing && existing.state!=='missing') return null;
+    }
+    try { requireReviewMaterials({...input.task,role,reviewPacket:validateReviewPacket(input.task.reviewPacket)}); }
+    catch (error) {
+      const response={ok:false,requestId:input.requestId,status:'blocked',code:'PI_REVIEW_PACKET_INVALID',error:redactSensitiveText(error.message),modelExecutionStarted:false,reviewDecision:'insufficient-materials',missingMaterials:error.missingMaterials??[]};
+      audit?.record(buildAuditRecord({requestId:ensureRequestId(input.requestId),operation:'dispatch_subagent',input,task:{...input.task,role},result:response,durationMs:0,failure:response.code,telemetry:{modelExecution:false}}));
+      return response;
+    }
+    return null;
+  }
+
   const executeSubagent = (input, signal, lifecycle = null) => withOperation(() => executeSubagentBody(input, signal, lifecycle));
   async function executeSubagentBody(input, signal, lifecycle = null) {
+    const invalidReview=newReviewInputFailure(input);
+    if (invalidReview) return {response:invalidReview,isError:true};
     const invoke = async () => {
       try {
         const result = await runInvocation(input, signal, null, 'dispatch_subagent', false, lifecycle);
         return { response: result, isError: result.ok === false && result.status !== 'awaiting-host-verification' };
       } catch (error) {
-        return { response: { ok: false, preflight:error.preflight, requestId: error.requestId ?? input.requestId, error: error.message, code:error.code, timings:error.timings, phaseTimings:error.phaseTimings, waitReasons:error.waitReasons,
-          ...(error.code==='REVIEW_MATERIALS_MISSING'?{status:'blocked',reviewDecision:'insufficient-materials',missingMaterials:error.missingMaterials}:{}),osSandbox, writeEnabled }, isError: true };
+        return { response: { ok: false, preflight:error.preflight, requestId: error.requestId ?? input.requestId, error: error.message, code:error.code, timings:error.timings, phaseTimings:error.phaseTimings, waitReasons:error.waitReasons, used:error.used,base:error.base,extensionEligible:error.extensionEligible,remainingMs:error.remainingMs,stageCap:error.stageCap,totalCap:error.totalCap,remainingMs:error.remainingMs,modelExecutionStarted:error.modelExecutionStarted,stageUsed:error.stageUsed,remainingBase:error.remainingBase,sharedExtraRemaining:error.sharedExtraRemaining,remainingStage:error.remainingStage,remainingTotal:error.remainingTotal,extensionUsed:error.extensionUsed,extensionEligibilityReason:error.extensionEligibilityReason,nextAction:error.nextAction,
+          ...(['REVIEW_MATERIALS_MISSING','PI_REVIEW_PACKET_INVALID'].includes(error.code)?{status:'blocked',reviewDecision:'insufficient-materials',missingMaterials:error.missingMaterials}:{}),osSandbox, writeEnabled }, isError: true };
       }
     };
     if (input.access === 'workspace-write' || input.task?.handoff || input.editorAuthorization) {
@@ -646,9 +983,10 @@ export function createGatewayRuntime(options) {
     server.registerTool('list_capabilities', { description: 'List approved Pi provider/model routes and gateway boundaries.', inputSchema: {} }, async () => textResult(capabilities()));
     server.registerTool('dispatch_subagent', {
       description: 'Run one Tifereth-authorized Kether subagent through an approved Pi provider/model route.',
-      inputSchema: { ...routeSchema, ...traceSchema, ...schedulingSchema, ...workflowTierFieldsSchema.shape, editorAuthorization:editorAuthorizationSchema.optional(), access: z.enum(['none', 'read', 'workspace-write']).default('none'), workflowReceipt:z.string().max(128).optional(), task: taskSchema },
+      inputSchema: { ...routeSchema, ...traceSchema, reviewOfRequestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(), verificationOfRequestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(), ...schedulingSchema, ...workflowTierFieldsSchema.shape, editorAuthorization:editorAuthorizationSchema.optional(), access: z.enum(['none', 'read', 'workspace-write']).default('none'), workflowReceipt:z.string().max(128).optional(), task: taskSchema },
     }, admitted(async (input, extra) => {
-      validateWriteTier(input,requireTopic);
+      const cwd = resolveAllowedCwd(input.cwd, roots);
+      validateWriteTier(input,requireTopic,riskProfileFor(cwd));
       const {workflowReceipt:_,...invocation}=input;
       const outcome = await executeSubagent(invocation, extra.signal);
       return textResult(outcome.response, outcome.isError);
@@ -659,6 +997,8 @@ export function createGatewayRuntime(options) {
         ...routeSchema,
         requestId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
         parentRunId: traceSchema.parentRunId,
+        reviewOfRequestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(),
+        verificationOfRequestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(),
         ...schedulingSchema,
         ...workflowTierFieldsSchema.shape,
         editorAuthorization:editorAuthorizationSchema.optional(),
@@ -667,9 +1007,12 @@ export function createGatewayRuntime(options) {
         task: taskSchema,
       },
     }, admitted(async input => {
-      validateWriteTier(input,requireTopic);
+      const cwd = resolveAllowedCwd(input.cwd, roots);
+      validateWriteTier(input,requireTopic,riskProfileFor(cwd));
       const {workflowReceipt:_,...invocation}=input;
       try {
+        const invalidReview=newReviewInputFailure(invocation);
+        if (invalidReview) return structuredResult(invalidReview,true);
         const submission = taskMonitor.submit(invocation, (signal, markRunning, markWaiting, markProgress) => executeSubagent(invocation, signal, { onRunning: markRunning, onWaiting:markWaiting,onProgress:markProgress }));
         return structuredResult({ ok: true, ...submission, preflight:runtimePreflight(input.task) });
       } catch (error) {
@@ -682,27 +1025,52 @@ export function createGatewayRuntime(options) {
       annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     },async input=>{
       try{
+        const effective=ledger?.getEffectiveResult(input.requestId);
+        if(effective)return structuredResult({ok:true,ready:true,requestId:input.requestId,state:effective.state,gatewayInstanceId,...exportResult(effective,{offset:input.offset,limit:input.limit})});
         const result=taskMonitor.getResult(input.requestId,{offset:input.offset,limit:input.limit});
-        if(result.code==='RESULT_NOT_FOUND'){
-          const effective=ledger?.getEffectiveResult(input.requestId);
-          if(effective)return structuredResult({ok:true,ready:true,requestId:input.requestId,state:effective.state,gatewayInstanceId,...exportResult(effective,{offset:input.offset,limit:input.limit})});
-        }
         return structuredResult(result,result.ok===false);
       }
       catch(error){return textResult({ok:false,requestId:input.requestId,error:error.message},true);}
+    });
+    const handoffSchema={requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),artifactSha256:z.string().regex(/^[a-f0-9]{64}$/).optional()};
+    const handoffView=input=>projectTaskHandoff({ledger,taskMonitor,requestId:input.requestId,artifactSha256:input.artifactSha256});
+    server.registerTool('get_task_handoff',{description:'Read candidate-bound durable task handoff and final acceptance evidence; no work is dispatched or executed.',inputSchema:handoffSchema,annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false}},async input=>structuredResult(handoffView(input)));
+    server.registerTool('wait_task_handoff',{description:'Wait once for a candidate-bound handoff projection change. Timeout or abort cancels only this wait, never worker execution.',inputSchema:{...handoffSchema,afterRevision:z.string().regex(/^[a-f0-9]{64}$/).optional(),timeoutMs:z.number().int().min(0).max(55000).default(55000)},annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false}},async(input,extra)=>{
+      const current=handoffView(input);const actionable=new Set(['accepted','repair-required','acceptance-missing','acceptance-in-doubt','unknown','host-verification-required','post-review-required']);
+      if(handoffClosed)return structuredResult({ok:false,code:'GATEWAY_CLOSED',requestId:input.requestId},true);
+      const finalState=new Set(['accepted','repair-required','acceptance-missing','acceptance-in-doubt','unknown']);
+      if((input.afterRevision?current.revision!==input.afterRevision||finalState.has(current.state):actionable.has(current.state))||input.timeoutMs===0)return structuredResult(current);
+      const total=[...handoffWaiters.values()].reduce((sum,set)=>sum+set.size,0);if(total>=128)return structuredResult({ok:false,code:'HANDOFF_WAITER_LIMIT',requestId:input.requestId},true);
+      return await new Promise(resolveWait=>{
+        const waiter={requestId:input.requestId,signal:extra.signal,done:false,resolve:value=>resolveWait(structuredResult(value)),wake:()=>{const next=handoffView(input);if(next.revision!==current.revision)finishHandoffWaiter(waiter,next);}};
+        waiter.abort=()=>finishHandoffWaiter(waiter,{ok:false,code:'ABORTED',requestId:input.requestId});
+        waiter.timer=setTimeout(()=>finishHandoffWaiter(waiter,{...current,waitTimedOut:true}),input.timeoutMs);waiter.timer.unref?.();
+        if(waiter.signal?.aborted){waiter.abort();return;}waiter.signal?.addEventListener('abort',waiter.abort,{once:true});
+        if(!handoffWaiters.has(input.requestId))handoffWaiters.set(input.requestId,new Set());handoffWaiters.get(input.requestId).add(waiter);
+        waiter.wake();
+      });
     });
     server.registerTool('list_host_verification_pending',{
       description:'List durable worker patches awaiting host-run checks. This is a read-only ledger view; it does not execute commands.',
       inputSchema:{limit:z.number().int().min(1).max(100).default(50)},
       annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     },admitted(async input=>structuredResult({ok:true,items:ledger?.listHostPending({limit:input.limit}).map(item=>({requestId:item.requestId,artifactSha256:item.artifactSha256,goal:item.goal,phase:item.phase,requiredCheckNames:item.requiredCheckNames}))??[]})));
+    server.registerTool('apply_artifact',{
+      description:'Apply a trusted, pending repository-relative patch to its admitted workspace after Git preflight. Does not complete or verify the task.',
+      inputSchema:z.object({requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/)}).strict(),
+      annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:false,openWorldHint:false},
+    },admitted(async input=>{
+      if(!writeEnabled||!resourceLimitsEnforced)throw Object.assign(new Error('Artifact apply requires verified workspace-write sandbox admission'),{code:'ARTIFACT_APPLY_SANDBOX_REQUIRED'});
+      return structuredResult(await applyArtifact({requestId:input.requestId,ledger,roots,writeLocks}));
+    }));
     server.registerTool('record_host_verification',{
       description:'Record bounded command and exit-code evidence from checks already run by the host. This tool never executes commands; use only actual host results for the bound pending artifact.',
               inputSchema:hostVerificationSchema,
       annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     },admitted(async(input,extra)=>{
-      requireTopic('task-tiers',input.workflowReceipt);
       if(!ledger?.enabled)throw Object.assign(new Error('Durable host verification ledger is unavailable'),{code:'HOST_VERIFICATION_LEDGER_REQUIRED'});
+      const source=ledger.getHostArtifact(input.requestId);
+      if (!source || !['T0','T1'].includes(source.contractTemplate?.tier)) requireTopic('task-tiers',input.workflowReceipt);
       const started=Date.now();
       const submission={requestId:input.requestId,artifactSha256:input.artifactSha256,commands:input.commands.map(item=>({
         checkName:item.checkName,
@@ -710,14 +1078,31 @@ export function createGatewayRuntime(options) {
         exitCode:item.exitCode,
         outputSummary:redactSensitiveText(item.outputSummary),
       }))};
+      const before=ledger.getEffectiveResult(input.requestId);
       const record=ledger.recordHostVerification(submission);
       const effective=ledger.getEffectiveResult(input.requestId);
       if(!effective||!['completed','failed'].includes(effective.state))throw Object.assign(new Error('Durable host verification could not be projected'),{code:'HOST_VERIFICATION_PROJECTION_FAILED'});
       taskMonitor.resolveHostVerification(input.requestId,effective);
+      if (!before || before.state!=='completed') {
+        const artifact=ledger.getHostArtifact(input.requestId);
+        if (effective.state==='completed' && artifact?.contractTemplate?.tier==='T0') await emitFinalAcceptance({implementationRequestId:input.requestId,source:'host',artifactSha256:effective.verifiedArtifactSha256,recordSha256:effective.verificationRecordSha256,template:artifact.contractTemplate,pending:artifact.pending});
+      }
       const result={ok:true,requestId:record.requestId,artifactSha256:record.artifactSha256,recordSha256:record.recordSha256,outcome:record.outcome,state:effective.state,checks:record.commands.map(item=>({checkName:item.checkName,exitCode:item.exitCode}))};
       audit?.record(buildAuditRecord({requestId:input.requestId,operation:'record_host_verification',input:{access:'none'},task:null,result,durationMs:Date.now()-started}));
       return structuredResult(result);
     }));
+    server.registerTool('wait_subagent', {
+      description: 'Wait once for a monitored task to become terminal; timeout and caller abort stop only this wait, never the task.',
+      inputSchema: { requestId: traceSchema.requestId.unwrap(), timeoutMs:z.number().int().min(0).max(55000).default(55000) },
+      annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
+    }, async (input,extra) => {
+      const effective=ledger?.getEffectiveResult(input.requestId);
+      if(effective)return structuredResult({ok:true,ready:true,requestId:input.requestId,state:effective.state,gatewayInstanceId});
+      const waited=await taskMonitor.wait(input.requestId,{timeoutMs:input.timeoutMs,signal:extra.signal});
+      const resolved=ledger?.getEffectiveResult(input.requestId);
+      if(resolved)return structuredResult({ok:true,ready:true,requestId:input.requestId,state:resolved.state,gatewayInstanceId});
+      return structuredResult(waited,waited.ok===false);
+    });
     server.registerTool('get_subagent_status', {
       description: 'Read sanitized live status for one Pi subagent by requestId.',
       inputSchema: { requestId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/) },
@@ -725,7 +1110,9 @@ export function createGatewayRuntime(options) {
       const task = taskMonitor.get(input.requestId);
       if(task)return structuredResult({ok:true,task});
       const effective=ledger?.getEffectiveResult(input.requestId);
-      return structuredResult(effective?{ok:true,task:{requestId:input.requestId,state:effective.state,hostVerification:effective.hostVerification??null,finishedAt:null,cancellable:false}}:{ok:false,requestId:input.requestId,error:'task not found in this gateway instance'},!effective);
+      if(effective)return structuredResult({ok:true,task:{requestId:input.requestId,state:effective.state,hostVerification:effective.hostVerification??null,cancellable:false}});
+      const stored=ledger?.readMonitorResult(input.requestId);
+      return structuredResult(stored?{ok:true,task:{requestId:input.requestId,state:stored.state,cancellable:false}}:{ok:false,requestId:input.requestId,error:'task not found in this gateway instance'},!stored);
     });
     server.registerTool('list_subagents', {
       description: 'List sanitized Pi subagent status records, optionally restricted to one Tifereth parentRunId.',
@@ -868,6 +1255,8 @@ export function createGatewayRuntime(options) {
         return { gatewayInstanceId, disposed:false, remainingOperations:inFlight, execution:{ ...execution, remainingActive:executor.state.active } };
       }
       workflowReceipts.clear();
+      handoffClosed=true;unsubscribeHandoff();
+      for(const waiters of [...handoffWaiters.values()])for(const waiter of [...waiters])finishHandoffWaiter(waiter,{ok:false,code:'GATEWAY_CLOSED',requestId:waiter.requestId});
       // Let admitted monitor callbacks settle before final metadata cleanup.
       await Promise.resolve();
       let ledgerRetention, auditRetention;
@@ -1008,6 +1397,8 @@ export function loadGatewayOptions(env = process.env) {
     auditFile,
     providerCircuitFile,
     requestLedgerDir,
+    riskProfiles: config.riskProfiles ?? [],
+    hostExecutionAvailable: config.hostExecutionAvailable === undefined ? true : config.hostExecutionAvailable,
     token: readFileSync(tokenPath, 'utf8').trim(),
   };
 }

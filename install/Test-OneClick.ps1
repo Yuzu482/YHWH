@@ -1,8 +1,14 @@
-﻿#requires -Version 5.1
+﻿#requires -Version 7.0
 [CmdletBinding()]
 param([string]$Installer)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+$buildErrors=$null
+$buildAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'Build-Release.ps1'),[ref]$null,[ref]$buildErrors)
+if($buildErrors){throw 'Build-Release parser errors.'}
+foreach($fn in $buildAst.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst]},$false)) {
+  if($fn.Name -in @('Invoke-ValidationProcess','Test-ValidationSuccess','Assert-ValidationSuccess')){. ([scriptblock]::Create($fn.Extent.Text))}
+}
 $source = Join-Path $repo 'Install-YHWH.ps1'
 $test = Join-Path $repo ('.test\one click ' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $test -Force | Out-Null
@@ -87,12 +93,42 @@ $script:fakeOwner='a'*32
 Initialize-YhwhDistro $ownerRoot $null $null
 Check $true 'Owned WSL reused without import or download'
 
-$engine=(Get-Process -Id $PID).Path
+$engine=Join-Path $PSHOME 'pwsh.exe'
+$parentModulePath=$env:PSModulePath
+$ps51=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+$cp=Invoke-ValidationProcess $ps51 @('-NoProfile','-Command','[Console]::Write([Console]::OutputEncoding.CodePage)') 60 $test
+Assert-ValidationSuccess $cp $ps51 60
+Check ($cp.stdout -match '^\d+$') 'Windows PowerShell code page is numeric'
+$legacyEncoding=[Text.Encoding]::GetEncoding([int]$cp.stdout)
+$legacy=Invoke-ValidationProcess $ps51 @('-NoProfile','-Command','Get-Command Get-FileHash | Out-Null;[Console]::Error.Write("legacy-"+[char]0x00E9);exit 37') 10 $test $legacyEncoding
+Check ($legacy.status -eq 37 -and $legacy.stderr -ceq ('legacy-'+[char]0x00E9) -and $legacy.stderr -ceq $legacyEncoding.GetString($legacyEncoding.GetBytes('legacy-'+[char]0x00E9))) 'Windows PowerShell modules and code-page diagnostics preserved'
+Check ($env:PSModulePath -ceq $parentModulePath) 'Legacy child leaves parent module path unchanged'
+$ok=Invoke-ValidationProcess $engine @('-NoProfile','-Command','[Console]::Write("out");[Console]::Error.Write("err")') 10 $test
+Check ((Test-ValidationSuccess $ok) -and $ok.stdout -eq 'out' -and $ok.stderr -eq 'err') 'Process success accepts stderr and retains streams'
+$fail=Invoke-ValidationProcess $engine @('-NoProfile','-Command','[Console]::Error.Write("failure");exit 37') 10 $test
+Check ($fail.status -eq 37 -and $fail.stderr -eq 'failure' -and -not(Test-ValidationSuccess $fail)) 'Process nonzero status retained'
+$missing=Invoke-ValidationProcess (Join-Path $test 'missing executable') @() 2 $test
+Check ($null -eq $missing.status -and $missing.error -and -not(Test-ValidationSuccess $missing)) 'Missing executable has unknown status and error'
+$fixture=Join-Path $test 'argument fixture.ps1'
+'param([string]$Value); [Console]::Write($Value)' | Set-Content -LiteralPath $fixture
+$quoted=Invoke-ValidationProcess $engine @('-NoProfile','-File',$fixture,'-Value','space "quoted" path') 10 $test
+Check ((Test-ValidationSuccess $quoted) -and $quoted.stdout -eq 'space "quoted" path') 'Process arguments preserve quotes and spaces'
+$large=Invoke-ValidationProcess $engine @('-NoProfile','-Command','[Console]::Out.Write("x"*100000);[Console]::Error.Write("y"*100000)') 15 $test
+Check ((Test-ValidationSuccess $large) -and $large.stdout.Length -eq 100000 -and $large.stderr.Length -eq 100000) 'Process drains both large streams without deadlock'
+$timer=[Diagnostics.Stopwatch]::StartNew()
+$slow=Invoke-ValidationProcess $engine @('-NoProfile','-Command','Start-Sleep -Seconds 3') 1 $test
+$timer.Stop()
+Check ($slow.timedOut -and $null -ne $slow.status -and -not $slow.signal -and $timer.Elapsed.TotalSeconds -lt 8) 'Process timeout bounded and child reaped'
+try { Assert-ValidationSuccess $fail $engine 10; $diagnostic='' } catch { $diagnostic=$_.Exception.Message }
+Check ($diagnostic.Contains($engine) -and $diagnostic.Contains('timeout=10s') -and $diagnostic.Contains('37 (0x25)') -and $diagnostic.Contains('stderr:') -and $diagnostic.Contains('failure')) 'Failure diagnostic includes executable, timeout, status and stderr'
+try { Invoke-ValidationProcess $engine @() 0 $test; $invalidTimeout=$false } catch { $invalidTimeout=$true }
+Check $invalidTimeout 'Nonpositive process timeout rejected'
 $planTarget=Join-Path $test 'plan install target'
-& $engine -NoProfile -ExecutionPolicy Bypass -File $source -PlanOnly -InstallRoot $planTarget
-Check ($LASTEXITCODE -eq 0 -and -not(Test-Path -LiteralPath $planTarget)) 'Plan is read-only'
-& $engine -NoProfile -ExecutionPolicy Bypass -File $source -PlanOnly -InstallRoot $planTarget -Hosts 'cursor,vscode-copilot,windsurf,cline,roo-code,gemini-cli,kiro,zed,continue,lm-studio'
-Check ($LASTEXITCODE -eq 0 -and -not(Test-Path -LiteralPath $planTarget)) 'All common-client host selections plan without writes'
+foreach($planArguments in @(@('-NoProfile','-ExecutionPolicy','Bypass','-File',$source,'-PlanOnly','-InstallRoot',$planTarget),@('-NoProfile','-ExecutionPolicy','Bypass','-File',$source,'-PlanOnly','-InstallRoot',$planTarget,'-Hosts','cursor,vscode-copilot,windsurf,cline,roo-code,gemini-cli,kiro,zed,continue,lm-studio'))) {
+  $r=Invoke-ValidationProcess $engine $planArguments 60 $test
+  Assert-ValidationSuccess $r $engine 60
+  Check (-not(Test-Path -LiteralPath $planTarget)) 'Plan is read-only'
+}
 $featureScript=Join-Path $PSScriptRoot 'Set-CodexFeatures.ps1'
 $fresh=& $featureScript -Text ''
 Check ($fresh -match '(?s)\[features\]\s+multi_agent = false') 'Fresh Codex config uses the features table'
@@ -108,8 +144,15 @@ Check ($emptyTable -match '(?s)\[features\]\s+multi_agent = false') 'Empty featu
 Reject {& $featureScript -Text 'features = { other = true }'} 'manual migration'
 if($Installer) {
   $actualOut=Join-Path $test 'release extracted'
-  & $engine -NoProfile -ExecutionPolicy Bypass -File $Installer -ExtractOnly -Destination $actualOut
-  Check ($LASTEXITCODE -eq 0) 'Generated installer extracts successfully'
+  $r=Invoke-ValidationProcess $engine @('-NoProfile','-ExecutionPolicy','Bypass','-File',$Installer,'-ExtractOnly','-Destination',$actualOut) 180 $test
+  Assert-ValidationSuccess $r $engine 180
+  Check (Test-ValidationSuccess $r) 'Generated installer extracts successfully'
+  $ps51Out=Join-Path $test 'PS51 release extracted'
+  $r=Invoke-ValidationProcess $ps51 @('-NoProfile','-ExecutionPolicy','Bypass','-File',$Installer,'-ExtractOnly','-Destination',$ps51Out) 180 $test $legacyEncoding
+  Assert-ValidationSuccess $r $ps51 180
+  $ps51Package=Join-Path $ps51Out 'pi-kether-portable'
+  $representative='payload/pi-dispatch/.codex-plugin/plugin.json'
+  Check ((Test-Path -LiteralPath (Join-Path $ps51Package $representative)) -and ((Get-FileHash -LiteralPath (Join-Path $ps51Package $representative) -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath (Join-Path (Join-Path $actualOut 'pi-kether-portable') $representative) -Algorithm SHA256).Hash)) 'PS51 generated installer extraction matches PS7 payload SHA256'
   $package=Join-Path $actualOut 'pi-kether-portable'
   foreach($required in @('Workflow.ps1','payload/pi-dispatch/.codex-plugin/plugin.json','payload/wsl-package-lock.json','templates/agent-references/pi-routing.md','README.md','README.en.md','.readme-assets/en.svg','install/bootstrap-dependencies.json','templates/host-primary.md','payload/pi-dispatch/workflow/catalog.json','payload/pi-dispatch/scripts/host-profiles.mjs','payload/pi-dispatch/scripts/check-host-connection.mjs','install/Export-HostProfiles.ps1','docs/host-integration.md','docs/host-integration.en.md','payload/pi-dispatch/scripts/common-client-profiles.mjs','docs/common-clients.md','docs/common-clients.en.md','install/Apply-HindsightWrapper.ps1','templates/hindsight-coding-agent/SKILL.md')) {
     Check (Test-Path -LiteralPath (Join-Path $package $required)) "Release contains $required"
@@ -137,7 +180,13 @@ if($Installer) {
   $files=@(Get-ChildItem -LiteralPath $package -Recurse -Force -File)
   $badFiles=@($files|Where-Object{$_.FullName -match '[\\/](node_modules|\.git|\.runtime)[\\/]|[\\/]auth\.json$|[\\/](anthropic-api-key|provider-config|provider-credentials)\.json$|[\\/]\.env[^\\/]*$'})
   Check ($badFiles.Count -eq 0) 'Release excludes dependencies, credentials and runtime state'
-  & $engine -NoProfile -ExecutionPolicy Bypass -File $Installer -PlanOnly -InstallRoot (Join-Path $test 'generated plan')
-  Check ($LASTEXITCODE -eq 0 -and -not(Test-Path -LiteralPath (Join-Path $test 'generated plan'))) 'Generated installer plan remains read-only'
+  $generatedPlan=Join-Path $test 'generated plan'
+  $r=Invoke-ValidationProcess $engine @('-NoProfile','-ExecutionPolicy','Bypass','-File',$Installer,'-PlanOnly','-InstallRoot',$generatedPlan) 60 $test
+  Assert-ValidationSuccess $r $engine 60
+  Check ((Test-ValidationSuccess $r) -and -not(Test-Path -LiteralPath $generatedPlan)) 'Generated installer plan remains read-only'
+  $ps51Plan=Join-Path $test 'PS51 generated plan target'
+  $r=Invoke-ValidationProcess $ps51 @('-NoProfile','-ExecutionPolicy','Bypass','-File',$Installer,'-PlanOnly','-InstallRoot',$ps51Plan) 60 $test $legacyEncoding
+  Assert-ValidationSuccess $r $ps51 60
+  Check (-not(Test-Path -LiteralPath $ps51Plan)) 'PS51 generated installer plan remains read-only'
 }
 Write-Host "[PASS] $checks one-click checks; no host installation, WSL mutation or model calls."

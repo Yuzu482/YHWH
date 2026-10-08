@@ -4,6 +4,9 @@
   "roots": [
     "E:\\Projects"
   ],
+  "riskProfiles": [
+    { "cwd": "E:\\Projects\\DeepSeekHarness\\github-publish\\pi-kether-workflow", "riskProfile": "critical" }
+  ],
   "tokenFile": "C:\\Users\\YOUR_USER\\.pi\\agent\\gateway\\token.txt",
   "auditFile": "C:\\Users\\YOUR_USER\\.local\\state\\pi-kether\\audit.jsonl",
   "providerCircuitFile": "C:\\Users\\YOUR_USER\\.local\\state\\pi-kether\\provider-circuit.jsonl",

@@ -143,6 +143,7 @@ if ($InstallHost) {
   $changed.Add($catalogTarget)
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pluginManifestTarget) | Out-Null
   Copy-Item -LiteralPath $pluginManifestSource -Destination $pluginManifestTarget
+  & (Join-Path $PSScriptRoot 'Set-InstalledPluginVersion.ps1') -PackageRoot $root -PluginRoot (Join-Path $homePath 'plugins/pi-dispatch') | Out-Null
   $changed.Add($pluginManifestTarget)
   Set-ManagedPolicy $agentsTarget ([IO.File]::ReadAllText($agentsSource))
   $changed.Add($agentsTarget)
@@ -163,7 +164,7 @@ if ($InstallHost) {
   }
   $hashes['plugins/pi-dispatch/skills/pi-dispatch/SKILL.md'] = (Get-FileHash -LiteralPath $piSkillSource -Algorithm SHA256).Hash.ToLowerInvariant()
   $hashes['plugins/pi-dispatch/workflow/catalog.json'] = (Get-FileHash -LiteralPath $catalogSource -Algorithm SHA256).Hash.ToLowerInvariant()
-  $hashes['plugins/pi-dispatch/.codex-plugin/plugin.json'] = (Get-FileHash -LiteralPath $pluginManifestSource -Algorithm SHA256).Hash.ToLowerInvariant()
+  $hashes['plugins/pi-dispatch/.codex-plugin/plugin.json'] = (Get-FileHash -LiteralPath $pluginManifestTarget -Algorithm SHA256).Hash.ToLowerInvariant()
   $managedBlock = "<!-- PI-KETHER:BEGIN -->`r`n$([IO.File]::ReadAllText($agentsSource).TrimEnd())`r`n<!-- PI-KETHER:END -->"
   $blockBytes = [Text.UTF8Encoding]::new($false).GetBytes($managedBlock)
   $hashes['.codex/AGENTS.md#PI-KETHER'] = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($blockBytes)).ToLowerInvariant()

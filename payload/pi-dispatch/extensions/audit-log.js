@@ -65,12 +65,31 @@ export function summarizePatch(patch) {
   const pathHashes = new Set();
   let additions = 0;
   let deletions = 0;
+  let oldRemaining = 0;
+  let newRemaining = 0;
   for (const line of patch.split(/\r?\n/)) {
+    if (oldRemaining > 0 || newRemaining > 0) {
+      if (line.startsWith('+') && newRemaining > 0) { additions++; newRemaining--; continue; }
+      if (line.startsWith('-') && oldRemaining > 0) { deletions++; oldRemaining--; continue; }
+      if (line.startsWith(' ') && oldRemaining > 0 && newRemaining > 0) { oldRemaining--; newRemaining--; continue; }
+      if (line === '\\ No newline at end of file') continue;
+      oldRemaining = 0;
+      newRemaining = 0;
+    }
+    const hunk = /^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/.exec(line);
+    if (hunk) {
+      const oldCount = Number(hunk[1] ?? 1);
+      const newCount = Number(hunk[2] ?? 1);
+      if (Number.isSafeInteger(oldCount) && Number.isSafeInteger(newCount)) {
+        oldRemaining = oldCount;
+        newRemaining = newCount;
+      }
+      continue;
+    }
     if (line.startsWith('+++ ') || line.startsWith('--- ')) {
       const path = line.slice(4).split('\t', 1)[0];
-      if (path !== '/dev/null') pathHashes.add(sha256(path.replace(/^[ab]\//, '')));
-    } else if (line.startsWith('+')) additions++;
-    else if (line.startsWith('-')) deletions++;
+      if (path !== '/dev/null') pathHashes.add(sha256(path.replace(/^("?)[ab]\//, '$1')));
+    }
   }
   return {
     present: true,
@@ -147,13 +166,87 @@ function summarizeHostVerification(value) {
 function summarizeRuntimePreflight(value) {
   // Audit admission is intentionally independent of untrusted messages and counters.
   const warnings=Array.isArray(value?.warnings)?value.warnings:[];
-  const codes=['script_without_real_run','output_without_parent_path','mixed_layers','missing_interface_contract'].filter(code=>warnings.some(item=>item?.code===code));
+  const codes=['script_without_real_run','output_without_parent_path','mixed_layers','missing_interface_contract','task_scope_broad','acceptance_not_observable','verification_owner_unspecified','invalid_complexity_assessment'].filter(code=>warnings.some(item=>item?.code===code));
   return {advisory:true,codes,counts:Object.fromEntries(codes.map(code=>[code,1]))};
 }
 
-export function buildAuditRecord({ timestamp = new Date().toISOString(), requestId, operation, input, task, result, durationMs, failure }) {
+const TIERS = new Set(['T0', 'T1', 'T2']);
+const PROFILES = new Set(['standard', 'personal', 'critical']);
+const THINKING = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
+const REVIEW_STAGES = new Set(['pre-review', 'post-review']);
+function safeId(value) { return typeof value === 'string' && value.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(value) ? value : undefined; }
+function safeSha(value) { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) ? value : undefined; }
+function safeTime(value) {
+  if (typeof value !== 'string' || value.length > 40 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return undefined;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return undefined;
+  return value;
+}
+function safeCount(value) { return Number.isSafeInteger(value) && value >= 0 ? value : undefined; }
+const SEMANTIC_RISK_KEYS = ['publicApiOrProtocol', 'dependencyOrLockfile', 'securityAuthOrCredentials', 'migration', 'irreversibleOrNoRollback'];
+const MODEL_EXECUTION_FORBIDDEN = new Set(['probe_model', 'lsp_request', 'record_host_verification', 'replay', 'idempotency', 'retention_cleanup', 'task_accepted']);
+function summarizeVerification(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const keys = Object.keys(value).sort();
+  if (keys.join(',') !== 'artifactSha256,recordSha256,source,state'
+      || value.state !== 'completed' || !['host', 'netzach'].includes(value.source)
+      || !safeSha(value.artifactSha256) || !safeSha(value.recordSha256)) return undefined;
+  return { state: value.state, source: value.source, artifactSha256: value.artifactSha256, recordSha256: value.recordSha256 };
+}
+function summarizeTelemetry(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out = {};
+  for (const key of ['parentRunId', 'implementationRequestIds']) {
+    if (key === 'implementationRequestIds' && Array.isArray(value[key]) && value[key].length <= 32) {
+      const ids = value[key].map(safeId);
+      if (ids.every(Boolean)) out[key] = [...new Set(ids)];
+    } else if (key === 'parentRunId') { const id = safeId(value[key]); if (id) out[key] = id; }
+  }
+  for (const key of ['workspaceSha256', 'runAnchorSha256']) { const hash = safeSha(value[key]); if (hash) out[key] = hash; }
+  for (const [key, allowed] of [['declaredTier', TIERS], ['derivedTier',TIERS], ['baseTier', TIERS], ['tier', TIERS], ['riskProfile', PROFILES], ['thinking', THINKING], ['reviewStage', REVIEW_STAGES]]) if (allowed.has(value[key])) out[key] = value[key];
+  for (const key of ['tierOverDeclared','tierReasonInvalid']) if(typeof value[key]==='boolean')out[key]=value[key];
+  if(typeof value.tierReason==='string'&&value.tierReason.length<=400)out.tierReason=redactSensitiveText(value.tierReason);
+  for (const key of ['submittedAt', 'startedAt', 'completedAt', 'acceptedAt']) { const time = safeTime(value[key]); if (time) out[key] = time; }
+  if ((typeof value.modelExecution === 'boolean' || value.modelExecution === null) && (value._operation === 'dispatch_subagent' || !MODEL_EXECUTION_FORBIDDEN.has(value._operation))) out.modelExecution = value.modelExecution;
+  if (typeof value.conditionalApproval === 'boolean') out.conditionalApproval = value.conditionalApproval;
+  if (typeof value.taskAccepted === 'boolean') out.taskAccepted = value.taskAccepted;
+  if (value.semanticRisks && typeof value.semanticRisks === 'object' && !Array.isArray(value.semanticRisks)
+      && Object.keys(value.semanticRisks).length === SEMANTIC_RISK_KEYS.length
+      && SEMANTIC_RISK_KEYS.every(key => typeof value.semanticRisks[key] === 'boolean')
+      && Object.keys(value.semanticRisks).every(key => SEMANTIC_RISK_KEYS.includes(key))) {
+    out.semanticRisks = Object.fromEntries(SEMANTIC_RISK_KEYS.map(key => [key, value.semanticRisks[key]]));
+  }
+  const verification = summarizeVerification(value.verification);
+  if (verification) out.verification = verification;
+  const counts = value.counts;
+  if (counts && typeof counts === 'object' && !Array.isArray(counts)) {
+    const files = safeCount(counts.files), addedLines = safeCount(counts.addedLines), deletedLines = safeCount(counts.deletedLines), estimatedLines = safeCount(counts.estimatedLines);
+    if ([files, addedLines, deletedLines, estimatedLines].every(item => item !== undefined) && addedLines + deletedLines <= Number.MAX_SAFE_INTEGER && estimatedLines === addedLines + deletedLines) out.counts = { files, addedLines, deletedLines, estimatedLines };
+  }
+  return out;
+}
+
+export function buildAuditRecord({ timestamp = new Date().toISOString(), requestId, operation, input, task, result, durationMs, failure, telemetry }) {
   const reason = failure ?? result?.failure ?? (result?.ok === false ? 'execution failed' : null);
+  const hostTelemetry = summarizeTelemetry(telemetry ? { ...telemetry, _operation: operation } : null);
+  if (MODEL_EXECUTION_FORBIDDEN.has(operation)) hostTelemetry.modelExecution = false;
+  const parentRunId = hostTelemetry.parentRunId ?? safeId(input?.parentRunId) ?? safeId(result?.contract?.parentRunId);
   const formatDiagnostic = summarizeFormatDiagnostic(result?.formatValidation);
+  const warningCodes=['execution-limitation-invalid'];
+  const suppliedWarnings=Array.isArray(result?.roleValidation?.warnings)?result.roleValidation.warnings:[];
+  const safeWarnings=suppliedWarnings.filter(code=>typeof code==='string'&&warningCodes.includes(code));
+  const metadataWarningCodes=[...new Set(safeWarnings)];
+  const metadataWarnings=metadataWarningCodes.length?{codes:metadataWarningCodes,count:safeWarnings.length}:undefined;
+  const roleValidation=result?.roleValidation&&typeof result.roleValidation==='object'?{
+    ...(typeof result.roleValidation.ok==='boolean'?{ok:result.roleValidation.ok}:{}),
+    ...(Number.isSafeInteger(result.roleValidation.version)?{version:result.roleValidation.version}:{}),
+    ...(typeof result.roleValidation.role==='string'&&/^[A-Za-z][A-Za-z0-9._ -]{0,63}$/.test(result.roleValidation.role)?{role:result.roleValidation.role}:{}),
+    ...(typeof result.roleValidation.code==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(result.roleValidation.code)?{code:result.roleValidation.code}:{}),
+    ...(safeWarnings.length?{warnings:safeWarnings}:{}),
+  }:undefined;
   const hostVerification = summarizeHostVerification(result?.hostVerification ?? (operation==='record_host_verification' ? result : null));
   // Dispatch can return a completed operation while the task awaits host verification or has a valid review decision.
   const awaitingHost = result?.status === 'awaiting-host-verification' || result?.failure === 'awaiting-host-verification';
@@ -170,8 +263,16 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
       : ['blocked', 'unverified'].includes(taskState) ? taskState
         : ['completed', 'failed', 'changes-requested'].includes(taskState) ? taskState
           : result?.ok === false ? 'failed' : result?.ok === true && !reason ? 'completed' : 'unknown';
+  const acceptedEvent = operation === 'task_accepted' && hostTelemetry.taskAccepted === true && parentRunId
+    && hostTelemetry.workspaceSha256 && hostTelemetry.runAnchorSha256 && hostTelemetry.acceptedAt
+    && hostTelemetry.implementationRequestIds?.length;
+  const acceptedVerification = acceptedEvent ? summarizeVerification(telemetry?.verification) : undefined;
   return {
     auditVersion: AUDIT_VERSION,
+    ...(parentRunId ? { parentRunId } : {}),
+    ...Object.fromEntries(Object.entries(hostTelemetry).filter(([key]) => key !== 'parentRunId' && key !== 'taskAccepted' && key !== 'acceptedAt' && key !== 'implementationRequestIds' && key !== 'verification')),
+    ...(hostTelemetry.counts ? { counts: hostTelemetry.counts, files: hostTelemetry.counts.files, addedLines: hostTelemetry.counts.addedLines, deletedLines: hostTelemetry.counts.deletedLines, estimatedLines: hostTelemetry.counts.estimatedLines } : {}),
+    ...(acceptedEvent ? { acceptedAt: hostTelemetry.acceptedAt, implementationRequestIds: hostTelemetry.implementationRequestIds, ...(acceptedVerification ? { verification: acceptedVerification } : {}) } : {}),
     timestamp,
     requestId: redactSensitiveText(ensureRequestId(requestId)),
     operation,
@@ -186,6 +287,8 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     },
     phaseTimings: result?.phaseTimings,
     executionMode: result?.executionMode,
+    // Internal adapter identity is separate from process isolation/transport runtime.
+    ...(['pi','claude-code-cli'].includes(result?.workerRuntime) ? {workerRuntime:result.workerRuntime} : {}),
     // A configured backend is runtime evidence only after the process actually ran.
     runtime: result?.runtime ?? ((finiteNumber(result?.exitCode) !== undefined || finiteNumber(result?.phaseTimings?.processMs) > 0)
       ? result?.osSandbox ?? (operation === 'dispatch_subagent' ? result?.sandbox : undefined) : undefined),
@@ -197,8 +300,10 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     durationMs: Math.max(0, Math.round(finiteNumber(durationMs) || 0)),
     timings:result?.timings?{queueWaitMs:finiteNumber(result.timings.queueWaitMs),executionMs:finiteNumber(result.timings.executionMs)}:undefined,
     contract:result?.contract,
-    roleValidation:result?.roleValidation,
+    ...(roleValidation?{roleValidation}:{}),
     ...(formatDiagnostic ? { formatDiagnostic } : {}),
+    ...(metadataWarnings ? { metadataWarnings } : {}),
+    ...(summarizeOutputLimit(result?.outputLimitObservation) ? {outputLimitObservation:summarizeOutputLimit(result.outputLimitObservation)} : {}),
     reviewDecision:result?.reviewValidation?.decision??result?.reviewDecision,
     ...(hostVerification ? {hostVerification} : {}),
     tokens: summarizeUsage(result?.usage),
@@ -208,6 +313,13 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
     taskOutcome,
     failureReason: reason ? redactSensitiveText(reason) : null,
   };
+}
+
+export function summarizeOutputLimit(value) {
+  if(!value||!['patch','retained','wire','frame','pending','direct'].includes(value.bucket))return undefined;
+  const out={bucket:value.bucket};
+  for(const key of ['wireBytes','retainedBytes','patchBytes','frameBytes','pendingBytes','directBytes','limitBytes'])if(safeCount(value[key])!==undefined)out[key]=value[key];
+  return out;
 }
 
 export const AUDIT_RETENTION_POLICY = Object.freeze({
