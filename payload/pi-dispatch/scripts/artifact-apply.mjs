@@ -134,7 +134,8 @@ export function describeSandboxFiles(patch, {baseline, workspace}) {
 
 function gitEnvironment(cwd) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/i.test(key)));
-  Object.assign(env,{GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:process.platform === 'win32' ? 'NUL' : '/dev/null',GIT_TERMINAL_PROMPT:'0',GIT_CONFIG_COUNT:'3',
+  // Git recognizes /dev/null on every supported platform; some Windows releases reject NUL.
+  Object.assign(env,{GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_TERMINAL_PROMPT:'0',GIT_CONFIG_COUNT:'3',
     GIT_CONFIG_KEY_0:'core.fsmonitor',GIT_CONFIG_VALUE_0:'false',GIT_CONFIG_KEY_1:'core.hooksPath',GIT_CONFIG_VALUE_1:process.platform === 'win32' ? 'NUL' : '/dev/null',GIT_CONFIG_KEY_2:'safe.directory',GIT_CONFIG_VALUE_2:cwd});
   return env;
 }
