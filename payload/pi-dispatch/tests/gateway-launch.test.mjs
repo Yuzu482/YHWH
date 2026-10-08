@@ -68,7 +68,7 @@ server.listen(c.port,'127.0.0.1');`);
         assert.ok(Date.now()<deadline,'owned fixture process cleanup must complete');await new Promise(r=>setTimeout(r,50));}
     }
     assert.equal(path.dirname(root),temporaryRoot);
-    fs.rmSync(root,{recursive:true,force:true,maxRetries:50,retryDelay:100});
+    await fs.promises.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:50});
   });
   return {root,launcher,settings,config,data,pidFile,port,
     run:args=>command(process.execPath,[launcher,...(args??['--settings-file',settings,'--timeout-ms',scenario==='timeout'?'1000':'5000'])])};
