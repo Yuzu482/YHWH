@@ -109,3 +109,14 @@ test('review cannot approve with missing materials, blocked status, or no eviden
  assert.equal(validateReviewDecision({status:'blocked',reviewDecision:'insufficient-materials',missingMaterials:['tests']}).ok,true);
  assert.equal(validateReviewDecision({...valid,reviewDecision:'request-changes'}).approved,false);
 });
+
+test('sandbox root removal preserves repository baseline and workspace directories',()=>{
+ const paths=['workspace/x.js','baseline/x.js','src/workspace/x.js','src/baseline/workspace/x.js','a/workspace/x.js','b/baseline/x.js'];
+ for(const file of paths) for(const root of ['/sandbox','/var/lib/pi-kether/jobs/123']) {
+  const patch='--- '+root+'/baseline/'+file+'\n+++ '+root+'/workspace/'+file+'\n@@ -1 +1 @@\n-old\n+new\n';
+  assert.deepEqual(missingReviewPatchMaterials([file],[patch]),[],root+'/'+file);
+  assert.deepEqual(missingReviewPatchMaterials(['x.js'],[patch]),['x.js']);
+ }
+ for(const file of paths) assert.deepEqual(missingReviewPatchMaterials([file],['--- a/'+file+'\n+++ b/'+file+'\n@@ -1 +1 @@\n-old\n+new']),[]);
+ assert.deepEqual(missingReviewPatchMaterials(['x.js'],['--- /unrelated/workspace/x.js\n+++ /unrelated/baseline/x.js\n@@ -1 +1 @@\n-old\n+new']),['x.js']);
+});
