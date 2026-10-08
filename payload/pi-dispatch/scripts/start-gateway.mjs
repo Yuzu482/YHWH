@@ -89,10 +89,12 @@ function isolatedWindowsStart(settingsFile, timeoutMs) {
 export async function startGateway({settingsFile, timeoutMs = 30000}) {
   const started = Date.now();
   let child, childExit, spawned = false, childError, stdoutFd, stderrFd, record, recordFile;
+  let validationStage = 'settings-file';
   try {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) fail('invalid_timeout');
     if (!plainFile(settingsFile) || canonical(settingsFile) !== path.resolve(settingsFile).toLowerCase()) fail('invalid_settings');
     const settings = readJson(settingsFile), url = new URL(settings.gatewayUrl);
+    validationStage = 'gateway-settings';
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.pathname !== '/' ||
         url.username || url.password || url.search || url.hash || !url.port ||
         Number(url.port) < 1024 || !plainFile(settings.gatewayScript) ||
@@ -100,12 +102,14 @@ export async function startGateway({settingsFile, timeoutMs = 30000}) {
         !plainFile(settings.nodePath) || canonical(settings.nodePath) !== canonical(process.execPath) ||
         !plainFile(settings.gatewayConfig) || !plainFile(settings.tokenFile) ||
         typeof settings.wslDistro !== 'string' || !settings.wslDistro.trim()) fail('invalid_settings');
+    validationStage = 'gateway-config';
     const config = readJson(settings.gatewayConfig), token = fs.readFileSync(settings.tokenFile, 'utf8').trim();
     if (config.host !== '127.0.0.1' || config.port !== Number(url.port) || !token) fail('invalid_settings');
     if (process.platform === 'win32' && process.env.PI_KETHER_ISOLATED_LAUNCH !== '1') {
       return isolatedWindowsStart(settingsFile, timeoutMs);
     }
     await unusedPort(config.port);
+    validationStage = 'launch-id';
     const launchId = process.platform==='win32'&&process.env.PI_KETHER_ISOLATED_LAUNCH==='1' ? process.env.PI_KETHER_LAUNCH_ID : randomUUID();
     if(!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(launchId??''))fail('invalid_settings');
     const prefix = path.join(path.dirname(settingsFile), 'gateway-start-' + launchId);
@@ -165,6 +169,7 @@ export async function startGateway({settingsFile, timeoutMs = 30000}) {
       } catch { cleanupConfirmed = false; }
     }
     const result = {status: 'failed', failure: cleanupConfirmed ? failure : 'gateway_cleanup_unconfirmed',
+      ...(failure === 'invalid_settings' ? {validationStage} : {}),
       timedOut: failure === 'readiness_timeout', childExitCode: child?.exitCode ?? null,
       childSignal: child?.signalCode ?? null, cleanupConfirmed,
       elapsedMs: Date.now() - started, finishedAt: new Date().toISOString()};
