@@ -44,8 +44,28 @@ try {
     if ($m.version -cne '0.14.0') { throw 'Portable product version changed.' }
   }
   Assert-Stamp $false
+  function Assert-InstallationStage([bool]$expectDirty) {
+    $copy=Join-Path $full ('install-source-'+[guid]::NewGuid().ToString('N'))
+    $target=Join-Path $full ('install-target-'+[guid]::NewGuid().ToString('N'))
+    $before=[IO.File]::ReadAllText((Join-Path $source $pluginRel))
+    $actual=& (Join-Path $PSScriptRoot 'Stage-InstalledPlugin.ps1') -PackageRoot $source -Destination $copy
+    Copy-Item -LiteralPath $actual -Destination $target -Recurse
+    & node (Join-Path $repo 'payload/pi-dispatch/scripts/plugin-upgrade.mjs') record $actual $target
+    if($LASTEXITCODE -ne 0){throw 'Stamped source installation baseline failed.'}
+    $marker=Get-Content -LiteralPath (Join-Path $target '.yhwh-managed-files.json') -Raw | ConvertFrom-Json
+    if($marker.files.'build-provenance.json' -cne (Get-FileHash -LiteralPath (Join-Path $target 'build-provenance.json')).Hash.ToLowerInvariant()){throw 'Installed provenance was not included in baseline.'}
+    $proof=Get-Content -LiteralPath (Join-Path $target 'build-provenance.json') -Raw | ConvertFrom-Json
+    if($proof.dirty -ne $expectDirty -or [IO.File]::ReadAllText((Join-Path $source $pluginRel)) -cne $before){throw 'Installation staging changed source identity.'}
+    $collision='';try{& (Join-Path $PSScriptRoot 'Stage-InstalledPlugin.ps1') -PackageRoot $source -Destination $copy | Out-Null}catch{$collision=$_.Exception.Message}
+    if($collision -cne 'Installation staging destination already exists.'){throw 'Staging overwrote an existing directory.'}
+    [IO.File]::AppendAllText((Join-Path $target '.codex-plugin/plugin.json'),' ')
+    & node (Join-Path $repo 'payload/pi-dispatch/scripts/plugin-upgrade.mjs') record $actual $target
+    if($LASTEXITCODE -eq 0){throw 'Modified installed bytes were accepted.'}
+  }
+  Assert-InstallationStage $false
   [IO.File]::WriteAllText((Join-Path $source 'untracked.fixture'), 'ignored')
   Assert-Stamp $true
+  Assert-InstallationStage $true
   Remove-Item -LiteralPath (Join-Path $source 'untracked.fixture')
   [IO.File]::AppendAllText((Join-Path $source $pluginRel), "`n")
   Assert-Stamp $true

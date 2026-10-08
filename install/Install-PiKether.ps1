@@ -126,8 +126,8 @@ $backupRoot = Join-Path $stateRoot "installer-backups\$timestamp"
 New-Item -ItemType Directory -Force -Path $backupRoot, $stateRoot | Out-Null
 
 $pluginTarget = Join-Path $TargetHome 'plugins\pi-dispatch'
-Copy-WithBackup $pluginSource $pluginTarget $backupRoot
-& (Join-Path $PSScriptRoot 'Set-InstalledPluginVersion.ps1') -PackageRoot $packageRoot -PluginRoot $pluginTarget | Out-Null
+$installationSource = & (Join-Path $PSScriptRoot 'Stage-InstalledPlugin.ps1') -PackageRoot $packageRoot -Destination (Join-Path $backupRoot 'installation-source')
+Copy-WithBackup $installationSource $pluginTarget $backupRoot
 Push-Location $pluginTarget
 try {
   & (Join-Path (Split-Path -Parent $nodePath) 'npm.cmd') ci --omit=dev --ignore-scripts=false
@@ -316,7 +316,7 @@ if ($installCodex -and (Test-Path -LiteralPath (Join-Path $TargetHome '.agents/s
 & (Join-Path $PSScriptRoot 'Protect-PiState.ps1') -TargetHome $TargetHome
 & (Join-Path $packageRoot 'install\Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $WslDistro -Hosts $Hosts -SkipWsl:$(-not $installWsl)
 if ($LASTEXITCODE -ne 0) { throw 'Post-install self-test failed.' }
-& $nodePath (Join-Path $pluginTarget 'scripts/plugin-upgrade.mjs') record $pluginSource $pluginTarget
+& $nodePath (Join-Path $pluginTarget 'scripts/plugin-upgrade.mjs') record $installationSource $pluginTarget
 if($LASTEXITCODE -ne 0){throw 'Managed installation baseline could not be recorded.'}
 Say "Installation complete. Backup: $backupRoot"
 Say 'Sign in with Pi on this Windows account if ~/.pi/agent/auth.json is not already present.'
