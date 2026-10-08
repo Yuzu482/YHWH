@@ -61,9 +61,14 @@ server.listen(c.port,'127.0.0.1');`);
     gatewayUrl:'http://127.0.0.1:'+port,tokenFile,wslDistro:'fixture-not-wsl'};
   fs.writeFileSync(settings,JSON.stringify(data));
   t.after(async () => {
-    if(fs.existsSync(pidFile)){const pid=Number(fs.readFileSync(pidFile));try{process.kill(pid);}catch{}}
-    await new Promise(r=>setTimeout(r,100));
-    assert.equal(path.dirname(root),temporaryRoot);fs.rmSync(root,{recursive:true,force:true});
+    if(fs.existsSync(pidFile)){
+      const pid=Number(fs.readFileSync(pidFile));try{process.kill(pid);}catch(error){if(error.code!=='ESRCH')throw error;}
+      const deadline=Date.now()+5000;
+      for(;;){try{process.kill(pid,0);}catch(error){if(error.code==='ESRCH')break;throw error;}
+        assert.ok(Date.now()<deadline,'owned fixture process cleanup must complete');await new Promise(r=>setTimeout(r,50));}
+    }
+    assert.equal(path.dirname(root),temporaryRoot);
+    fs.rmSync(root,{recursive:true,force:true,maxRetries:50,retryDelay:100});
   });
   return {root,launcher,settings,config,data,pidFile,port,
     run:args=>command(process.execPath,[launcher,...(args??['--settings-file',settings,'--timeout-ms',scenario==='timeout'?'1000':'5000'])])};
