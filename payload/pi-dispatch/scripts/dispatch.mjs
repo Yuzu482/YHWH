@@ -3,8 +3,6 @@ import {safeFlags} from './worker-runtime/pi/args.mjs';
 import {piRuntime} from './worker-runtime/pi/index.mjs';
 import { API_PROVIDERS, loadProviderConfig, configuredRoute, providerPolicy, configDigest } from './controlled-provider.mjs';
 import {requireRoleFields, roleResultSchema} from '../extensions/role-contract.js';
-import {prepareWindowsApiPacket} from './windows-api-credential.mjs';
-import {ensureOpenAIAuth} from './openai-auth-renewal.mjs';
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync, statSync, realpathSync } from 'node:fs';
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -232,13 +230,10 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
   const authStarted=Date.now();
   let authenticationMs=0;
   const progress=value=>onProgress?.({authenticationMs,...value});
-  if(['anthropic','openai-codex',...API_PROVIDERS].includes(request.provider)){
-    try{
-      if(request.provider==='openai-codex')authentication=await ensureOpenAIAuth({piEntry:findPiEntry(),signal,minimumValidityMs:request.timeoutSeconds*1000+360000});
-      else {apiPacket=await prepareWindowsApiPacket(request,{signal});authentication={ok:true,authentication:'api_key',atRestEncryption:'Windows DPAPI CurrentUser',networkValidated:false};}
-    }
-    catch(error){return {ok:false,...runtimeMetadata,...(structuredResultTool ? {resultSubmissionRequired:true} : {}),target:request.target,requestedProvider:request.provider,requestedModel:request.model,failureCode:error.code??'PI_AUTH_RENEW_FAILED',failure:error.code??'PI_AUTH_RENEW_FAILED',toolsUsed:[],toolErrors:0,phaseTimings:{authenticationMs:Date.now()-authStarted}};}
+  try{
+    ({authentication,apiPacket}=await runtime.prepareAuthentication(request,{signal,findPiEntry}));
   }
+    catch(error){return {ok:false,...runtimeMetadata,...(structuredResultTool ? {resultSubmissionRequired:true} : {}),target:request.target,requestedProvider:request.provider,requestedModel:request.model,failureCode:error.code??'PI_AUTH_RENEW_FAILED',failure:error.code??'PI_AUTH_RENEW_FAILED',toolsUsed:[],toolErrors:0,phaseTimings:{authenticationMs:Date.now()-authStarted}};}
   authenticationMs=Date.now()-authStarted;progress({});
   const prepared = runtime.prepare(request, task, {resultFormat,upstreamResults,editorBroker,structuredResultTool,dispatchStarted,childEnvironment});
   const executionBudget = calculateExecutionBudget({ overallTimeoutSeconds: request.timeoutSeconds, elapsedMs: performance.now() - dispatchStarted });

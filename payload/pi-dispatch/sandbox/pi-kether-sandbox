@@ -29,9 +29,19 @@ emit_checked_patch() {
 }
 
 BASE=/var/lib/pi-kether/jobs
-PI_ENTRY=/opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
+
+select_worker_runtime() {
+  case "${1:-}" in
+    pi)
+      WORKER_ENTRY=/opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
+      WORKER_BOOTSTRAP=/opt/pi-kether/scripts/secure-pi-bootstrap.mjs
+      ;;
+    *) echo "invalid worker runtime" >&2; return 2 ;;
+  esac
+}
 
 probe() {
+  select_worker_runtime pi || return 2
   local host_visible=false interop=false bwrap_ok=false pi_ok=false resource_limits=false
   mountpoint -q /mnt/c && host_visible=true
   command -v cmd.exe >/dev/null 2>&1 && interop=true
@@ -43,7 +53,7 @@ probe() {
     'process.exit(require("fs").existsSync("/mnt/c/Windows") ? 9 : 0)'; then
     bwrap_ok=true
   fi
-  test -f "$PI_ENTRY" && /opt/node/bin/node "$PI_ENTRY" --version >/dev/null 2>&1 && pi_ok=true
+  test -f "$WORKER_ENTRY" && /opt/node/bin/node "$WORKER_ENTRY" --version >/dev/null 2>&1 && pi_ok=true
   local probe_cgroup="/sys/fs/cgroup/pi-kether-probe-$$"
   printf '+memory +cpu +pids\n' >/sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
   if [[ "$(stat -fc %T /sys/fs/cgroup 2>/dev/null)" == cgroup2fs ]] \
@@ -136,9 +146,19 @@ cleanup_orphans() {
 }
 
 run_job() {
+  (( $# >= 12 )) || { echo "missing run arguments or worker runtime" >&2; return 2; }
   local job="$1" drive="$2" relative_path="$3" access="$4" resource_profile="$5" timeout_seconds="$6" host_user="$7" scope_b64="$8" gateway_instance="$9" windows_pid="${10}"
   shift 10
-  local direct_lsp=false bootstrap=/opt/pi-kether/scripts/secure-pi-bootstrap.mjs
+  [[ "${1:-}" == --worker-runtime ]] || { echo "missing worker runtime" >&2; return 2; }
+  select_worker_runtime "${2:-}" || return 2
+  shift 2
+  local runtime_arg
+  for runtime_arg in "$@"; do
+    case "$runtime_arg" in
+      --worker-runtime|--worker-runtime=*) echo "duplicate worker runtime" >&2; return 2 ;;
+    esac
+  done
+  local direct_lsp=false bootstrap="$WORKER_BOOTSTRAP"
   local api_pipe=false api_packet="" issued_token=""
   if [[ "${1:-}" == --api-pipe ]]; then api_pipe=true; shift; fi
   local editor_bridge=false
@@ -363,5 +383,5 @@ case "${1:-}" in
   --cleanup) cleanup_job "${2:-}" ;;
   --cleanup-orphans) cleanup_orphans ;;
   run) shift; run_job "$@" ;;
-  *) echo "usage: pi-kether-sandbox --probe | --cleanup JOB | --cleanup-orphans | run JOB DRIVE REL ACCESS PROFILE TIMEOUT USER SCOPE [PI_ARGS...]" >&2; exit 2 ;;
+  *) echo "usage: pi-kether-sandbox --probe | --cleanup JOB | --cleanup-orphans | run JOB DRIVE REL ACCESS PROFILE TIMEOUT USER SCOPE INSTANCE PID --worker-runtime pi [PI_ARGS...]" >&2; exit 2 ;;
 esac
