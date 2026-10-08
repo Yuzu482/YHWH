@@ -33,6 +33,13 @@ jobs:
         run: |
           npm ci
           if ($LASTEXITCODE -ne 0) { throw 'Dependency install failed' }
+      - name: Verify artifact application with runner Git
+        working-directory: payload/pi-dispatch
+        run: |
+          git --version
+          if ($LASTEXITCODE -ne 0) { throw 'Git version check failed' }
+          node --test --test-concurrency=1 tests/artifact-apply.test.mjs tests/request-ledger.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Artifact application checks failed' }
       - name: Diagnose Windows ACL timeout
         working-directory: payload/pi-dispatch
         run: |
