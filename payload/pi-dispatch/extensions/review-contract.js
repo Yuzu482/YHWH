@@ -15,8 +15,8 @@ export function missingReviewPatchMaterials(changedFiles, content) {
     if(typeof value!=='string'||!value.trim())return null;
     let result=diffHeader ? parsePath(value) : value.trim().replace(/\\/g,'/');
     if(!result)return null;
-    result=result.replace(/^\/(?:sandbox\/)?(?:[^/]+\/)*(?:baseline|workspace)\//,'');
     if(diffHeader) result=result.replace(/^(?:a|b)\//,'');
+    result=result.replace(/^\/(?:sandbox|var\/lib\/pi-kether\/jobs\/[^/]+)\/(?:baseline|workspace)\//,'');
     return result.replace(/^\/+/, '');
   };
   const expectedFiles=[...new Set(changedFiles.map(value=>normalize(value)))];

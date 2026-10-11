@@ -67,6 +67,31 @@ test('normalizes sandbox headers and applies an actual Git patch in a repository
   assert.equal(readFileSync(join(outside,'docs/with space.txt'),'utf8'),'old\n');
 });
 
+test('artifact Git skips poisoned global/system configuration and inherited Git overrides',async t=>{
+  const cwd=fixture(t);mkdirSync(join(cwd,'docs'));writeFileSync(join(cwd,'docs/with space.txt'),'old\n');
+  const home=join(cwd,'fake-home'),xdg=join(home,'xdg');mkdirSync(join(xdg,'git'),{recursive:true});
+  const poison=join(home,'system.config');
+  for(const file of [join(home,'.gitconfig'),join(xdg,'git/config'),poison])writeFileSync(file,'[invalid config without closing bracket\n');
+  assert.throws(()=>execFileSync('git',['config','--file',poison,'--list'],{cwd,stdio:'pipe'}),/Command failed/);
+  const inherited={GIT_CONFIG_GLOBAL:poison,GIT_CONFIG_SYSTEM:poison,GIT_CONFIG_COUNT:'10',GIT_CONFIG_KEY_9:'core.worktree',GIT_CONFIG_VALUE_9:home,GIT_DIR:home};
+  const saved=Object.fromEntries(Object.keys(inherited).map(key=>[key,process.env[key]]));
+  let calls=0,result;
+  try {
+    Object.assign(process.env,inherited);
+    const {patch}=rawAndDelivered(cwd),artifact=pendingFor(cwd,patch);
+    result=await applyArtifact({requestId:artifact.requestId,ledger:artifact.ledger,roots:[cwd],writeLocks:{tryAcquire:()=>({}),release:()=>{}},spawnFn:(exe,args,options)=>{
+      calls++;assert.equal(exe,'git');assert.equal(options.shell,false);assert.equal(options.env.GIT_CONFIG_GLOBAL,'/dev/null');assert.equal(options.env.GIT_CONFIG_NOSYSTEM,'1');
+      assert.equal(options.env.GIT_CONFIG_SYSTEM,undefined);assert.equal(options.env.GIT_DIR,undefined);assert.equal(options.env.GIT_CONFIG_KEY_9,undefined);assert.equal(options.env.GIT_CONFIG_VALUE_9,undefined);
+      assert.equal(options.env.GIT_CONFIG_COUNT,'3');assert.equal(options.env.GIT_CONFIG_KEY_0,'core.fsmonitor');assert.equal(options.env.GIT_CONFIG_VALUE_0,'false');
+      assert.equal(options.env.GIT_CONFIG_KEY_1,'core.hooksPath');assert.equal(options.env.GIT_CONFIG_VALUE_1,process.platform==='win32'?'NUL':'/dev/null');
+      assert.equal(options.env.GIT_CONFIG_KEY_2,'safe.directory');assert.equal(options.env.GIT_CONFIG_VALUE_2,cwd);
+      // A malformed config would fail real Git if any global/system source were read.
+      return spawn(exe,args,{...options,env:{...options.env,HOME:home,USERPROFILE:home,XDG_CONFIG_HOME:xdg,GIT_CONFIG_SYSTEM:poison}});
+    }});
+  } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
+  assert.equal(result.ok,true,JSON.stringify(result));assert.equal(calls,2);assert.equal(readFileSync(join(cwd,'docs/with space.txt'),'utf8'),'new\n');
+});
+
 test('Git check failure leaves every workspace file untouched and does not run apply',async t=>{
   const cwd=fixture(t); mkdirSync(join(cwd,'docs')); writeFileSync(join(cwd,'docs/with space.txt'),'conflict\n'); writeFileSync(join(cwd,'docs/other.txt'),'untouched\n');
   const patch=`--- a/docs/with space.txt\n+++ b/docs/with space.txt\n@@ -1 +1 @@\n-old\n+new\n--- a/docs/other.txt\n+++ b/docs/other.txt\n@@ -1 +1 @@\n-untouched\n+changed\n`;

@@ -135,6 +135,76 @@ test('every currently admitted policy/API provider resolves to its existing runt
   for(const provider of new Set([...Object.keys(PROVIDER_POLICY),...API_PROVIDERS]))assert.equal(resolveRuntime({provider}).id,provider==='claude-code-cli'?'claude-code-cli':'pi',provider);
 });
 
+test('Pi owns credential calls with unchanged metadata, minimum validity and abort identity',async()=>{
+  const signal=new AbortController().signal,authentication={ok:true,authentication:'fixture-oauth'};
+  let nativeCalls=0,apiCalls=0,entryCalls=0;
+  const native=await RUNTIMES.pi.prepareAuthentication({provider:'openai-codex',timeoutSeconds:180},{
+    signal,findPiEntry:()=>{entryCalls++;return '/fixture/pi.mjs';},
+    ensureOpenAIAuthImpl:async options=>{nativeCalls++;assert.deepEqual(options,{piEntry:'/fixture/pi.mjs',signal,minimumValidityMs:540000});return authentication;},
+    prepareWindowsApiPacketImpl:()=>{throw Error('native route must not read API credentials');},
+  });
+  assert.deepEqual(native,{authentication});assert.equal(native.authentication,authentication);
+  for(const provider of ['anthropic',...API_PROVIDERS]){
+    const request={provider,timeoutSeconds:30,providerConfigDigest:'fixture-digest'},packet={provider,credentials:{fixture:'private-synthetic-value'}};
+    const actual=await RUNTIMES.pi.prepareAuthentication(request,{
+      signal,findPiEntry:()=>{throw Error('API route must not resolve Pi entry');},
+      ensureOpenAIAuthImpl:()=>{throw Error('API route must not renew OAuth');},
+      prepareWindowsApiPacketImpl:async (received,options)=>{apiCalls++;assert.equal(received,request);assert.deepEqual(options,{signal});return packet;},
+    });
+    assert.equal(actual.apiPacket,packet);
+    assert.deepEqual(actual.authentication,{ok:true,authentication:'api_key',atRestEncryption:'Windows DPAPI CurrentUser',networkValidated:false});
+  }
+  assert.equal(nativeCalls,1);assert.equal(entryCalls,1);assert.equal(apiCalls,1+API_PROVIDERS.length);
+});
+
+test('credential preparation preserves entry/helper exceptions and cancelled signals',async()=>{
+  const controller=new AbortController();controller.abort();
+  for(const location of ['entry','native','api']){
+    const error=Object.assign(new Error('synthetic preparation failure'),{code:'PI_AUTH_CHECK_CANCELLED'});
+    const options={signal:controller.signal,findPiEntry:()=>{if(location==='entry')throw error;return '/fixture/pi.mjs';},
+      ensureOpenAIAuthImpl:async ({signal})=>{assert.equal(signal,controller.signal);assert.equal(signal.aborted,true);throw error;},
+      prepareWindowsApiPacketImpl:async (_request,{signal})=>{assert.equal(signal,controller.signal);assert.equal(signal.aborted,true);throw error;}};
+    await assert.rejects(()=>RUNTIMES.pi.prepareAuthentication({provider:location==='api'?'anthropic':'openai-codex',timeoutSeconds:30},options),e=>e===error);
+  }
+});
+
+test('dispatch keeps credential progress, prepare/run order and private API packet boundary',async()=>{
+  const prior=process.env.PI_DISPATCH_SANDBOX;process.env.PI_DISPATCH_SANDBOX='wsl2-bwrap';
+  const trace=[],signal=new AbortController().signal,packet={credentials:{synthetic:'must-not-leak'}},authentication={ok:true,authentication:'fixture'};
+  const request={target:'model',provider:'openai-codex',model:'gpt-6-luna',access:'none',timeoutSeconds:30,resourceLimits:{profile:'small',timeoutSeconds:30,outputBytes:1048576}};
+  const fake={id:'pi',async prepareAuthentication(received,ctx){trace.push('authentication');assert.equal(received,request);assert.equal(ctx.signal,signal);assert.equal(typeof ctx.findPiEntry,'function');assert.deepEqual(Object.keys(ctx).sort(),['findPiEntry','signal']);return {authentication,apiPacket:packet};},
+    prepare(){trace.push('prepare');return {input:'fixture'};},
+    async run(_prepared,ctx){trace.push('run');assert.equal(ctx.apiPacket,packet);assert.equal(ctx.signal,signal);assert.ok(ctx.resourceLimits.timeoutSeconds>0);return {stdout:'',exitCode:0,phaseTimings:{startupMs:1}};},
+    summarize(){return {ok:true,runtime:'wsl2-bwrap'};}};
+  try{
+    const actual=await dispatch(request,signal,null,{runtimeResolver:()=>fake,onProgress:progress=>{trace.push('progress');assert.equal(typeof progress.authenticationMs,'number');}});
+    assert.deepEqual(trace,['authentication','progress','prepare','run']);assert.equal(actual.authentication,authentication);
+    assert.equal(actual.workerRuntime,'pi');assert.equal(actual.runtime,'wsl2-bwrap');assert.equal(actual.phaseTimings.startupMs,1);
+    assert.equal(typeof actual.phaseTimings.authenticationMs,'number');assert.doesNotMatch(JSON.stringify(actual),/must-not-leak/);
+  }finally{if(prior===undefined)delete process.env.PI_DISPATCH_SANDBOX;else process.env.PI_DISPATCH_SANDBOX=prior;}
+});
+
+test('actual entry resolution failures remain inside dispatch authentication projection',async()=>{
+  const saved={PI_DISPATCH_SANDBOX:process.env.PI_DISPATCH_SANDBOX,PI_DISPATCH_PI_ENTRY:process.env.PI_DISPATCH_PI_ENTRY};
+  process.env.PI_DISPATCH_SANDBOX='wsl2-bwrap';process.env.PI_DISPATCH_PI_ENTRY=path.join(os.tmpdir(),'yhwh-nonexistent-phase2-entry-'+process.pid+'.mjs');
+  assert.equal(fs.existsSync(process.env.PI_DISPATCH_PI_ENTRY),false);
+  try{
+    const actual=await dispatch({target:'model',provider:'openai-codex',model:'gpt-6-luna',access:'none',timeoutSeconds:30});
+    assert.equal(actual.ok,false);assert.equal(actual.failureCode,'PI_AUTH_RENEW_FAILED');assert.equal(actual.failure,'PI_AUTH_RENEW_FAILED');
+    assert.equal(actual.workerRuntime,'pi');assert.equal(typeof actual.phaseTimings.authenticationMs,'number');assert.deepEqual(actual.toolsUsed,[]);
+  }finally{for(const [key,value] of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
+});
+
+test('fresh Node subprocess imports the adapter and prepares only synthetic credentials',async()=>{
+  const moduleUrl=new URL('../scripts/worker-runtime/pi/index.mjs',import.meta.url).href;
+  const input=`import assert from 'node:assert/strict';import {piRuntime} from ${JSON.stringify(moduleUrl)};
+    const signal=new AbortController().signal;
+    const prepared=await piRuntime.prepareAuthentication({provider:'openai-codex',timeoutSeconds:1},{signal,findPiEntry:()=>'/fixture/pi.mjs',ensureOpenAIAuthImpl:async options=>{assert.equal(options.minimumValidityMs,361000);assert.equal(options.signal,signal);return {ok:true,authentication:'synthetic'};}});
+    assert.deepEqual(prepared,{authentication:{ok:true,authentication:'synthetic'}});console.log('PASS: isolated credential preparation; no credential file reads');`;
+  const actual=await runProcess(process.execPath,['--input-type=module','-e',input],{cwd:process.cwd(),input:'',timeoutMs:15000,maxOutputBytes:65536});
+  assert.equal(actual.failure??null,null);assert.equal(actual.exitCode,0,actual.stderr);assert.match(actual.stdout,/PASS: isolated credential preparation/);
+});
+
 test('normalized tool recovery matches the original counter for deterministic malformed/order/path streams',()=>{
   let seed=0x81317;const next=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;};
   const ids=['a','b','',null,undefined,3],names=['edit','write','read','bash','yhwh_submit_result'],paths=['a.js','a\\b.js','a/b.js','../outside.js',null,3],flags=[true,false,undefined,'true'];

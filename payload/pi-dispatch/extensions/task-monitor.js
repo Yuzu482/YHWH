@@ -101,7 +101,7 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
       if (!record.persisted && typeof persistResult === 'function') {
         try { record.persisted = persistResult(record.requestId,{state:record.state,result:record.result}) === true; } catch { record.persisted=false; }
       }
-      if (!record.persisted && record.result != null) continue;
+      if (typeof persistResult === 'function' && !record.persisted && record.result != null) continue;
       if (record.result != null) setResult(record,null);
       if (expired || overCount) records.delete(record.requestId);
     }

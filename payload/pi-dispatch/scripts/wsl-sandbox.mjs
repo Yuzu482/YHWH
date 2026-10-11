@@ -17,6 +17,12 @@ export function wslSandboxArgs(distro, args) {
   return ['-d', distro, '-u', 'root', '--cd', '/', '--', ...args];
 }
 
+// Host-owned selection only; MCP/request schemas do not admit this option.
+export function sandboxWorkerRuntimeArgs(workerRuntime='pi') {
+  if(workerRuntime !== 'pi') throw new TypeError('invalid-worker-runtime');
+  return ['--worker-runtime','pi'];
+}
+
 export function sandboxRequested(env = process.env) {
   return env.PI_DISPATCH_SANDBOX === 'wsl2-bwrap';
 }
@@ -158,8 +164,11 @@ export function createJsonOutputCollector(limit) {
   };
 }
 
-export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], fixtureScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket } = {}) {
+export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], fixtureScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket, workerRuntime='pi' } = {}) {
   return new Promise((done) => {
+    let runtimeArgs;
+    try { runtimeArgs=sandboxWorkerRuntimeArgs(workerRuntime); }
+    catch { done({exitCode:null,failure:'invalid-worker-runtime',stdout:'',stderr:'',sandbox:'wsl2-bwrap'}); return; }
     if (!resourceLimits?.profile || !Number.isInteger(resourceLimits.timeoutSeconds) || !Number.isInteger(resourceLimits.outputBytes)) {
       done({ exitCode: null, failure: 'invalid-resource-limits', stdout: '', stderr: '', sandbox: 'wsl2-bwrap' });
       return;
@@ -172,7 +181,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     if (!/^[a-f0-9-]{36}$/.test(gatewayInstanceId)) throw new Error('Invalid gateway instance id');
     if (!Number.isInteger(gatewayWindowsPid) || gatewayWindowsPid < 1) throw new Error('Invalid gateway Windows pid');
     const scopeManifest = buildSandboxScopeManifest({readScope, writeScope, fixtureScope});
-    const commandArgs = wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args]);
+    const commandArgs = wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...runtimeArgs, ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args]);
     const timeline=createExecutionTimeline({onProgress});
     let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false,outputLimitObservation;
     const collector=!editorBroker&&args.includes('--mode')&&args[args.indexOf('--mode')+1]==='json'?createJsonOutputCollector(resourceLimits.outputBytes):null;

@@ -4,11 +4,26 @@ import {summarizeRuntimeResult} from '../summarize.mjs';
 import {compileRoleWorkerTaskPrompt} from '../../task-packet-guidance.mjs';
 import {calculateExecutionBudget} from '../../../extensions/execution-budget.js';
 import {runWslSandbox} from '../../wsl-sandbox.mjs';
+import {ensureOpenAIAuth} from '../../openai-auth-renewal.mjs';
+import {prepareWindowsApiPacket} from '../../windows-api-credential.mjs';
+import {API_PROVIDERS} from '../../controlled-provider.mjs';
 
 const suppressed = new Set(['PI_PATCH_CONTAINS_ISSUED_CREDENTIAL','PI_PATCH_TOKEN_INVALID','PI_PATCH_INVALID_BYTES']);
 export const piRuntime = Object.freeze({
   id:'pi',
   capabilities:Object.freeze({launchKind:'wsl-sandbox',osSandbox:'wsl2-bwrap',tools:true,structuredResult:true,editorProxy:true}),
+  async prepareAuthentication(request,{signal,findPiEntry,ensureOpenAIAuthImpl=ensureOpenAIAuth,prepareWindowsApiPacketImpl=prepareWindowsApiPacket}={}){
+    // Dependency injection is a trusted host/test argument, never request data.
+    if(request.provider==='openai-codex'){
+      const authentication=await ensureOpenAIAuthImpl({piEntry:findPiEntry(),signal,minimumValidityMs:request.timeoutSeconds*1000+360000});
+      return {authentication};
+    }
+    if(['anthropic',...API_PROVIDERS].includes(request.provider)){
+      const apiPacket=await prepareWindowsApiPacketImpl(request,{signal});
+      return {apiPacket,authentication:{ok:true,authentication:'api_key',atRestEncryption:'Windows DPAPI CurrentUser',networkValidated:false}};
+    }
+    return {};
+  },
   prepare(request,task,ctx){
     const {resultFormat,upstreamResults,editorBroker,structuredResultTool,dispatchStarted}=ctx;
     let input = task
@@ -26,7 +41,7 @@ export const piRuntime = Object.freeze({
     return {input,env,structuredResultTool,editorAuthorized:!!editorBroker};
   },
   run(prepared,{request,task,signal,editorBroker,apiPacket,resourceLimits,onProgress}){
-    return runWslSandbox(buildPiArgs(request,'wsl2',prepared.editorAuthorized,prepared.structuredResultTool),{cwd:request.cwd,access:request.access,input:prepared.input,signal,editorBroker,apiPacket,resourceLimits,writeScope:task?.writeScope??[],readScope:task?.readScope??[],fixtureScope:task?.fixtureScope??[],gatewayInstanceId:request.gatewayInstanceId,gatewayWindowsPid:request.gatewayWindowsPid,gatewayRequestId:request.gatewayRequestId,env:prepared.env,onProgress});
+    return runWslSandbox(buildPiArgs(request,'wsl2',prepared.editorAuthorized,prepared.structuredResultTool),{workerRuntime:'pi',cwd:request.cwd,access:request.access,input:prepared.input,signal,editorBroker,apiPacket,resourceLimits,writeScope:task?.writeScope??[],readScope:task?.readScope??[],fixtureScope:task?.fixtureScope??[],gatewayInstanceId:request.gatewayInstanceId,gatewayWindowsPid:request.gatewayWindowsPid,gatewayRequestId:request.gatewayRequestId,env:prepared.env,onProgress});
   },
   createNormalizer:createPiNormalizer,
   summarize(raw,request){return summarizeRuntimeResult(raw,request,suppressed.has(raw.failureCode??raw.failure)?[]:normalizePiEvents(eventsFrom(raw.stdout)));},

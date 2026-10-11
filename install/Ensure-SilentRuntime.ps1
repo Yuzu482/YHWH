@@ -12,22 +12,39 @@ function Write-RuntimeEvent([string]$Event, [hashtable]$Details = @{}) {
     foreach ($key in $Details.Keys) { $record[$key] = $Details[$key] }
     $record | ConvertTo-Json -Compress | Add-Content -LiteralPath $runtimeLog -Encoding utf8
 }
-function Invoke-Hidden([string]$Exe, [string[]]$Arguments, [hashtable]$Environment = @{}, [switch]$Background) {
+function Invoke-Hidden([string]$Exe, [string[]]$Arguments, [hashtable]$Environment = @{},
+    [ValidateRange(100,60000)][int]$TimeoutMs = 60000, [ValidateRange(100,5000)][int]$DrainMs = 5000) {
     $info = [Diagnostics.ProcessStartInfo]::new($Exe)
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
     foreach ($arg in $Arguments) { $info.ArgumentList.Add($arg) }
     foreach ($key in $Environment.Keys) { $info.Environment[$key] = $Environment[$key] }
-    if (-not $Background) { $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true }
-    $p = [Diagnostics.Process]::Start($info)
-    if ($Background) { return $p }
-    $out = $p.StandardOutput.ReadToEndAsync()
-    $err = $p.StandardError.ReadToEndAsync()
-    if (-not $p.WaitForExit(60000)) { $p.Kill($true); throw 'Runtime command timeout' }
-    if ($p.ExitCode) { throw "Runtime command failed with exit code $($p.ExitCode)" }
-    $result = $out.GetAwaiter().GetResult()
-    $p.Dispose()
-    return $result
+    $info.RedirectStandardInput = $true
+    $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    $p = $null; $started = $false; $out = $null; $err = $null
+    $details = @{status=$null;signal='';stdout='';stderr='';error='';timedOut=$false}
+    try {
+        $p = [Diagnostics.Process]::Start($info); $started = $true
+        $p.StandardInput.Close()
+        $out = $p.StandardOutput.ReadToEndAsync(); $err = $p.StandardError.ReadToEndAsync()
+        if (-not $p.WaitForExit($TimeoutMs)) { $details.timedOut=$true; $p.Kill($true); [void]$p.WaitForExit(5000) }
+        if ($p.HasExited) {$details.status=$p.ExitCode} else {$details.signal='child cleanup unconfirmed'}
+        if ($out.Wait($DrainMs)) {$details.stdout=$out.Result} else {$details.signal='stdout drain timeout'}
+        if ($err.Wait($DrainMs)) {$details.stderr=$err.Result} else {$details.signal='stderr drain timeout'}
+    } catch {
+        $details.error=$_.Exception.GetType().Name
+    } finally {
+        if ($p) {
+            try { if ($started -and -not $p.HasExited) { $p.Kill($true); [void]$p.WaitForExit(5000) } } catch {$details.signal='child cleanup unconfirmed'}
+            $p.Dispose()
+        }
+    }
+    if ($details.status -ne 0 -or $details.error -or $details.signal -or $details.timedOut) {
+        $failure=[Exception]::new("Runtime command failed with exit code $($details.status); timeout=$($details.timedOut); signal=$($details.signal); error=$($details.error); stdout: $($details.stdout); stderr: $($details.stderr)")
+        $failure.Data['processResult']=$details
+        throw $failure
+    }
+    return $details.stdout
 }
 $mutex = [Threading.Mutex]::new($false, 'Local\PiKetherSilentRuntime')
 if (-not $mutex.WaitOne(0)) { $mutex.Dispose(); exit 0 }
@@ -50,17 +67,12 @@ try {
             throw 'Gateway port cannot be bound; see runtime-startup.jsonl'
         } finally { $listener.Stop() }
         $stage = 'gateway-start'
-        $envs = @{PI_GATEWAY_CONFIG=$s.gatewayConfig; PI_DISPATCH_SANDBOX='wsl2-bwrap'; PI_SANDBOX_DISTRO=$s.wslDistro}
-        $gatewayProcess = Invoke-Hidden $s.nodePath @($s.gatewayScript) $envs -Background
-        for ($i=0; $i -lt 80; $i++) {
-            if ($gatewayProcess.HasExited) {
-                Write-RuntimeEvent 'gateway-exited' @{exitCode=$gatewayProcess.ExitCode}
-                throw 'Gateway exited before readiness; see runtime-startup.jsonl'
-            }
-            Start-Sleep -Milliseconds 500
-            try { $r = Invoke-RestMethod ($s.gatewayUrl + '/readyz') -Headers $headers -TimeoutSec 2; if ($r.ok) {$ready=$true; break} } catch {}
-        }
-        if (-not $ready) { throw 'Gateway failed readiness check' }
+        $launcher = Join-Path (Split-Path -Parent $s.gatewayScript) 'start-gateway.mjs'
+        $launch = (Invoke-Hidden $s.nodePath @($launcher, '--settings-file', [IO.Path]::GetFullPath($SettingsFile))) | ConvertFrom-Json
+        if ($launch.status -ne 'ready' -or $launch.exitCode -ne 0) { throw 'Gateway launch was not confirmed' }
+        $gatewayProcess = Get-Process -Id $launch.pid -ErrorAction Stop
+        Write-RuntimeEvent 'gateway-ready' @{pid=$launch.pid;completionFile=$launch.completionFile}
+        $ready = $true
     }
     $stage = 'tunnel-connect'
     # Use HTTP so the Tunnel daemon never launches a cmd.exe MCP transport.
@@ -81,7 +93,12 @@ try {
     Write-Output 'Pi Gateway and Tunnel ready (HTTP transport).'
 } catch {
     # Record only stage/type, never raw provider output, arguments or credentials.
-    Write-RuntimeEvent 'startup-failed' @{errorType=$_.Exception.GetType().Name}
+    $failureDetails=@{errorType=$_.Exception.GetType().Name}
+    if ($_.Exception.Data['processResult']) {
+        $r=$_.Exception.Data['processResult']; $failureDetails.exitCode=$r.status
+        $failureDetails.timedOut=$r.timedOut; $failureDetails.signal=$r.signal
+    }
+    Write-RuntimeEvent 'startup-failed' $failureDetails
     throw
 } finally {
     if ($gatewayProcess) { $gatewayProcess.Dispose() }
