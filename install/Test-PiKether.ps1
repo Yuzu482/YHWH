@@ -8,6 +8,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'HostWorkflowDrift.ps1')
+. (Join-Path $PSScriptRoot 'DeploymentMainPolicy.ps1')
 $packageRoot = Split-Path -Parent $PSScriptRoot
 $failures = [Collections.Generic.List[string]]::new()
 function Check([bool]$Ok, [string]$Name) {
@@ -54,6 +55,11 @@ $backups = $scanFiles | Where-Object { $_.Name -match '\.bak$|\.backup$' }
 Check (-not $backups) 'no backup files in payload'
 
 if ($Installed) {
+  try {
+    $deployedProof = Get-Content -LiteralPath (Join-Path $TargetHome 'plugins/pi-dispatch/build-provenance.json') -Raw | ConvertFrom-Json
+    $mainState = Get-DeploymentMainState -Repository $packageRoot -Commit ([string]$deployedProof.sourceCommit)
+    Write-DeploymentMainWarning $mainState
+  } catch { Write-Warning '[DEPLOYMENT_MAIN_UNKNOWN] Installed ancestry coverage unavailable; existing integrity checks still apply.' }
   $baselineHashes = @{}
   $baselineValid = $false
   try {
