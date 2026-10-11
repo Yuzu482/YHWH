@@ -36,6 +36,35 @@ Cargo vendor trees, Go module caches, JVM and .NET package caches are future
 runner work and are currently rejected rather than silently executed. Windows
 dependencies are not treated as Linux-compatible caches.
 
+### Reinstalling without losing registrations
+
+The root installer preserves every existing cache registration, its original
+file order and project dependency pins. It validates the bounded manifest,
+root ownership, permissions, paths, link counts and complete cache hashes before
+publishing an update. It refreshes only the installer-owned Node runner hash.
+The Windows project/command policy and dependency cache contents are untouched.
+Only a first installation with no registered caches creates the empty default.
+Missing registrations, malformed manifests and cache drift stop provisioning;
+the installer never silently drops caches, imports workspace files or repins
+changed dependencies. An authorized operator must investigate and repair drift.
+
+An exclusive root-owned lock serializes trust provisioning. Unique staged files
+are flushed and atomically replaced individually, then the directory is flushed.
+Runner and manifest publication is not a two-file atomic transaction: a crash
+between replacements can temporarily leave a hash mismatch, which disables
+checks at runtime. Reinstalling reconciles the runner from the fixed installer
+source after revalidating the unchanged caches. No unsafe fallback is enabled.
+Node archives are extracted as root with `--no-same-owner`,
+`--no-same-permissions` and umask `022`, so upstream archive owner IDs cannot
+make the runner source writable by another user. A full reinstall refreshes
+`/opt/node` before trust provisioning; if provisioning fails, existing checks
+still use the previously pinned trusted runner, or fail closed if that runner
+has already been published with a different hash. A subsequent successful
+reinstall reconciles the pair without reauthorizing dependency drift.
+Run the Linux/root installer regression suite with
+`python3 install/Test-RunCheckTrust.py` in an isolated root-owned test checkout;
+its temporary fixtures live under `/var/lib`, outside production trust.
+
 ## Isolation and bounds
 
 Each check receives a bounded, no-follow regular-file snapshot of the task's
