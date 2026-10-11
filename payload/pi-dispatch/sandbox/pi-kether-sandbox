@@ -3,6 +3,47 @@ set -euo pipefail
 set +a
 set +x
 
+# Candidate selection is the trusted executable's own root-owned path, never a task option.
+unset NODE_OPTIONS NODE_PATH LD_PRELOAD LD_LIBRARY_PATH
+SELF=$(readlink -f "${BASH_SOURCE[0]:-/dev/stdin}")
+BASE=/var/lib/pi-kether/jobs
+GROUP_PREFIX=pi-kether-
+MOUNT_PREFIX=/run/pi-kether-
+CHECK_TRUST_ROOT=/var/lib/pi-kether-run-check/trust
+if [[ "$SELF" =~ ^(/var/lib/pi-kether-candidates/([a-f0-9]{64})/root)/sandbox/pi-kether-sandbox$ ]]; then
+  CANDIDATE_ROOT="${BASH_REMATCH[1]}"
+  CANDIDATE_SHA="${BASH_REMATCH[2]}"
+  local_path="$CANDIDATE_ROOT/sandbox/pi-kether-sandbox"
+  while [[ "$local_path" != / ]]; do
+    [[ ! -L "$local_path" && "$(stat -c %u "$local_path")" == 0 ]] || exit 9
+    (( (8#$(stat -c %a "$local_path") & 8#022) == 0 )) || exit 9
+    local_path=$(dirname "$local_path")
+  done
+  for trusted_dir in scripts extensions trust; do
+    [[ -z "$(find "$CANDIDATE_ROOT/$trusted_dir" \( -type l -o ! -user root -o -perm /022 \) -print -quit)" ]] || exit 9
+  done
+  if [[ "${1:-}" != --candidate-inner ]]; then
+    exec /usr/bin/unshare --mount --propagation private "$SELF" --candidate-inner "$@"
+  fi
+  shift
+  mount --make-rprivate /
+  mount --bind "$CANDIDATE_ROOT/trust/runners/node" /opt/node/bin/node
+  mount -o remount,bind,ro,nosuid,nodev /opt/node/bin/node
+  /usr/bin/python3 - "$CANDIDATE_ROOT/trust/manifest.json" <<'PY'
+import sys,json,hashlib
+m=json.load(open(sys.argv[1]));r=next(x for x in m['runners'] if x['id']=='node')
+assert hashlib.sha256(open('/opt/node/bin/node','rb').read()).hexdigest()==r['sha256']
+PY
+  mount --bind "$CANDIDATE_ROOT/scripts" /opt/pi-kether/scripts
+  mount -o remount,bind,ro /opt/pi-kether/scripts
+  mount --bind "$CANDIDATE_ROOT/extensions" /opt/pi-kether/extensions
+  mount -o remount,bind,ro /opt/pi-kether/extensions
+  BASE="$CANDIDATE_ROOT/jobs"
+  GROUP_PREFIX="yhwh-check-test-${CANDIDATE_SHA:0:12}-"
+  MOUNT_PREFIX="/run/${GROUP_PREFIX}"
+  CHECK_TRUST_ROOT="$CANDIDATE_ROOT/trust"
+fi
+
 select_native_issued_token() {
   /opt/node/bin/node -e 'const x=JSON.parse(require("fs").readFileSync(process.argv[1]));const v=x.openaiAccess?.["access"+"Token"];if(typeof v!=="string"||!v)process.exit(1);process.stdout.write(v)' "$1" 2>/dev/null
 }
@@ -28,8 +69,6 @@ emit_checked_patch() {
   return 4
 }
 
-BASE=/var/lib/pi-kether/jobs
-
 select_worker_runtime() {
   case "${1:-}" in
     pi)
@@ -54,7 +93,7 @@ probe() {
     bwrap_ok=true
   fi
   test -f "$WORKER_ENTRY" && /opt/node/bin/node "$WORKER_ENTRY" --version >/dev/null 2>&1 && pi_ok=true
-  local probe_cgroup="/sys/fs/cgroup/pi-kether-probe-$$"
+  local probe_cgroup="/sys/fs/cgroup/${GROUP_PREFIX}probe-$$"
   printf '+memory +cpu +pids\n' >/sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
   if [[ "$(stat -fc %T /sys/fs/cgroup 2>/dev/null)" == cgroup2fs ]] \
     && grep -qw memory /sys/fs/cgroup/cgroup.controllers \
@@ -78,7 +117,7 @@ probe() {
 cleanup_job() {
   local job="$1"
   [[ "$job" =~ ^[a-f0-9-]{36}$ ]] || exit 2
-  local failed=0 mount_root="/run/pi-kether-$job"
+  local failed=0 mount_root="${MOUNT_PREFIX}$job"
   pkill -KILL -f "$BASE/$job" 2>/dev/null || true
   for mount_path in "$mount_root/host-work" "$mount_root/host-c"; do
     if mountpoint -q "$mount_path"; then
@@ -88,11 +127,23 @@ cleanup_job() {
   if ! mountpoint -q "$mount_root/host-work" && ! mountpoint -q "$mount_root/host-c"; then
     rm -rf -- "$mount_root" || { echo "failed to remove $mount_root" >&2; failed=1; }
   fi
-  local cgroup_dir="/sys/fs/cgroup/pi-kether-$job"
+  local cgroup_dir="/sys/fs/cgroup/${GROUP_PREFIX}$job"
   if [[ -d "$cgroup_dir" ]]; then
     if [[ -w "$cgroup_dir/cgroup.kill" ]]; then
       printf '1\n' >"$cgroup_dir/cgroup.kill" 2>/dev/null || { echo "failed to kill $cgroup_dir" >&2; failed=1; }
     fi
+    local nested
+    shopt -s nullglob
+    for nested in "$cgroup_dir"/check-* "$cgroup_dir/model"; do
+      [[ -d "$nested" ]] || continue
+      local child_attempt
+      for child_attempt in {1..100}; do
+        rmdir "$nested" 2>/dev/null && break
+        sleep 0.02
+      done
+      [[ ! -d "$nested" ]] || { echo "failed to remove child cgroup" >&2; failed=1; }
+    done
+    shopt -u nullglob
     local attempt
     for attempt in {1..20}; do
       rmdir "$cgroup_dir" 2>/dev/null && break
@@ -110,9 +161,9 @@ cleanup_orphans() {
   local scanned=0 cleaned=0 failed=0 skipped_active=0 path job
   declare -A jobs=()
   shopt -s nullglob
-  for path in "$BASE"/* /sys/fs/cgroup/pi-kether-* /run/pi-kether-*; do
+  for path in "$BASE"/* /sys/fs/cgroup/"$GROUP_PREFIX"* "$MOUNT_PREFIX"*; do
     job="${path##*/}"
-    job="${job#pi-kether-}"
+    job="${job#"$GROUP_PREFIX"}"
     [[ "$job" =~ ^[a-f0-9-]{36}$ ]] && jobs["$job"]=1
   done
   shopt -u nullglob
@@ -130,7 +181,7 @@ cleanup_orphans() {
       continue
     fi
     if [[ ! -f "$lease" ]]; then
-      for path in "$BASE/$job" "/sys/fs/cgroup/pi-kether-$job" "/run/pi-kether-$job"; do
+      for path in "$BASE/$job" "/sys/fs/cgroup/${GROUP_PREFIX}$job" "${MOUNT_PREFIX}$job"; do
         [[ -e "$path" ]] || continue
         modified=$(stat -c %Y "$path" 2>/dev/null || printf '0')
         (( modified > newest )) && newest=$modified
@@ -159,6 +210,8 @@ run_job() {
     esac
   done
   local direct_lsp=false bootstrap="$WORKER_BOOTSTRAP"
+  local run_check=false
+  if [[ "${1:-}" == --run-check ]]; then run_check=true; shift; fi
   local api_pipe=false api_packet="" issued_token=""
   if [[ "${1:-}" == --api-pipe ]]; then api_pipe=true; shift; fi
   local editor_bridge=false
@@ -216,17 +269,28 @@ run_job() {
 
   local jobdir="$BASE/$job"
   local baseline="$jobdir/baseline" workspace="$jobdir/workspace" home="$jobdir/home"
-  local mount_root="/run/pi-kether-$job"
-  local cgroup_dir="/sys/fs/cgroup/pi-kether-$job"
+  local mount_root="${MOUNT_PREFIX}$job"
+  local cgroup_dir="/sys/fs/cgroup/${GROUP_PREFIX}$job"
   CURRENT_JOB="$job"
+  CURRENT_CHECK_ENABLED="$run_check"
+  CURRENT_CHECK_JOBDIR="$jobdir"
+  CURRENT_CHECK_NODE="$CHECK_TRUST_ROOT/runners/node"
   cleanup_current_job() {
     local original_status=$?
+    local terminal_state=""
     unset api_packet issued_token
     trap - EXIT INT TERM
     set +e
     exec 3<&-
+    if [[ "$CURRENT_CHECK_ENABLED" == true && -f "$CURRENT_CHECK_JOBDIR/check-secret.json" ]]; then
+      terminal_state=$("$CURRENT_CHECK_NODE" /opt/pi-kether/scripts/run-check-broker.mjs --export-terminal "$CURRENT_CHECK_JOBDIR/check-secret.json" "$CURRENT_CHECK_JOBDIR/check-state.json" "$original_status")
+    fi
     cleanup_job "$CURRENT_JOB"
     local cleanup_status=$?
+    if [[ -n "$terminal_state" ]]; then
+      printf '%s\n%s\n' "$terminal_state" "$cleanup_status" | "$CURRENT_CHECK_NODE" /opt/pi-kether/scripts/run-check-broker.mjs --emit-terminal || original_status=10
+    fi
+    unset terminal_state
     if (( original_status == 0 && cleanup_status != 0 )); then original_status=10; fi
     exit "$original_status"
   }
@@ -248,6 +312,18 @@ run_job() {
   [[ -w "$cgroup_dir/memory.oom.group" ]] && printf '1\n' >"$cgroup_dir/memory.oom.group"
   printf '%s %s\n' "$cpu_quota" "$cpu_period" >"$cgroup_dir/cpu.max"
   printf '%s\n' "$pids_max" >"$cgroup_dir/pids.max"
+  if [[ "$run_check" == true ]]; then
+    [[ "$access" == workspace-write && "$lsp_bridge" == true && -w "$cgroup_dir/cgroup.kill" ]] || { echo CHECK_ROUTE_REJECTED >&2; exit 9; }
+    local preset="" prev="" check_arg
+    for check_arg in "$@"; do
+      [[ "$prev" == --yhwh-role-preset ]] && preset="$check_arg"
+      prev="$check_arg"
+    done
+    [[ "$preset" == Chesed ]] || { echo CHECK_ROLE_REJECTED >&2; exit 9; }
+    printf '+memory +cpu +pids\n' >"$cgroup_dir/cgroup.subtree_control" || exit 9
+    mkdir "$cgroup_dir/model"
+    printf '%s\n' "$((memory_bytes / 2))" >"$cgroup_dir/model/memory.low"
+  fi
   install -d -o root -g root -m 0700 "$baseline"
   install -d -o root -g root -m 0755 "$workspace"
   install -d -o pi-sandbox -g pi-sandbox -m 0700 "$home" "$home/agent"
@@ -260,6 +336,29 @@ run_job() {
   chmod 0444 "$home/agent/write-scope.json"
   cp "$home/agent/write-scope.json" "$jobdir/write-scope.json"
   chmod 0600 "$jobdir/write-scope.json"
+
+  if [[ "$run_check" == true ]]; then
+    /usr/bin/python3 - "$CHECK_TRUST_ROOT" <<'PY'
+import sys,os,stat,json,hashlib
+root=sys.argv[1]
+for file in (root+'/manifest.json',root+'/runners/node'):
+    p=file
+    while p!='/':
+        s=os.lstat(p)
+        assert s.st_uid==0 and not s.st_mode&0o022 and not stat.S_ISLNK(s.st_mode)
+        p=os.path.dirname(p)
+m=json.load(open(root+'/manifest.json'));r=next(x for x in m['runners'] if x['id']=='node')
+assert r['path']==root+'/runners/node' and hashlib.sha256(open(r['path'],'rb').read()).hexdigest()==r['sha256']
+PY
+    local check_header="" check_packet="" check_deadline
+    IFS= read -r -n 64 check_header || exit 9
+    [[ "$check_header" == YHWH_RUN_CHECK_V1 ]] || exit 9
+    IFS= read -r -n 131073 check_packet || exit 9
+    (( ${#check_packet} <= 131072 )) || exit 9
+    check_deadline=$(( $(date +%s%3N) + timeout_seconds * 1000 ))
+    printf '%s' "$check_packet" | "$CURRENT_CHECK_NODE" /opt/pi-kether/scripts/run-check-broker.mjs --accept "$jobdir/check-secret.json" "$CHECK_TRUST_ROOT" "$job" "$check_deadline" || exit 9
+    unset check_packet
+  fi
 
   if [[ "$access" != none ]]; then
     mount -t drvfs "${drive}:" "$mount_root/host-work" -o ro,metadata
@@ -331,7 +430,7 @@ run_job() {
 
   install -d -o pi-sandbox -g pi-sandbox -m 0700 "$jobdir/tmp"
   set +e
-  ( printf '%s\n' "$BASHPID" >"$cgroup_dir/cgroup.procs"
+  ( if [[ "$run_check" == true ]]; then printf '%s\n' "$BASHPID" >"$cgroup_dir/model/cgroup.procs"; else printf '%s\n' "$BASHPID" >"$cgroup_dir/cgroup.procs"; fi
   local model_command=(/usr/bin/setpriv --reuid=pi-sandbox --regid=pi-sandbox --init-groups bwrap --die-with-parent --new-session \
     "${network_args[@]}" --unshare-user --unshare-pid --unshare-uts --unshare-ipc --unshare-cgroup-try --cap-drop ALL \
     --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 --ro-bind /opt /opt \
@@ -346,7 +445,11 @@ run_job() {
     --setenv SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt \
     -- timeout --signal=TERM --kill-after=5s "${timeout_seconds}s" /opt/node/bin/node "$bootstrap" "$@")
   if [[ "$lsp_bridge" == true ]]; then
-    exec /opt/node/bin/node /opt/pi-kether/scripts/lsp-sandbox-broker.mjs "$workspace" "$editor_bridge" -- "${model_command[@]}"
+    local check_broker_args=()
+    [[ "$run_check" == true ]] && check_broker_args=(--run-check "$jobdir/check-secret.json" "$jobdir/check-state.json")
+    local broker_node=/opt/node/bin/node
+    [[ "$run_check" == true ]] && broker_node="$CURRENT_CHECK_NODE"
+    exec "$broker_node" /opt/pi-kether/scripts/lsp-sandbox-broker.mjs "$workspace" "$editor_bridge" "${check_broker_args[@]}" -- "${model_command[@]}"
   else
     exec "${model_command[@]}"
   fi )

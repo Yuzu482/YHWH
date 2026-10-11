@@ -17,7 +17,7 @@ test('host runtime marker allows only pi and rejects before environment or child
     assert.deepEqual(actual,{exitCode:null,failure:'invalid-worker-runtime',stdout:'',stderr:'',sandbox:'wsl2-bwrap'});
   }
   const source=readFileSync(new URL('../scripts/wsl-sandbox.mjs',import.meta.url),'utf8');
-  assert.match(source,/String\(gatewayWindowsPid\), \.\.\.runtimeArgs, \.\.\.\(apiPacket/);
+  assert.match(source,/String\(gatewayWindowsPid\), \.\.\.runtimeArgs, \.\.\.\(receipts\?\['--run-check'\]:\[\]\), \.\.\.\(apiPacket/);
 });
 
 test('bounded collection preserves genuine submission and same-path edit recovery through noisy split events',()=>{

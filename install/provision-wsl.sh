@@ -69,6 +69,32 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/multilspy-probe.py /opt/p
 install -o root -g root -m 0644 /tmp/pi-kether-install/secure-pi-bootstrap.mjs /opt/pi-kether/scripts/secure-pi-bootstrap.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/editor-pi-bootstrap.mjs /opt/pi-kether/scripts/editor-pi-bootstrap.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/lsp-sandbox-broker.mjs /opt/pi-kether/scripts/lsp-sandbox-broker.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/run-check-broker.mjs /opt/pi-kether/scripts/run-check-broker.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/check-policy.mjs /opt/pi-kether/scripts/check-policy.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/check-snapshot.py /opt/pi-kether/scripts/check-snapshot.py
+install -o root -g root -m 0644 /tmp/pi-kether-install/run-check-proxy.js /opt/pi-kether/extensions/run-check-proxy.js
+# Inert until a separately authorized host project policy exists. Never import workspace caches.
+install -d -o root -g root -m 0755 /var/lib/pi-kether-run-check/trust/runners /var/lib/pi-kether-run-check/trust/caches/empty
+install -o root -g root -m 0755 /opt/node/bin/node /var/lib/pi-kether-run-check/trust/runners/node
+/usr/bin/python3 - <<'PY'
+import json,hashlib,os,re,subprocess
+root='/var/lib/pi-kether-run-check/trust'
+runner=root+'/runners/node'
+libraries=subprocess.run(['/usr/bin/ldd',runner],check=True,capture_output=True,text=True,timeout=5,env={'PATH':'/usr/bin:/bin'}).stdout
+if len(libraries)>65536 or 'not found' in libraries: raise RuntimeError('runner library unavailable')
+for entry in re.findall(r'/[A-Za-z0-9_./+-]+',libraries):
+    physical=os.path.realpath(entry)
+    part=''
+    for segment in physical.split('/')[1:]:
+        part+='/'+segment
+        stat=os.lstat(part)
+        if stat.st_uid!=0 or stat.st_mode&0o022 or os.path.islink(part): raise RuntimeError('runner library permissions')
+manifest={'version':1,'runners':[{'id':'node','path':runner,'sha256':hashlib.sha256(open(runner,'rb').read()).hexdigest()}], 'caches':[{'id':'empty','path':root+'/caches/empty','files':[],'projectFiles':[]}]}
+temp=root+'/manifest.json.next'
+with open(temp,'x') as f: json.dump(manifest,f,separators=(',',':'))
+os.chmod(temp,0o644)
+os.replace(temp,root+'/manifest.json')
+PY
 install -o root -g root -m 0644 /tmp/pi-kether-install/csharp-probe-project.mjs /opt/pi-kether/scripts/csharp-probe-project.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/java-probe-launch.py /opt/pi-kether/scripts/java-probe-launch.py
 install -o root -g root -m 0755 /tmp/pi-kether-install/provision-go-rust.sh /opt/pi-kether/scripts/provision-go-rust.sh

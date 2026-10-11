@@ -7,6 +7,7 @@ import {runWslSandbox} from '../../wsl-sandbox.mjs';
 import {ensureOpenAIAuth} from '../../openai-auth-renewal.mjs';
 import {prepareWindowsApiPacket} from '../../windows-api-credential.mjs';
 import {API_PROVIDERS} from '../../controlled-provider.mjs';
+import {loadHostCheckContext} from '../../run-check-broker.mjs';
 
 const suppressed = new Set(['PI_PATCH_CONTAINS_ISSUED_CREDENTIAL','PI_PATCH_TOKEN_INVALID','PI_PATCH_INVALID_BYTES']);
 export const piRuntime = Object.freeze({
@@ -40,8 +41,14 @@ export const piRuntime = Object.freeze({
 
     return {input,env,structuredResultTool,editorAuthorized:!!editorBroker};
   },
-  run(prepared,{request,task,signal,editorBroker,apiPacket,resourceLimits,onProgress}){
-    return runWslSandbox(buildPiArgs(request,'wsl2',prepared.editorAuthorized,prepared.structuredResultTool),{workerRuntime:'pi',cwd:request.cwd,access:request.access,input:prepared.input,signal,editorBroker,apiPacket,resourceLimits,writeScope:task?.writeScope??[],readScope:task?.readScope??[],fixtureScope:task?.fixtureScope??[],gatewayInstanceId:request.gatewayInstanceId,gatewayWindowsPid:request.gatewayWindowsPid,gatewayRequestId:request.gatewayRequestId,env:prepared.env,onProgress});
+  async run(prepared,{request,task,signal,editorBroker,apiPacket,resourceLimits,onProgress,candidate,disableChecks=false}){
+    const started=Date.now();
+    const checkContext=disableChecks?{available:false,reason:'comparison-tool-off'}:await loadHostCheckContext({task,cwd:request.cwd,requestId:request.gatewayRequestId,access:request.access,candidate,distro:prepared.env.PI_SANDBOX_DISTRO??'Ubuntu-24.04'});
+    const seconds=resourceLimits.timeoutSeconds-Math.ceil((Date.now()-started)/1000);
+    if(seconds<1)return{exitCode:null,failure:'EXECUTION_TIMEOUT',stdout:'',stderr:'',sandbox:'wsl2-bwrap'};
+    const input=prepared.input+(checkContext.available?'\nAvailable yhwh_run_check commandIds: '+checkContext.manifest.commands.map(c=>c.id).join(', ')+'. Use it to diagnose implementation checks before delivery. These receipts are sandboxEvidence; host-assigned checks remain unverified.':task?.verify?'\nSandbox check tool unavailable: '+checkContext.reason+'. Host verification remains required.':'');
+    const raw=await runWslSandbox(buildPiArgs(request,'wsl2',prepared.editorAuthorized,prepared.structuredResultTool,checkContext.available),{workerRuntime:'pi',cwd:request.cwd,access:request.access,input,signal,editorBroker,apiPacket,resourceLimits:{...resourceLimits,timeoutSeconds:seconds},writeScope:task?.writeScope??[],readScope:task?.readScope??[],fixtureScope:task?.fixtureScope??[],gatewayInstanceId:request.gatewayInstanceId,gatewayWindowsPid:request.gatewayWindowsPid,gatewayRequestId:request.gatewayRequestId,env:prepared.env,onProgress,checkContext,candidate});
+    return{...raw,...(task?.verify?{sandboxCheckAvailability:{available:checkContext.available,reason:checkContext.reason??null}}:{})};
   },
   createNormalizer:createPiNormalizer,
   summarize(raw,request){return summarizeRuntimeResult(raw,request,suppressed.has(raw.failureCode??raw.failure)?[]:normalizePiEvents(eventsFrom(raw.stdout)));},

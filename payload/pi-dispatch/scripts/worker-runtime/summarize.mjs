@@ -74,6 +74,7 @@ function resultSubmissionFrom(events) {
 }
 
 export function summarizeRuntimeResult(raw, request, events = []) {
+  const sandboxProjection={...(raw.sandboxEvidence?{sandboxEvidence:raw.sandboxEvidence}:{}),...(raw.sandboxCheckAvailability?{sandboxCheckAvailability:raw.sandboxCheckAvailability}:{})};
   if (['PI_PATCH_CONTAINS_ISSUED_CREDENTIAL', 'PI_PATCH_TOKEN_INVALID', 'PI_PATCH_INVALID_BYTES'].includes(raw.failureCode ?? raw.failure)) {
     const code = raw.failureCode ?? raw.failure;
     const cleanup = raw.cleanup && typeof raw.cleanup === 'object' ? {
@@ -81,6 +82,7 @@ export function summarizeRuntimeResult(raw, request, events = []) {
       ...(Number.isFinite(raw.cleanup.exitCode) ? { exitCode: raw.cleanup.exitCode } : {}),
     } : undefined;
     return {
+      ...sandboxProjection,
       target: request.target, requestedProvider: request.provider, requestedModel: request.model,
       ok: false, failureCode: code, failure: code,
       ...(Number.isFinite(raw.exitCode) ? { exitCode: raw.exitCode } : {}),
@@ -103,6 +105,6 @@ export function summarizeRuntimeResult(raw, request, events = []) {
   const routeMismatch = !!last && (actualProvider !== request.provider || actualModel !== request.model);
   const primaryFailureCode = raw.failureCode ?? failureCode ?? processFailureCode;
   const primaryFailure = primaryFailureCode ?? raw.failure ?? (errors.join('; ') || (!last || !complete ? 'Missing complete assistant response' : toolRecovery.unrecoveredErrors ? 'Tool execution failed' : routeMismatch ? 'Provider/model mismatch in Pi response' : null));
-  return { ...(request.resultSubmissionRequired ? { resultSubmission: resultSubmissionFrom(events) } : {}), ...(request.configuredTransport?{configuredTransport:request.configuredTransport}:{}), target: request.target, provider: actualProvider, model: actualModel, requestedProvider: request.provider, requestedModel: request.model, ok: !primaryFailureCode && !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && toolRecovery.unrecoveredErrors === 0 && !routeMismatch, exitCode: raw.exitCode, failureCode: primaryFailureCode ?? failureCode, failure: primaryFailure, text: (last?.content || []).filter(part => part.type === 'text').map(part => part.text).join('\n'), usage: last?.usage, toolsUsed, toolErrors, ...toolRecovery, recoverableToolFailure: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && !routeMismatch && toolErrors > 0, recoverableFileToolFailure: toolRecovery.unrecoveredFileToolErrors > 0 && toolRecovery.unrecoveredErrors === toolRecovery.unrecoveredFileToolErrors, diagnostics: raw.stderr.slice(-6000), sandbox: raw.sandbox, cleanup: raw.cleanup, patch: raw.patch, patchValidation: raw.patchValidation, ...(raw.patchPolicy === 'issued-credential-v1' ? { patchPolicy: raw.patchPolicy, secretLikeContent: raw.secretLikeContent, ...(raw.secretLikeContent ? { patchConfirmationRequired: true, patchWarning: 'Generic secret-like patterns detected; obtain human confirmation before applying this patch.' } : {}), patchSha256: raw.patchSha256, patchBytes: raw.patchBytes } : {}) };
+  return { ...sandboxProjection, ...(request.resultSubmissionRequired ? { resultSubmission: resultSubmissionFrom(events) } : {}), ...(request.configuredTransport?{configuredTransport:request.configuredTransport}:{}), target: request.target, provider: actualProvider, model: actualModel, requestedProvider: request.provider, requestedModel: request.model, ok: !primaryFailureCode && !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && toolRecovery.unrecoveredErrors === 0 && !routeMismatch, exitCode: raw.exitCode, failureCode: primaryFailureCode ?? failureCode, failure: primaryFailure, text: (last?.content || []).filter(part => part.type === 'text').map(part => part.text).join('\n'), usage: last?.usage, toolsUsed, toolErrors, ...toolRecovery, recoverableToolFailure: !raw.failure && raw.exitCode === 0 && !!last && complete && errors.length === 0 && !routeMismatch && toolErrors > 0, recoverableFileToolFailure: toolRecovery.unrecoveredFileToolErrors > 0 && toolRecovery.unrecoveredErrors === toolRecovery.unrecoveredFileToolErrors, diagnostics: raw.stderr.slice(-6000), sandbox: raw.sandbox, cleanup: raw.cleanup, patch: raw.patch, patchValidation: raw.patchValidation, ...(raw.patchPolicy === 'issued-credential-v1' ? { patchPolicy: raw.patchPolicy, secretLikeContent: raw.secretLikeContent, ...(raw.secretLikeContent ? { patchConfirmationRequired: true, patchWarning: 'Generic secret-like patterns detected; obtain human confirmation before applying this patch.' } : {}), patchSha256: raw.patchSha256, patchBytes: raw.patchBytes } : {}) };
 }
 

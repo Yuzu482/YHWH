@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,copyFileSync,writeFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,copyFileSync,writeFileSync,rmSync,cpSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {spawn} from 'node:child_process';
 
 test('real wrapper forks child, passes prompt and inherited FD separately from bounded editor IPC',async()=>{
- const dir=mkdtempSync(join(tmpdir(),'pi-editor-pipe-'));
+ const root=mkdtempSync(join(tmpdir(),'pi-editor-pipe-')),dir=join(root,'scripts');
+ cpSync(resolve('scripts'),dir,{recursive:true});cpSync(resolve('extensions'),join(root,'extensions'),{recursive:true});
  copyFileSync(resolve('scripts/editor-pi-bootstrap.mjs'),join(dir,'editor-pi-bootstrap.mjs'));
  copyFileSync(resolve('scripts/editor-rpc.mjs'),join(dir,'editor-rpc.mjs'));
  copyFileSync(resolve('scripts/lsp-sandbox-broker.mjs'),join(dir,'lsp-sandbox-broker.mjs'));
@@ -32,5 +33,5 @@ test('real wrapper forks child, passes prompt and inherited FD separately from b
  child.stderr.on('data',b=>{err+=b;});child.stdin.on('error',()=>{});
  child.stdio[3].end('fixture-only');child.stdin.write(JSON.stringify({prompt:'fixture prompt'})+'\n');
  const timer=setTimeout(()=>child.kill(),8000);
- try{const code=await new Promise((done,reject)=>{child.on('close',done);child.on('error',reject);});assert.equal(code,0,err);assert.equal(answered,true);assert.equal(lspAnswered,true);assert.match(out,/"type":"done"/);assert.doesNotMatch(out,/fixture-only/);}finally{clearTimeout(timer);child.kill();rmSync(dir,{recursive:true,force:true});}
+ try{const code=await new Promise((done,reject)=>{child.on('close',done);child.on('error',reject);});assert.equal(code,0,err);assert.equal(answered,true);assert.equal(lspAnswered,true);assert.match(out,/"type":"done"/);assert.doesNotMatch(out,/fixture-only/);}finally{clearTimeout(timer);child.kill();rmSync(root,{recursive:true,force:true});}
 });

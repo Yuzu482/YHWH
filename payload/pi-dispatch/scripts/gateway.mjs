@@ -201,6 +201,7 @@ const taskSchema = z.object({
   contractVersion:z.literal(2).optional(), handoff:handoffSchema.optional(),
   role: z.string().min(1).max(64), objective: z.string().min(1).max(20000),
   context: stringList, readScope: stringList, writeScope: stringList, fixtureScope:stringList,
+  verify:z.object({commands:z.array(z.object({id:z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),argv:z.array(z.string().min(1).max(2048)).min(1).max(32),cwd:z.string().min(1).max(1024)}).strict()).min(1).max(16)}).strict().optional(),
   forbidden: stringList, dependencies: stringList, acceptance: stringList,
   returnFields: z.array(z.string().min(1).max(64)).max(32).optional(), assumptions: stringList,
   // Recognize an empty packet only to return the explicit material error before

@@ -2,6 +2,8 @@ import {createExecutionTimeline} from '../extensions/execution-timeline.js';
 import {validateFixtureScope} from '../extensions/kether-envelope.js';
 import {createEditorRpc} from './editor-rpc.mjs';
 import { createHash, randomUUID } from 'node:crypto';
+import {randomBytes} from 'node:crypto';
+import {RECEIPT_FRAME,createReceiptCollector,trustedCheckConfiguration} from './run-check-broker.mjs';
 import { normalizeSandboxPatch, sandboxPatchFiles } from './artifact-apply.mjs';
 import { compileWriteScope } from '../extensions/write-scope-guard.js';
 import { spawn, spawnSync } from 'node:child_process';
@@ -27,10 +29,11 @@ export function sandboxRequested(env = process.env) {
   return env.PI_DISPATCH_SANDBOX === 'wsl2-bwrap';
 }
 
-export function probeWslSandbox(env = process.env) {
+export function probeWslSandbox(env = process.env, {candidate} = {}) {
+  const configuration=trustedCheckConfiguration(candidate);
   if (!sandboxRequested(env)) return { ok: false, backend: 'unavailable', reason: 'sandbox is not configured' };
   const distro = env.PI_SANDBOX_DISTRO || 'Ubuntu-24.04';
-  const orphanScan = spawnSync('wsl.exe', wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', '--cleanup-orphans']), {
+  const orphanScan = spawnSync('wsl.exe', wslSandboxArgs(distro, [configuration.launcher, '--cleanup-orphans']), {
     windowsHide: true, shell: false, encoding: 'utf8', timeout: 15000,
   });
   if (orphanScan.error || orphanScan.status !== 0) return { ok: false, backend: 'unavailable', reason: `orphan cleanup failed: ${orphanScan.error?.message || orphanScan.stderr?.trim() || `exited ${orphanScan.status}`}` };
@@ -41,7 +44,7 @@ export function probeWslSandbox(env = process.env) {
   } catch (error) {
     return { ok: false, backend: 'unavailable', reason: `orphan cleanup returned invalid status: ${error.message}` };
   }
-  const result = spawnSync('wsl.exe', wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', '--probe']), {
+  const result = spawnSync('wsl.exe', wslSandboxArgs(distro, [configuration.launcher, '--probe']), {
     windowsHide: true, shell: false, encoding: 'utf8', timeout: 15000,
   });
   if (result.error || result.status !== 0) return { ok: false, backend: 'unavailable', reason: result.error?.message || result.stderr?.trim() || `probe exited ${result.status}` };
@@ -53,7 +56,8 @@ export function probeWslSandbox(env = process.env) {
   }
 }
 
-export function cleanupWslJob(distro, job, { env = process.env, spawnFn = spawn, timeoutMs = 15000 } = {}) {
+export function cleanupWslJob(distro, job, { env = process.env, spawnFn = spawn, timeoutMs = 15000, candidate } = {}) {
+  const configuration=trustedCheckConfiguration(candidate);
   return new Promise((resolveCleanup) => {
     let settled = false;
     let timer;
@@ -64,7 +68,7 @@ export function cleanupWslJob(distro, job, { env = process.env, spawnFn = spawn,
       clearTimeout(timer);
       resolveCleanup(value);
     };
-    const child = spawnFn('wsl.exe', wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', '--cleanup', job]), {
+    const child = spawnFn('wsl.exe', wslSandboxArgs(distro, [configuration.launcher, '--cleanup', job]), {
       env, windowsHide: true, shell: false, stdio: ['ignore', 'ignore', 'pipe'],
     });
     child.stderr?.setEncoding('utf8').on('data', chunk => { if (stderr.length < 4096) stderr += chunk; });
@@ -87,11 +91,12 @@ function workspaceLocation(cwd) {
   return { drive, rel };
 }
 
-export function validateSandboxPatch(patch, { job, requestId, writeScope = [], access, fileStates } = {}) {
+export function validateSandboxPatch(patch, { job, requestId, writeScope = [], access, fileStates, candidate } = {}) {
   if (!patch || access !== 'workspace-write' || !requestId) return { patchValidation: undefined, failure: undefined };
   try {
-    const baselinePrefix = `/var/lib/pi-kether/jobs/${job}/baseline`;
-    const workspacePrefix = `/var/lib/pi-kether/jobs/${job}/workspace`;
+    const configuration=trustedCheckConfiguration(candidate);
+    const baselinePrefix = `${configuration.jobs}/${job}/baseline`;
+    const workspacePrefix = `${configuration.jobs}/${job}/workspace`;
     const changedFiles = sandboxPatchFiles(patch,{baseline:baselinePrefix,workspace:workspacePrefix,writeScope});
     const delivered = normalizeSandboxPatch(patch, job, changedFiles, {baseline:baselinePrefix,workspace:workspacePrefix}, fileStates);
     const canonicalScope = compileWriteScope(writeScope).map(item => `${item.tree ? 'tree' : 'file'}:${item.path}`).sort().join('\\n');
@@ -164,7 +169,7 @@ export function createJsonOutputCollector(limit) {
   };
 }
 
-export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], fixtureScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket, workerRuntime='pi' } = {}) {
+export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, writeScope = [], readScope = [], fixtureScope = [], gatewayInstanceId = randomUUID(), gatewayWindowsPid = process.pid, gatewayRequestId, env = process.env, signal, onProgress, editorBroker, apiPacket, workerRuntime='pi', checkContext, candidate } = {}) {
   return new Promise((done) => {
     let runtimeArgs;
     try { runtimeArgs=sandboxWorkerRuntimeArgs(workerRuntime); }
@@ -175,13 +180,17 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     }
     const distro = env.PI_SANDBOX_DISTRO || 'Ubuntu-24.04';
     const job = randomUUID();
+    const configuration=trustedCheckConfiguration(candidate);
+    const checkKey=checkContext?.available?randomBytes(32):null;
+    const receipts=checkKey?createReceiptCollector({key:checkKey,requestId:gatewayRequestId,jobId:job}):null;
+    let receiptPending='';
     const { drive, rel } = workspaceLocation(cwd);
     const hostUser = basename(env.USERPROFILE || '');
     if (!/^[A-Za-z0-9._-]+$/.test(hostUser)) throw new Error('Unable to determine a safe Windows user name');
     if (!/^[a-f0-9-]{36}$/.test(gatewayInstanceId)) throw new Error('Invalid gateway instance id');
     if (!Number.isInteger(gatewayWindowsPid) || gatewayWindowsPid < 1) throw new Error('Invalid gateway Windows pid');
     const scopeManifest = buildSandboxScopeManifest({readScope, writeScope, fixtureScope});
-    const commandArgs = wslSandboxArgs(distro, ['/usr/local/libexec/pi-kether-sandbox', 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...runtimeArgs, ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args]);
+    const commandArgs = wslSandboxArgs(distro, [configuration.launcher, 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...runtimeArgs, ...(receipts?['--run-check']:[]), ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args]);
     const timeline=createExecutionTimeline({onProgress});
     let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false,outputLimitObservation;
     const collector=!editorBroker&&args.includes('--mode')&&args[args.indexOf('--mode')+1]==='json'?createJsonOutputCollector(resourceLimits.outputBytes):null;
@@ -205,6 +214,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
       timeline.close();
+      if(receiptPending){if(receiptPending.startsWith(RECEIPT_FRAME))receipts?.feed(receiptPending);else collectOutput('stdout',receiptPending);receiptPending='';}
       await editorRpc?.close();
       if(collector){const captured=collector.close();stdout=captured.stdout;stderr=captured.stderr;failure ||= captured.failure;outputLimitObservation=captured.outputLimitObservation??outputLimitObservation;}
       const patchFailure = (() => {
@@ -212,32 +222,44 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
         return PATCH_FAILURES.has(terminal) ? terminal : null;
       })();
       const cleanupStarted=Date.now();
-      const cleanup = await cleanupWslJob(distro, job, { env });
+      const cleanup = await cleanupWslJob(distro, job, { env, candidate });
+      const sandboxEvidence=receipts?.close();
+      if(sandboxEvidence&&!sandboxEvidence.ok)failure ||= sandboxEvidence.failure;
       timeline.cleaned(Date.now()-cleanupStarted);
       if (!cleanup.ok) {
         failure ||= `sandbox-cleanup-failed:${cleanup.error || 'unknown'}`;
 
       }
       if (patchFailure) {
-        done({ exitCode: code, failure: failure??patchFailure, failureCode: patchFailure, ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode}, phaseTimings: timeline.snapshot() });
+        done({ exitCode: code, failure: failure??patchFailure, failureCode: patchFailure, ...(sandboxEvidence?{sandboxEvidence}:{}), ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode}, phaseTimings: timeline.snapshot() });
         return;
       }
       try {
         const separated = stripPatch(stdout, stderr);
-        const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access, fileStates:separated.fileStates });
+        const proof = validateSandboxPatch(separated.patch, { job, requestId: gatewayRequestId, writeScope, access, fileStates:separated.fileStates, candidate });
         const patchValidation = proof.patchValidation;
         if (proof.failure) failure ||= proof.failure;
         const deliveredPatch = proof.patch ?? separated.patch;
-        done({ exitCode: code, failure, ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: separated.stdout, stderr: separated.stderr, patch: deliveredPatch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: patchValidation?.patchSha256 ?? separated.patchSha256, patchBytes: Buffer.byteLength(deliveredPatch, 'utf8') } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
+        done({ exitCode: code, failure, ...(sandboxEvidence?{sandboxEvidence}:{}), ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: separated.stdout, stderr: separated.stderr, patch: deliveredPatch, ...(separated.patchPolicy ? { patchPolicy: separated.patchPolicy, secretLikeContent: separated.secretLikeContent, patchSha256: patchValidation?.patchSha256 ?? separated.patchSha256, patchBytes: Buffer.byteLength(deliveredPatch, 'utf8') } : {}), patchValidation, sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode,stderr:cleanup.stderr},phaseTimings:timeline.snapshot() });
       } catch {
-        done({ exitCode: code, failure: failure??'PI_PATCH_INVALID_BYTES', failureCode: 'PI_PATCH_INVALID_BYTES', ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode},phaseTimings:timeline.snapshot() });
+        done({ exitCode: code, failure: failure??'PI_PATCH_INVALID_BYTES', failureCode: 'PI_PATCH_INVALID_BYTES', ...(sandboxEvidence?{sandboxEvidence}:{}), ...(outputLimitObservation?{outputLimitObservation}:{}), stdout: '', stderr: '', sandbox: 'wsl2-bwrap', cleanup: {ok:cleanup.ok,exitCode:cleanup.exitCode},phaseTimings:timeline.snapshot() });
       }
     };
-    const collect = (stream) => (chunk) => {
+    const collectOutput = (stream,chunk) => {
       if(collector){if(stream==='stdout')timeline.feed(chunk);collector.feed(stream,chunk);if(collector.failed())stop(collector.failed());return;}
       bytes += Buffer.byteLength(chunk);
       if (bytes > resourceLimits.outputBytes) { outputLimitObservation={bucket:'direct',directBytes:bytes,limitBytes:resourceLimits.outputBytes};stop('output-limit'); return; }
       if (stream === 'stdout') {if(editorRpc)editorRpc.feed(chunk);else {stdout += chunk;timeline.feed(chunk);}} else stderr += chunk;
+    };
+    const collect = stream => chunk => {
+      if(stream!=='stdout'||!receipts){collectOutput(stream,chunk);return;}
+      receiptPending+=chunk;
+      if(Buffer.byteLength(receiptPending)>8388608){stop('output-limit');return;}
+      let at;
+      while((at=receiptPending.indexOf('\n'))>=0){
+        const line=receiptPending.slice(0,at+1);receiptPending=receiptPending.slice(at+1);
+        if(line.startsWith(RECEIPT_FRAME))receipts.feed(line);else collectOutput(stream,line);
+      }
     };
     const editorRpc=editorBroker?createEditorRpc({broker:editorBroker,maxBytes:resourceLimits.outputBytes,send:line=>{if(!settled&&!killing)child.stdin.write(line);},onOutput:chunk=>{stdout+=chunk;timeline.feed(chunk);},onFailure:stop}):null;
     child.stdout.setEncoding('utf8').on('data', collect('stdout'));
@@ -245,6 +267,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     child.on('error', (error) => { failure = error.message; finish(null); });
     child.on('close', finish);
     child.stdin.on('error', () => {});
+    if(receipts)child.stdin.write('YHWH_RUN_CHECK_V1\n'+JSON.stringify({...checkContext.manifest,jobId:job,key:checkKey.toString('hex')})+'\n');
     if(apiPacket)child.stdin.write('YHWH_API_CREDENTIAL_V1\n'+JSON.stringify(apiPacket)+'\n');
     if(editorBroker)child.stdin.write(JSON.stringify({prompt:input})+'\n');else child.stdin.end(input);
   });
