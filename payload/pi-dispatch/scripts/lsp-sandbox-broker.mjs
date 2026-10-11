@@ -7,6 +7,7 @@ import {constants,openSync,closeSync,fstatSync,readSync,readFileSync,mkdtempSync
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {prepareCsharpSnapshot} from './csharp-probe-project.mjs';
+import {createCheckFrames} from './run-check-broker.mjs';
 
 export const LSP_FRAME = 'YHWH_LSP_RPC=';
 const methods = new Set(['diagnostics','hover','definition','references','symbols','completions','code_actions'].map(m => 'lsp_'+m));
@@ -287,23 +288,31 @@ export function createProbeFrames({workspace,send,onOutput,onFailure,probe}) {
     } catch { fail(); }
   }
   return {
+    busy(){return active!==null;},
     feed(chunk) { if (closed) return; buffer+=chunk; if (Buffer.byteLength(buffer)>8388608) { fail(); return; } let at; while ((at=buffer.indexOf('\n'))>=0) { const value=buffer.slice(0,at); buffer=buffer.slice(at+1); line(value); } },
     async close() { closed=true; active?.controller.abort(); if(buffer && !buffer.startsWith(LSP_FRAME))onOutput(buffer); buffer=''; await Promise.allSettled([...pending]); return sessions ? sessions.close() : {ok:true}; },
   };
 }
 
 async function main() {
-  const [workspace,editorMode,separator,command,...args]=process.argv.slice(2);
-  if (process.getuid?.() !== 0 || separator !== '--' || command !== '/usr/bin/setpriv' || !['true','false'].includes(editorMode) || !/^\/var\/lib\/pi-kether\/jobs\/[a-f0-9-]{36}\/workspace$/.test(workspace)) throw Error('invalid-broker-launch');
-  const group='pi-kether-'+workspace.split('/').at(-2);
-  if (!readFileSync('/proc/self/cgroup','utf8').split('\n').some(line=>line === '0::/'+group)) throw Error('missing-task-cgroup');
+  const [workspace,editorMode,...launch]=process.argv.slice(2);
+  let secretFile,stateFile;
+  if(launch[0]==='--run-check'){launch.shift();secretFile=launch.shift();stateFile=launch.shift();}
+  const [separator,command,...args]=launch;
+  const candidate=/^\/var\/lib\/pi-kether-candidates\/([a-f0-9]{64})\/root\/jobs\/([a-f0-9-]{36})\/workspace$/.exec(workspace??'');
+  if (process.getuid?.() !== 0 || separator !== '--' || command !== '/usr/bin/setpriv' || !['true','false'].includes(editorMode) || !(candidate||/^\/var\/lib\/pi-kether\/jobs\/[a-f0-9-]{36}\/workspace$/.test(workspace))) throw Error('invalid-broker-launch');
+  const group=(candidate?'yhwh-check-test-'+candidate[1].slice(0,12)+'-':'pi-kether-')+workspace.split('/').at(-2);
+  if(secretFile&&(secretFile!==dirname(workspace)+'/check-secret.json'||stateFile!==dirname(workspace)+'/check-state.json'))throw Error('invalid-check-private-path');
+  if (!readFileSync('/proc/self/cgroup','utf8').split('\n').some(line=>line === '0::/'+group+(secretFile?'/model':''))) throw Error('missing-task-cgroup');
   for (const limit of ['memory.max','pids.max','cpu.max']) {
     if (!/^[1-9][0-9]*(?: [1-9][0-9]*)?$/.test(readFileSync('/sys/fs/cgroup/'+group+'/'+limit,'utf8').trim())) throw Error('missing-task-limit');
   }
   const child=spawn(command,args,{stdio:['pipe','pipe','pipe',3],env:process.env});
   closeSync(3);
   const stop=() => { child.kill('SIGTERM'); };
-  const frames=createProbeFrames({workspace,send:line=>{if(!child.stdin.destroyed)child.stdin.write(line);},onOutput:chunk=>process.stdout.write(chunk),onFailure:stop});
+  const channel={workspace,send:line=>{if(!child.stdin.destroyed)child.stdin.write(line);},onOutput:chunk=>process.stdout.write(chunk),onFailure:stop};
+  const probes=createProbeFrames(channel);
+  const frames=secretFile?createCheckFrames({...channel,group:'/sys/fs/cgroup/'+group,secretFile,stateFile,otherFrames:probes}):probes;
   child.stdout.setEncoding('utf8'); child.stdout.on('data',chunk=>frames.feed(chunk)); child.stderr.pipe(process.stderr);
   child.stdin.on('error',()=>{}); child.on('error',()=>{process.exitCode=2;process.stdin.destroy();});
   child.on('close',async code=>{try{const cleanup=await frames.close();process.exitCode=cleanup.ok?(code??2):2;}catch{process.exitCode=2;}process.stdin.destroy();});

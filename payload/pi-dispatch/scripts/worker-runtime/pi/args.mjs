@@ -10,7 +10,7 @@ const rolePresetExtension = '/opt/pi-kether/extensions/role-presets.js';
 const resultSubmitExtension = '/opt/pi-kether/extensions/result-submit.js';
 const sourceWindowExtension = '/opt/pi-kether/extensions/source-window.js';
 
-export function buildPiArgs(request, runtime = 'host', editorAuthorized = false, structuredResultTool = false) {
+export function buildPiArgs(request, runtime = 'host', editorAuthorized = false, structuredResultTool = false, runCheck = false) {
   const args = [...safeFlags, '--print', '--mode', 'json', '--no-session'];
   let preset;
   if (request.rolePresetId !== undefined) {
@@ -22,6 +22,10 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false,
   for (const extension of resolveControlledExtensions(request.provider, request.access, process.env, runtime)) args.push('--extension', extension);
   if (runtime === 'wsl2') args.push('--extension', '/opt/pi-kether/extensions/auth-scrub.js');
   if (runtime === 'wsl2' && request.access !== 'none') args.push('--extension', sourceWindowExtension);
+  if(runCheck){
+    if(runtime!=='wsl2'||request.access!=='workspace-write'||preset?.id!=='Chesed')throw Error('CHECK_TOOL_ROUTE');
+    args.push('--extension','/opt/pi-kether/extensions/run-check-proxy.js');
+  }
   if (structuredResultTool) {
     if (runtime !== 'wsl2' || request.access === 'none') throw new Error('Structured result tool requires WSL2 read or workspace-write access');
     if (!preset) throw new Error('Structured result tool requires a trusted role preset');
@@ -44,6 +48,7 @@ export function buildPiArgs(request, runtime = 'host', editorAuthorized = false,
       : [...readTools, ...(runtime === 'wsl2' ? [] : lspReadTools), 'edit', 'write', ...(runtime === 'wsl2' ? [] : ['code_rewrite'])];
     if (runtime === 'wsl2' && request.access !== 'none') tools.push(...wslLspTools, 'yhwh_source_window');
     if (structuredResultTool) tools.push('yhwh_submit_result');
+    if(runCheck)tools.push('yhwh_run_check');
     if (preset) {
       const ceiling = new Set(preset.toolCeilings[request.access]);
       const bounded = tools.filter(tool => ceiling.has(tool));

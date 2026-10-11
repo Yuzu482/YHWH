@@ -37,7 +37,7 @@ import { createWriteScopeLockManager } from '../extensions/write-scope-locks.js'
 import { createTaskMonitor } from '../extensions/task-monitor.js';
 import {projectTaskHandoff,TASK_HANDOFF_POLICY} from '../extensions/task-handoff.js';
 import { ROLE_MODELS, ROLE_ALIASES, ROLE_PROVIDERS, effectiveRoleProviders } from './role-policy.mjs';
-import {isReviewer,validateReviewDecision,validateReviewPacket,missingReviewPatchMaterials,requireReviewMaterials} from '../extensions/review-contract.js';
+import {isReviewer,validateReviewDecision,validateReviewPacket,missingReviewPatchMaterials,requireReviewMaterials,enforceT1ReviewBudget,T1_REVIEW_BUDGET} from '../extensions/review-contract.js';
 import {editorAuthorizationSchema,authorizeEditors,createEditorBroker,EDITOR_POLICY} from './editor-authorization.mjs';
 import { buildReviewPacket } from './review-materials.mjs';
 import { workflowTierFieldsSchema, validateWriteTier, classifyPatchTier, tierResponseMetadata, tierContractMetadata, tierObservation } from './workflow-tier-gate.mjs';
@@ -201,6 +201,7 @@ const taskSchema = z.object({
   contractVersion:z.literal(2).optional(), handoff:handoffSchema.optional(),
   role: z.string().min(1).max(64), objective: z.string().min(1).max(20000),
   context: stringList, readScope: stringList, writeScope: stringList, fixtureScope:stringList,
+  verify:z.object({commands:z.array(z.object({id:z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),argv:z.array(z.string().min(1).max(2048)).min(1).max(32),cwd:z.string().min(1).max(1024)}).strict()).min(1).max(16)}).strict().optional(),
   forbidden: stringList, dependencies: stringList, acceptance: stringList,
   returnFields: z.array(z.string().min(1).max(64)).max(32).optional(), assumptions: stringList,
   // Recognize an empty packet only to return the explicit material error before
@@ -402,7 +403,7 @@ export function createGatewayRuntime(options) {
       timeouts: {independent:true,queueDefaultSeconds:120,queueMaximumSeconds:900,execution:'timeoutSeconds bounded by resourceProfile',completionWait:{tool:'wait_subagent',maxTimeoutMs:55000}}, 
       modelMismatchRejected: true, thinkingUnchanged: true, probeTargetExemptFromRoleBinding: true,
       acceptanceRequired: true, explicitReadScopeRequired: true, adaptiveThinking:TASK_PLANNING_POLICY,
-      workflowTiers:{version:2,reviewQuota:{version:REVIEW_QUOTA_POLICY.version,T1:{basePerStage:REVIEW_QUOTA_POLICY.T1.base,stageCap:REVIEW_QUOTA_POLICY.T1.stage,totalCap:REVIEW_QUOTA_POLICY.T1.total,timeMs:REVIEW_QUOTA_POLICY.T1.time},T2:{basePerStage:REVIEW_QUOTA_POLICY.T2.base,stageCap:REVIEW_QUOTA_POLICY.T2.stage,totalCap:REVIEW_QUOTA_POLICY.T2.total,timeMs:REVIEW_QUOTA_POLICY.T2.time,sharedExtensions:REVIEW_QUOTA_POLICY.T2.sharedExtensions}},levels:['T0','T1','T2'],semanticRisks:['publicApiOrProtocol','dependencyOrLockfile','securityAuthOrCredentials','migration','irreversibleOrNoRollback'],counts:'trusted unified patch files, added and deleted lines',t0:{files:3,lines:100,testsDocsFixturesExempt:true},t1:{postReviewAttempts:1,highThinking:false,reviewPacketMaxUtf8Bytes:10240},t2:{attemptsPerStage:2},riskProfiles:{canonicalCwd:true,longestAncestor:true,default:'standard'},hostExecutionAvailable,primaryDirectEnabled:false,enforcementBoundary:'actual patch classification before host-pending registration'},
+      workflowTiers:{version:2,reviewQuota:{version:REVIEW_QUOTA_POLICY.version,T1:{basePerStage:REVIEW_QUOTA_POLICY.T1.base,stageCap:REVIEW_QUOTA_POLICY.T1.stage,totalCap:REVIEW_QUOTA_POLICY.T1.total,timeMs:REVIEW_QUOTA_POLICY.T1.time},T2:{basePerStage:REVIEW_QUOTA_POLICY.T2.base,stageCap:REVIEW_QUOTA_POLICY.T2.stage,totalCap:REVIEW_QUOTA_POLICY.T2.total,timeMs:REVIEW_QUOTA_POLICY.T2.time,sharedExtensions:REVIEW_QUOTA_POLICY.T2.sharedExtensions}},levels:['T0','T1','T2'],semanticRisks:['publicApiOrProtocol','dependencyOrLockfile','securityAuthOrCredentials','migration','irreversibleOrNoRollback'],counts:'trusted unified patch files, added and deleted lines',t0:{files:3,lines:100,testsDocsFixturesExempt:true},t1:{postReviewAttempts:1,highThinking:false,reviewPacketMaxUtf8Bytes:T1_REVIEW_BUDGET.totalMaxUtf8Bytes,reviewMaterialBudget:T1_REVIEW_BUDGET},t2:{attemptsPerStage:2},riskProfiles:{canonicalCwd:true,longestAncestor:true,default:'standard'},hostExecutionAvailable,primaryDirectEnabled:false,enforcementBoundary:'actual patch classification before host-pending registration'},
       enforcementBoundary: 'Pi invocation validation; host-agent review stages are not attested',
       primaryHost: {protocol:'MCP',policyTool:'get_workflow',primaryModel:'host-selected',enforcement:'Pi invocation checks; host compliance is not attested',runtimePlatform:'Windows + WSL2'},
       requiredConnectorTools: ['get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','wait_subagent','get_task_handoff','wait_task_handoff','probe_model','lsp_request','check_claude_auth'],
@@ -518,10 +519,16 @@ export function createGatewayRuntime(options) {
         const linkedValid=contract?.mode==='linked' && linked && contract.handoffVersion===2 && contract.runAnchorSha256===linkedAnchor && contract.phaseIndex===task.handoff.phaseIndex;
         if (claimedReview && input.reviewOfRequestId && contract?.tierPolicyVersion!==1) throw Object.assign(new Error('Legacy review state lacks tier policy proof'),{code:'PI_LEGACY_REVIEW_STATE_UNKNOWN'});
         if (!claimedReview || !input.reviewOfRequestId || contract?.tierPolicyVersion!==1 || !/^[a-f0-9]{64}$/.test(sourceAnchor??'') || prior?.state!=='completed' || !verified || contract?.role!=='Chesed' || contract?.stage!=='implementing' || contract?.tier!=='T1' || contract.parentRunId!==(input.parentRunId??null) || contract.workspaceSha256!==workspaceSha256 || !(standalone || linkedValid)) throw Object.assign(new Error('T1 post-review requires a trusted completed T1 implementation reference in the same workspace, parent and anchor'),{code:'PI_T1_REVIEW_REFERENCE_REQUIRED'});
-        if (task.reviewPacket.stage!=='post-change' || !['medium','high','xhigh'].includes(input.thinking ?? PROVIDER_POLICY[input.provider]?.defaultThinking ?? 'medium') || Buffer.byteLength(JSON.stringify(task.reviewPacket),'utf8')>10240) throw Object.assign(new Error('T1 post-review requires medium/high/xhigh thinking and a review packet of at most 10240 UTF-8 bytes'),{code:'PI_T1_REVIEW_PACKET_INVALID'});
+        if (task.reviewPacket.stage!=='post-change' || !['medium','high','xhigh'].includes(input.thinking ?? PROVIDER_POLICY[input.provider]?.defaultThinking ?? 'medium')) throw Object.assign(new Error('T1 post-review requires medium/high/xhigh thinking and post-change material'),{code:'PI_T1_REVIEW_PACKET_INVALID'});
         const changedFiles=source?.patchValidation?.changedFiles ?? source?.originalResult?.patchValidation?.changedFiles;
         const missingPatchFiles=missingReviewPatchMaterials(changedFiles,task?.reviewPacket?.changes?.content);
         if (missingPatchFiles.length) throw Object.assign(new Error(`T1 review packet omits changed-file patch material: ${missingPatchFiles.slice(0,16).join(', ')}`),{code:'REVIEW_MATERIALS_MISSING',missingMaterials:missingPatchFiles.slice(0,16)});
+        const reviewArtifact=ledger?.getHostArtifact(input.reviewOfRequestId);
+        const trustedPatch=(reviewArtifact?.originalResult?.response??reviewArtifact?.originalResult)?.patch;
+        if(reviewArtifact?.pending?.artifactSha256!==(source.verifiedArtifactSha256??source.patchValidation?.patchSha256))throw Object.assign(new Error('T1 artifact fingerprint does not match the trusted host verification'),{code:'PI_T1_REVIEW_REFERENCE_REQUIRED'});
+        if(typeof trustedPatch!=='string'||!trustedPatch||task.reviewPacket.changes.content.join('')!==trustedPatch)throw Object.assign(new Error('T1 review changes must contain the complete exact patch from the current trusted host-verified artifact; truncated, substituted or explanatory text is not diff evidence'),{code:'REVIEW_MATERIALS_MISSING'});
+        try {enforceT1ReviewBudget(task.reviewPacket,{trustedPatch});}
+        catch(error){throw Object.assign(error,{code:'PI_T1_REVIEW_PACKET_INVALID'});}
         trustedReviewTier='T1';
         trustedReviewAnchor=sourceAnchor;
       }

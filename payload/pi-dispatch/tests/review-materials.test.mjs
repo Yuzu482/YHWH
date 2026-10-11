@@ -21,25 +21,25 @@ test('review packet enforces tier byte limits and complete per-file diff evidenc
  assert.throws(()=>buildReviewPacket({...input,context:[padding.repeat(2)]}),/byte budget|128 KiB/);
  assert.throws(()=>buildReviewPacket({...input,changedFiles:['src/a.js','src/b.js'],changes:[input.changes[0]+'\n--- src/b.js\n+++ src/b.js']}),error=>error.message.includes('src/b.js'));
  const smallDiff={...input,tier:'T1',requirements:['R'],changes:input.changes,context:['C'],verification:['V']};
- assert.throws(()=>buildReviewPacket({...smallDiff,context:['x'.repeat(11000)]}),/10240/);
+ assert.throws(()=>buildReviewPacket({...smallDiff,context:['x'.repeat(11000)]}),/8192/);
 });
 
 test('review chunks preserve lines, CRLF, whitespace and Unicode exactly',()=>{
  const crlf='a'.repeat(7999)+'\r\n  tail\n';
- const packet=buildReviewPacket({...input,tier:'T1',changes:[input.changes[0]],context:[crlf]});
+ const packet=buildReviewPacket({...input,tier:'T2',changes:[input.changes[0]],context:[crlf]});
  assert.equal(packet.context.content.join(''),crlf);
  assert.ok(packet.context.content.length>1);
  assert.ok(packet.context.content.every(part=>part.trim()));
  const long='x'.repeat(7999)+'😀'+'tail';
- const longPacket=buildReviewPacket({...input,tier:'T1',changes:[input.changes[0]],context:[long]});
+ const longPacket=buildReviewPacket({...input,tier:'T2',changes:[input.changes[0]],context:[long]});
  assert.equal(longPacket.context.content.join(''),long);
  assert.ok(longPacket.context.content.every(part=>!(part.charCodeAt(part.length-1)>=0xd800&&part.charCodeAt(part.length-1)<=0xdbff)));
  const lines='first\nsecond\nthird';
- const linePacket=buildReviewPacket({...input,tier:'T1',changes:[input.changes[0]],context:[lines]});
+ const linePacket=buildReviewPacket({...input,tier:'T2',changes:[input.changes[0]],context:[lines]});
  assert.equal(linePacket.context.content.join(''),lines);
  assert.equal(linePacket.context.content.length,1);
  const completeLines='first\n'+'x'.repeat(7995)+'\ntail';
- const completePacket=buildReviewPacket({...input,tier:'T1',context:[completeLines]});
+ const completePacket=buildReviewPacket({...input,tier:'T2',context:[completeLines]});
  assert.equal(completePacket.context.content[0],'first\n');
  assert.equal(completePacket.context.content.join(''),completeLines);
  const spaced='prefix\n'+' '.repeat(15000)+'suffix';
@@ -47,7 +47,7 @@ test('review chunks preserve lines, CRLF, whitespace and Unicode exactly',()=>{
  assert.equal(spacedPacket.context.content.join(''),spaced);
  assert.ok(spacedPacket.context.content.every(part=>part.trim()));
  const leading='\n'+('z'.repeat(7999))+'\nend';
- const leadingPacket=buildReviewPacket({...input,tier:'T1',changes:[input.changes[0]],context:[leading]});
+ const leadingPacket=buildReviewPacket({...input,tier:'T2',changes:[input.changes[0]],context:[leading]});
  assert.equal(leadingPacket.context.content.join(''),leading);
 });
 
@@ -75,7 +75,7 @@ test('compiled reviewer prompt preserves packet and explains serialized content'
 
 test('review packet bounds chunks, strings, bytes and rejects NUL',()=>{
  const large='x'.repeat(REVIEW_MATERIAL_LIMITS.sectionChars+1);
- const packet=buildReviewPacket({...input,tier:'T1',changedFiles:['src/a.js'],context:[large]});
+ const packet=buildReviewPacket({...input,tier:'T2',changedFiles:['src/a.js'],context:[large]});
  assert.equal(packet.context.content.length,2);
  assert.ok(packet.context.content.every(part=>part.length<=8000));
  assert.throws(()=>buildReviewPacket({...input,requirements:['bad\0text']}),/Invalid review material/);

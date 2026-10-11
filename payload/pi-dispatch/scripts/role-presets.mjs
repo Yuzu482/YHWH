@@ -18,7 +18,7 @@ const ceilings = Object.freeze({ none: [], read: [...read, 'yhwh_submit_result']
 
 export const ROLE_PRESETS = Object.freeze(Object.fromEntries(Object.keys(ROLE_MODELS).map(role => [role, Object.freeze({
   id: role, displayName: ROLE_DISPLAY_NAMES[role][0], displayNameZh: ROLE_DISPLAY_NAMES[role][1], purpose: purposes[role], allowedAccess: Object.freeze(accessByRole[role]),
-  toolCeilings: Object.freeze(Object.fromEntries(accessByRole[role].map(access => [access, role === 'Chesed' ? (access === 'workspace-write' ? [...chesedRead, 'edit', 'write', 'code_rewrite'] : access === 'read' ? chesedRead : ceilings[access]) : ceilings[access]]))),
+  toolCeilings: Object.freeze(Object.fromEntries(accessByRole[role].map(access => [access, role === 'Chesed' ? (access === 'workspace-write' ? [...chesedRead, 'edit', 'write', 'code_rewrite', 'yhwh_run_check'] : access === 'read' ? chesedRead : ceilings[access]) : ceilings[access]]))),
 })])));
 
 export function resolveRolePreset(role) {

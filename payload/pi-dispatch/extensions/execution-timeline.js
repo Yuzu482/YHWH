@@ -1,7 +1,7 @@
 import {createPiNormalizer} from '../scripts/worker-runtime/pi/normalize.mjs';
 // Host-observed Pi JSON stream timings. Missing events remain null, never zero.
 export function createExecutionTimeline({now=Date.now,onProgress=()=>{},normalizerFactory=createPiNormalizer}={}) {
-  const started=now();let ready=null,first=null,ended=null,closed=null,cleanup=null,firstSource=null;
+  const started=now();let ready=null,first=null,ended=null,closed=null,cleanup=null,firstSource=null;const lifecycle=[];
   const stream={thinkingDeltas:0,textDeltas:0,toolStarts:0,toolEnds:0,toolErrors:0,firstTextMs:null,lastEventMs:null,lastEventType:null};
   const hasTextContent=message=>{
     const content=message?.content;
@@ -9,7 +9,7 @@ export function createExecutionTimeline({now=Date.now,onProgress=()=>{},normaliz
       ? content.some(part=>part?.type==='text'&&typeof part.text==='string'&&part.text.length>0)
       : typeof content==='string'&&content.length>0;
   };
-  const state=()=>({startupMs:ready===null?null:ready-started,timeToFirstResponseMs:first===null?null:first-started,firstResponseSource:firstSource,generationMs:first===null||ended===null?null:ended-first,processMs:closed===null?null:closed-started,processTailMs:ended===null||closed===null?null:closed-ended,cleanupMs:cleanup,stream:{...stream}});
+  const state=()=>({startupMs:ready===null?null:ready-started,timeToFirstResponseMs:first===null?null:first-started,firstResponseSource:firstSource,generationMs:first===null||ended===null?null:ended-first,processMs:closed===null?null:closed-started,processTailMs:ended===null||closed===null?null:closed-ended,cleanupMs:cleanup,stream:{...stream},...(lifecycle.length?{lifecycle:lifecycle.map(v=>({...v}))}:{})});
   const publish=()=>onProgress(state());
   const event=value=>{
     const recognized=['start','end','text_delta','thinking_delta','tool_start','tool_end'].includes(value.type)||(value.type==='message_end'&&value.role==='assistant');
@@ -36,6 +36,7 @@ export function createExecutionTimeline({now=Date.now,onProgress=()=>{},normaliz
   return {
     feed(chunk){parser.feed(chunk);},
     event,
+    lifecycle(value){if(lifecycle.length<32){lifecycle.push({...value});publish();}},
     close(){closed=now();publish();},
     cleaned(ms){cleanup=ms;publish();},
     snapshot:state,

@@ -31,7 +31,7 @@ test('durable T1 host verification completes source contract before one default-
   const goal='T1 fixture objective';
   const runAcceptance=['T1 fixture acceptance'];
   const checkName='reviewer effort regression suite';
-  const patch='--- /var/lib/pi-kether/jobs/22222222-2222-4222-8222-222222222222/baseline/package.json\n+++ /var/lib/pi-kether/jobs/22222222-2222-4222-8222-222222222222/workspace/package.json\n@@ -0,0 +1 @@\n+synthetic fixture\n';
+  const patch='--- /var/lib/pi-kether/jobs/22222222-2222-4222-8222-222222222222/baseline/package.json\n+++ /var/lib/pi-kether/jobs/22222222-2222-4222-8222-222222222222/workspace/package.json\n@@ -0,0 +1 @@\n+synthetic fixture '+'x'.repeat(12000)+'\n';
   const scopeSha256=hash(compileWriteScope(['package.json']).map(item=>`${item.tree?'tree':'file'}:${item.path}`).sort().join('\\n'));
   const requests=[];
   const dispatchFn=async(request,_signal,task)=>{
@@ -44,7 +44,9 @@ test('durable T1 host verification completes source contract before one default-
     }
     return {ok:true,requestedProvider:request.provider,requestedModel:request.model,provider:request.provider,model:request.model,exitCode:0,cleanup:{ok:true},text:'KETHER_RESULT_JSON='+JSON.stringify(value)};
   };
-  const {app,runtime}=createGatewayApp({host:'127.0.0.1',port:0,roots:[root],token,dispatchFn,sandboxStatus:sandbox,requestLedgerDir:directory,auditLogger:{enabled:true,record:value=>records.push(value)},schedulerOptions:{availableMemoryBytes:()=>Number.MAX_SAFE_INTEGER,pollIntervalMs:5}});
+  let wrapHostArtifact=false;
+  const moduleFactories={ledger:()=>new Proxy(ledger,{get(target,key){if(key==='getHostArtifact')return id=>{const value=target.getHostArtifact(id);return wrapHostArtifact&&value?{...value,originalResult:{response:value.originalResult}}:value;};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}})};
+  const {app,runtime}=createGatewayApp({host:'127.0.0.1',port:0,roots:[root],token,dispatchFn,sandboxStatus:sandbox,requestLedgerDir:directory,moduleFactories,auditLogger:{enabled:true,record:value=>records.push(value)},schedulerOptions:{availableMemoryBytes:()=>Number.MAX_SAFE_INTEGER,pollIntervalMs:5}});
   const http=await listenHttpFixture(app);
   const client=new Client({name:'tier-t1-review-flow-test',version:'1.0.0'});
   const transport=new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${http.address().port}/mcp`),{requestInit:{headers:{Authorization:`Bearer ${token}`}}});
@@ -69,12 +71,32 @@ test('durable T1 host verification completes source contract before one default-
     assert.equal(missing.ok,false,JSON.stringify(missing));
     assert.equal(missing.code,'REVIEW_MATERIALS_MISSING');
     assert.equal(requests.filter(item=>item.task.role==='Geburah').length,0);
-    reviewPacket.changes.content=[`--- /var/lib/pi-kether/jobs/22222222-2222-4222-8222-222222222222/baseline/package.json\n+++ /var/lib/pi-kether/jobs/22222222-2222-4222-8222-222222222222/workspace/package.json\n@@ -0,0 +1 @@\n+synthetic fixture\n`];
+    const chunks=value=>value.match(/[\s\S]{1,7000}/g);
+    reviewPacket.changes.content=chunks(patch);
+    const normal=structuredClone(reviewPacket);
+    for(const [suffix,change] of [
+      ['substituted',p=>{p.changes.content=chunks(patch.replace('synthetic fixture','substituted fixture'));}],
+      ['truncated',p=>{p.changes.content=chunks(patch.replace('x'.repeat(100),'x'.repeat(99)));}],
+      ['prose',p=>{p.changes.content=chunks(patch+'description pretending to be diff');}],
+      ['non-diff-limit',p=>{p.context.content=['z'.repeat(7900),'y'.repeat(500)];}],
+      ['total-limit',p=>{p.changes.content=chunks(patch.replace('x'.repeat(100),'x'.repeat(16000)));}],
+    ]){
+      const changed=structuredClone(normal);change(changed);
+      const rejected=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...reviewArgs,requestId:'tier-t1-'+suffix,task:{...reviewArgs.task,reviewPacket:changed}}}));
+      assert.equal(rejected.ok,false,JSON.stringify(rejected));
+      assert.equal(requests.filter(item=>item.task.role==='Geburah').length,0);
+    }
+    const caps=parsed(await client.callTool({name:'list_capabilities',arguments:{}}));
+    assert.equal(caps.governance.workflowTiers.t1.reviewPacketMaxUtf8Bytes,24576);
+    assert.equal(caps.governance.workflowTiers.t1.reviewMaterialBudget.nonDiffMaxUtf8Bytes,8192);
+    assert.equal(caps.governance.workflowTiers.reviewQuota.T1.totalCap,2);
+    wrapHostArtifact=true; // Older stored response wrappers retain exact trusted diff accounting.
     const review=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...reviewArgs,requestId:'tier-t1-post-review'}}));
     assert.equal(review.ok,true,JSON.stringify(review));
     assert.equal(requests.filter(item=>item.task.role==='Geburah').length,1);
     assert.equal(requests.find(item=>item.task.role==='Geburah').request.thinking,'medium');
     assert.equal(review.reviewValidation.approved,true);
+    assert.equal(review.reviewQuota.used,1); // All admission failures above consumed zero model quota.
     const accepted=records.find(record=>record.operation==='task_accepted');
     assert.ok(accepted);
     assert.equal(accepted.requestId,'tier-t1-source');

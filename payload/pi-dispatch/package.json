@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "test:memory": "node --expose-gc tests/memory-regression.mjs",
     "test:pi-long": "node scripts/pi-long-run.mjs",
     "gateway": "node scripts/gateway.mjs",

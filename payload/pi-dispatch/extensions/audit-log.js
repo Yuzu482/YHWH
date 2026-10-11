@@ -286,6 +286,7 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
       actualModel: result?.model,
     },
     phaseTimings: result?.phaseTimings,
+    ...(result?.sandboxEvidence?{sandboxEvidence:{evidenceKind:'sandboxEvidence',ok:result.sandboxEvidence.ok===true,receipts:(result.sandboxEvidence.receipts??[]).slice(0,8).map(r=>({commandId:r.commandId,argv:r.argv.map(v=>redactSensitiveText(v,{compact:false})),cwd:r.cwd,exitCode:r.exitCode,signal:r.signal,reason:r.reason,startedAt:r.startedAt,endedAt:r.endedAt,outputBytes:r.outputBytes,outputSha256:r.outputSha256,outputSummary:redactSensitiveText(r.outputSummary,{compact:false}),cleanupOk:r.cleanupOk,taskSha256:r.taskSha256,policySha256:r.policySha256,trustSha256:r.trustSha256,snapshotSha256:r.snapshotSha256})),terminal:result.sandboxEvidence.terminal??null,failure:result.sandboxEvidence.failure??null}}:{}),
     executionMode: result?.executionMode,
     // Internal adapter identity is separate from process isolation/transport runtime.
     ...(['pi','claude-code-cli'].includes(result?.workerRuntime) ? {workerRuntime:result.workerRuntime} : {}),

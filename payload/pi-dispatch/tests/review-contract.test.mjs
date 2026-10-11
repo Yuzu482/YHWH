@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateReviewPacket,requireReviewMaterials,validateReviewDecision,missingReviewPatchMaterials} from '../extensions/review-contract.js';
+import {validateReviewPacket,requireReviewMaterials,validateReviewDecision,missingReviewPatchMaterials,measureReviewPacket,enforceT1ReviewBudget} from '../extensions/review-contract.js';
 import {validateKetherTask,compileKetherTask} from '../extensions/kether-envelope.js';
 const packet=()=>({version:1,stage:'post-change',...Object.fromEntries(['requirements','changes','context','verification'].map(k=>[k,{status:'provided',content:[`${k}: concrete fixture evidence`]}]))});
 test('review packet requires all evidence sections and fixed decision fields',()=>{
@@ -30,40 +30,42 @@ test('review omissions require explicit justification and cannot omit requiremen
  p.context={status:'provided',content:['Context']};p.requirements={status:'not-applicable',reason:'skip'};
  assert.throws(()=>requireReviewMaterials({role:'Geburah',reviewPacket:p}),e=>e.code==='REVIEW_MATERIALS_MISSING'&&e.missingMaterials.includes('requirements'));
 });
-test('trusted T1 packet cap measures normalized whole-packet UTF-8 bytes and requires post-change',()=>{
- const exact=packet();
- const size=()=>Buffer.byteLength(JSON.stringify(validateReviewPacket(exact)),'utf8');
- while(size()<10240) {
-  const section=exact.requirements.content[0].length<7900?'requirements':'changes';
-  exact[section].content[0]+='x';
- }
- while(size()>10240) {
-  const section=exact.changes.content[0].length?'changes':'requirements';
-  exact[section].content[0]=exact[section].content[0].slice(0,-1);
- }
- assert.equal(size(),10240);
- assert.doesNotThrow(()=>validateReviewPacket(exact,{tier:'T1'}));
- exact.requirements.content[0]+='x';
+test('T1 budgets include normalized JSON overhead and Unicode at exact independent boundaries',()=>{
+ const exact=packet();exact.context.content=['中文🙂'];
+ const size=()=>measureReviewPacket(validateReviewPacket(exact)).nonDiffUtf8Bytes;
+ while(size()<8192){const key=exact.requirements.content[0].length<7900?'requirements':'verification';exact[key].content[0]+='x';}
+ assert.equal(size(),8192);assert.doesNotThrow(()=>validateReviewPacket(exact,{tier:'T1'}));
+ exact.verification.content[0]+='x';assert.equal(size(),8193);
  assert.throws(()=>validateReviewPacket(exact,{tier:'T1'}),e=>e.code==='REVIEW_PACKET_T1_LIMIT');
- const multilingual=packet();multilingual.context.content=['中文🙂'];
- const bytes=()=>Buffer.byteLength(JSON.stringify(validateReviewPacket(multilingual)),'utf8');
- assert.ok(bytes()>JSON.stringify(validateReviewPacket(multilingual)).length);
- const padSections=['requirements','changes','verification'];
- while(bytes()<10240) {
-  const section=padSections.find(key=>multilingual[key].content[0].length<7900);
-  assert.ok(section,'fixture padding must fit within per-string limit');
-  const remaining=10240-bytes();
-  multilingual[section].content[0]+='x'.repeat(Math.min(remaining,7900-multilingual[section].content[0].length));
+ exact.stage='pre-change';assert.throws(()=>validateReviewPacket(exact,{tier:'T1'}),e=>e.code==='REVIEW_PACKET_T1_LIMIT');
+ assert.doesNotThrow(()=>validateReviewPacket(exact)); // T2 safety cap is unchanged.
+ const large=packet();
+ const setDiff=n=>{const patch='--- a/x.js\n+++ b/x.js\n@@ -0,0 +1 @@\n+'+'x'.repeat(n)+'\n';large.changes.content=[patch.slice(0,6000),patch.slice(6000,12000),patch.slice(12000,18000),patch.slice(18000)];return patch;};
+ let length=23000,patch=setDiff(length);
+ length+=24576-measureReviewPacket(large).totalUtf8Bytes;patch=setDiff(length);
+ assert.equal(measureReviewPacket(large).totalUtf8Bytes,24576);
+ assert.equal(measureReviewPacket(large).validatedDiff,true);
+ assert.ok(measureReviewPacket(large).nonDiffUtf8Bytes<8192);
+ assert.doesNotThrow(()=>enforceT1ReviewBudget(large,{trustedPatch:patch}));
+ assert.doesNotThrow(()=>validateReviewPacket(large,{tier:'T1'}));
+ setDiff(length+1);assert.throws(()=>validateReviewPacket(large,{tier:'T1'}),e=>e.code==='REVIEW_PACKET_T1_LIMIT'&&e.totalUtf8Bytes===24577);
+});
+test('only complete validated diff can be exempt; prose and stale fingerprints never earn budget',()=>{
+ const patch='--- a/x.js\n+++ b/x.js\n@@ -1 +1 @@\n-old\n+new\n';
+ const p=packet();p.changes.content=[patch.slice(0,22),patch.slice(22)];
+ const original=JSON.stringify(p);
+ const measured=measureReviewPacket(p,{trustedPatch:patch});
+ const stripped=structuredClone(p);stripped.changes.content=['',''];
+ assert.equal(measured.nonDiffUtf8Bytes,Buffer.byteLength(JSON.stringify(stripped),'utf8'));
+ assert.equal(JSON.stringify(p),original);
+ for(const invalid of [patch.replace('+new','+stale'),patch.replace('@@ -1 +1 @@','@@ -1 +2 @@'),patch+'explanatory prose\n',patch.slice(0,patch.indexOf('+new')), 'x.js changed']){
+  p.changes.content=[invalid];const m=measureReviewPacket(p,{trustedPatch:patch});
+  assert.equal(m.validatedDiff,false);assert.equal(m.nonDiffUtf8Bytes,m.totalUtf8Bytes);
  }
- while(bytes()>10240) {
-  const section=[...padSections].reverse().find(key=>multilingual[key].content[0].length>0);
-  multilingual[section].content[0]=multilingual[section].content[0].slice(0,-1);
- }
- assert.equal(bytes(),10240);assert.doesNotThrow(()=>validateReviewPacket(multilingual,{tier:'T1'}));
- multilingual.requirements.content[0]+='x';assert.equal(bytes(),10241);
- assert.throws(()=>validateReviewPacket(multilingual,{tier:'T1'}),e=>e.code==='REVIEW_PACKET_T1_LIMIT');
- multilingual.stage='pre-change';assert.throws(()=>validateReviewPacket(multilingual,{tier:'T1'}),e=>e.code==='REVIEW_PACKET_T1_LIMIT');
- assert.doesNotThrow(()=>validateReviewPacket(multilingual));
+ p.changes.content=[patch];p.changes.reason='An explanation always counts';
+ assert.ok(measureReviewPacket(p).nonDiffUtf8Bytes>measured.nonDiffUtf8Bytes);
+ p.context.content=['x'.repeat(7900),'y'.repeat(400)];
+ assert.throws(()=>validateReviewPacket(p,{tier:'T1'}),e=>e.code==='REVIEW_PACKET_T1_LIMIT');
 });
 test('T1 patch material coverage requires changed lines in a matching unified-diff section',()=>{
  const patch='--- /sandbox/baseline/src/a.js\n+++ /sandbox/workspace/src/a.js\n@@ -1 +1 @@\n-old\n+new\n';

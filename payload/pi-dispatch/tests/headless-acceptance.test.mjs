@@ -36,7 +36,7 @@ test('live cancellation starts only after CLI launch and confirms the requested 
   return directory;
  });
  const result=await acceptHeadless(fixture(t),{live:true,cancel:true});
- assert.equal(result.clients.codex.response,'passed');assert.equal(result.clients.codex.cancellation,'passed');
+ assert.equal(result.clients.codex.response,'passed',JSON.stringify(result));assert.equal(result.clients.codex.cancellation,'passed',JSON.stringify(result));
  assert.equal(result.clients.codex.cancellationEvidence.started,true);assert.equal(result.clients.codex.cancellationEvidence.cancelRequested,true);
  assert.equal(result.complete,false);assert.equal(result.clients.codex.permissions,'unverified');
  assert.equal(acceptanceDirectories.length,1);
