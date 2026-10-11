@@ -242,6 +242,7 @@ if ($installWsl) {
   if ($LASTEXITCODE -ne 0) { throw 'Could not initialize WSL provisioning directory.' }
   $transfers = @{
     (Join-Path $packageRoot 'install\provision-wsl.sh')='/tmp/pi-kether-install/provision-wsl.sh'
+    (Join-Path $packageRoot 'install\provision-run-check-trust.py')='/tmp/pi-kether-install/provision-run-check-trust.py'
     (Join-Path $packageRoot 'install\patch-pi-lsp.mjs')='/tmp/pi-kether-install/patch-pi-lsp.mjs'
     (Join-Path $payload 'wsl-package-lock.json')='/tmp/pi-kether-install/wsl-package-lock.json'
     (Join-Path $pluginTarget 'sandbox\pi-kether-sandbox')='/tmp/pi-kether-install/pi-kether-sandbox'
