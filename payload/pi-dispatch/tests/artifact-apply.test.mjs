@@ -220,7 +220,9 @@ test('real process timeout/output/launch failure are bounded and resolve only af
   const cwd=fixture(t);const scripts={timeout:'setInterval(()=>{},1000)',output:'process.stdout.write("x".repeat(100000));setInterval(()=>{},1000)'};
   for(const [mode,source]of Object.entries(scripts)) {
     const file=join(cwd,`${mode}.cjs`);writeFileSync(file,source);let child,closed=false;
-    const result=await runArtifactGit({cwd,args:['apply','--check'],patch:'',timeoutMs:500,outputLimit:1024,
+    // Output overflow and the short timeout are independent failure paths.
+    // Allow startup time for the output case, while retaining the 500ms timeout case.
+    const result=await runArtifactGit({cwd,args:['apply','--check'],patch:'',timeoutMs:mode==='timeout'?500:10000,outputLimit:1024,
       spawnFn:(_exe,args,opts)=>{assert.deepEqual(args,['apply','--check']);child=spawn(process.execPath,[file],opts);child.on('close',()=>{closed=true;});return child;}});
     assert.equal(closed,true);assert.equal(result.ok,false);
     assert.equal(result.error.code,mode==='timeout'?'ETIMEDOUT':'EOUTPUTLIMIT');
