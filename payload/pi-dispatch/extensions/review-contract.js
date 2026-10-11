@@ -2,6 +2,59 @@ export const REVIEW_SECTIONS = Object.freeze(['requirements','changes','context'
 export const REVIEW_FIELDS = Object.freeze(['reviewDecision','missingMaterials']);
 export const isReviewer = role => role === 'Geburah' || role === 'reviewer';
 
+export const T1_REVIEW_BUDGET = Object.freeze({version:2,nonDiffMaxUtf8Bytes:8192,totalMaxUtf8Bytes:24576,splitStrategy:'commit-ranges-preserve-whole-goal'});
+
+// Preliminary syntax check only. Admission additionally binds these exact bytes
+// to the trusted ledger artifact; a caller's own diff/hash is never provenance.
+function completeUnifiedDiff(text) {
+  if(typeof text!=='string'||!text||text.includes('\0'))return false;
+  const lines=text.split('\n');
+  let old=0,next=0,files=0,hunks=0,changed=false,fileHunks=0;
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].replace(/\r$/,'');
+    if(old||next){
+      if(line==='\\ No newline at end of file')continue;
+      if(line.startsWith('+')&&next){next--;changed=true;}
+      else if(line.startsWith('-')&&old){old--;changed=true;}
+      else if(line.startsWith(' ')&&old&&next){old--;next--;}
+      else return false;
+      continue;
+    }
+    if(line==='\\ No newline at end of file')continue;
+    if(line.startsWith('--- ')){
+      if(files&&!fileHunks)return false;
+      if(!line.slice(4).trim()||!lines[i+1]?.startsWith('+++ ')||!lines[i+1].slice(4).trim())return false;
+      i++;files++;fileHunks=0;continue;
+    }
+    const hunk=/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$/.exec(line);
+    if(hunk){
+      if(!files)return false;
+      old=Number(hunk[2]??1);next=Number(hunk[4]??1);
+      if(![old,next].every(Number.isSafeInteger)||(!old&&!next))return false;
+      hunks++;fileHunks++;continue;
+    }
+    if(/^(?:diff --git |index [a-f0-9]+\.\.[a-f0-9]+(?: \d+)?$|(?:new file|deleted file|old|new) mode \d+$)/.test(line))continue;
+    if(i===lines.length-1&&line==='')continue;
+    return false;
+  }
+  return !old&&!next&&files>0&&hunks>0&&fileHunks>0&&changed;
+}
+
+export function measureReviewPacket(packet,{trustedPatch}={}) {
+  const full=JSON.stringify(packet),withoutDiff=structuredClone(packet);
+  const parts=packet.changes?.content;
+  const diff=Array.isArray(parts)?parts.join(''):'';
+  const validatedDiff=completeUnifiedDiff(diff)&&(trustedPatch===undefined||diff===trustedPatch);
+  if(validatedDiff)withoutDiff.changes.content=parts.map(()=>'');
+  return {totalUtf8Bytes:Buffer.byteLength(full,'utf8'),nonDiffUtf8Bytes:Buffer.byteLength(JSON.stringify(withoutDiff),'utf8'),validatedDiff};
+}
+
+export function enforceT1ReviewBudget(packet,options={}) {
+  const measured=measureReviewPacket(packet,options);
+  if(packet.stage!=='post-change'||measured.totalUtf8Bytes>T1_REVIEW_BUDGET.totalMaxUtf8Bytes||measured.nonDiffUtf8Bytes>T1_REVIEW_BUDGET.nonDiffMaxUtf8Bytes)throw Object.assign(new Error(`T1 post-change reviewPacket requires non-diff <= 8192 and total <= 24576 UTF-8 bytes (non-diff=${measured.nonDiffUtf8Bytes}, total=${measured.totalUtf8Bytes}); organize complete reviews by commit without resetting whole-goal tier, identity or quota`),{code:'REVIEW_PACKET_T1_LIMIT',...measured});
+  return measured;
+}
+
 export function missingReviewPatchMaterials(changedFiles, content) {
   if (!Array.isArray(changedFiles)) return ['<changed-file-list-unavailable>'];
   if (!Array.isArray(content)) return [...changedFiles];
@@ -55,7 +108,7 @@ export function validateReviewPacket(packet, {tier='T2'}={}) {
     result[name]={status:part.status,content:[...content],...(part.reason?{reason:part.reason}:{})};
   }
   const serializedBytes=Buffer.byteLength(JSON.stringify(result),'utf8');
-  if (tier==='T1' && (result.stage!=='post-change' || serializedBytes>10240)) throw Object.assign(new Error('T1 post-change reviewPacket exceeds 10240 UTF-8 bytes or has invalid stage'),{code:'REVIEW_PACKET_T1_LIMIT'});
+  if (tier==='T1') enforceT1ReviewBudget(result);
   if (serializedBytes>128*1024) throw new Error('reviewPacket exceeds 128 KiB');
   return result;
 }

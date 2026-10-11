@@ -23,7 +23,7 @@ Only effective T2 writes require a `task-tiers` receipt; T0/T1 dispatch and host
 
 Accept only terminal `completed` with `outcome.ok=true`, correct route, valid format/role, full evidence and cleanup. See `pi-results` for retrieval and validation.
 
-T2 uses v2 links; never forge upstream or disguise dependencies. Upgraded known-scope: primary plan → approved pre-review → Chesed → bound record_host_verification → post-review. T0/T1/T2 use real host outputs/exit codes; Netzach needs unavailable host execution or a concrete independent check. T1 post-review ≤10KB; approval/conditional stops. Elastic quota/activation: pi-review. Follow actual admitted stages before upgrade; details: `task-tiers`, `pi-contracts`, `pi-review`.
+T2 uses v2 links; never forge upstream or disguise dependencies. Upgraded known-scope: primary plan → approved pre-review → Chesed → bound record_host_verification → post-review. T0/T1/T2 use real host outputs/exit codes; Netzach needs unavailable host execution or a concrete independent check. T1 non-diff ≤8 KiB / total ≤24 KiB; split by commit under pi-review; approval/conditional stops. Elastic quota/activation: pi-review. Follow actual admitted stages before upgrade; details: `task-tiers`, `pi-contracts`, `pi-review`.
 
 Choose the lowest justified whole-goal tier; explain escalation with TIER_REASON=. Authorized host-diagnosed repairs need no renewed permission and never reset reviews. Validate complete material/bytes before launch; no truncation/path-only review. Corrections need current artifact evidence; label reused coverage.
 

@@ -1435,7 +1435,8 @@ test('rejected LSP path is audited without persisting the path', async () => {
 
 test('bounded executor enforces queue capacity and cancels active work on timeout', async () => {
   assert.throws(() => new BoundedExecutor(5, 1), /1 to 4/);
-  const executor = new BoundedExecutor(1, 1);
+  // Queue semantics use a synthetic memory provider; host pressure is covered by scheduler tests.
+  const executor = new BoundedExecutor(1, 1, {availableMemoryBytes:()=>Number.MAX_SAFE_INTEGER});
   let release;
   const first = executor.run(signal => new Promise(resolvePromise => {
     release = resolvePromise;
@@ -1453,7 +1454,7 @@ test('bounded executor enforces queue capacity and cancels active work on timeou
 });
 
 test('queued cancellation removes work before it can start', async () => {
-  const executor = new BoundedExecutor(1, 1);
+  const executor = new BoundedExecutor(1, 1, {availableMemoryBytes:()=>Number.MAX_SAFE_INTEGER});
   let release;
   let queuedStarted = false;
   const first = executor.run(() => new Promise(resolvePromise => { release = resolvePromise; }), 500);
