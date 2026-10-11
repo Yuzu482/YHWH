@@ -14,12 +14,14 @@ param(
   [switch]$SkipTunnel,
   [switch]$SkipCodexRegistration,
   [switch]$AllowDirty,
-  [string]$DirtyReason
+  [string]$DirtyReason,
+  [switch]$PreMergeDeploy,
+  [string]$Reason
 )
 $ErrorActionPreference='Stop'
 switch($Action) {
   'Install' {
-    $admission = & (Join-Path $PSScriptRoot 'install/Assert-DeploymentSource.ps1') -PackageRoot $PSScriptRoot -AllowDirty:$AllowDirty -DirtyReason $DirtyReason
+    $admission = & (Join-Path $PSScriptRoot 'install/Assert-DeploymentSource.ps1') -PackageRoot $PSScriptRoot -AllowDirty:$AllowDirty -DirtyReason $DirtyReason -PreMergeDeploy:$PreMergeDeploy -Reason $Reason
     $recordRoot = Join-Path ([IO.Path]::GetFullPath($TargetHome)) '.local/state/pi-kether/installation-records'
     New-Item -ItemType Directory -Force -Path $recordRoot | Out-Null
     $recordPath = Join-Path $recordRoot (([guid]::NewGuid().ToString('N')) + '.json')
