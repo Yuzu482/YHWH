@@ -1,8 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createExecutionTimeline} from '../extensions/execution-timeline.js';
+import {createJsonOutputCollector,stripPatch} from '../scripts/wsl-sandbox.mjs';
+import {LIFECYCLE_PREFIX} from '../scripts/pi-single-shot-lifecycle.mjs';
 
 const line=value=>`${JSON.stringify(value)}\n`;
+
+test('lifecycle metadata cannot hide patch failure or evade output budget',()=>{
+  const t=createExecutionTimeline(),c=createJsonOutputCollector(10000,{onLifecycle:v=>t.lifecycle(v)});
+  const frame=LIFECYCLE_PREFIX+line({v:1,n:1,event:'main_return',ms:10});
+  c.feed('stderr','PI_PATCH_INVALID_BYTES\n');for(const part of frame)c.feed('stderr',part);
+  c.feed('stderr',LIFECYCLE_PREFIX+'forged');const result=c.close();
+  assert.equal(stripPatch('',result.stderr).failure,'PI_PATCH_INVALID_BYTES');assert.equal(t.snapshot().lifecycle.length,1);
+  const overflow=createJsonOutputCollector(30);overflow.feed('stderr',LIFECYCLE_PREFIX+'x'.repeat(100));assert.equal(overflow.close().failure,'output-limit');
+  const before=createExecutionTimeline().snapshot();assert.equal(Object.hasOwn(before,'lifecycle'),false);
+});
 
 test('separates thinking and text and counts tool outcomes',()=>{
   let tick=0;

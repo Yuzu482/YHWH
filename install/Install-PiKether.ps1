@@ -263,6 +263,8 @@ if ($installWsl) {
     (Join-Path $pluginTarget 'scripts\multilspy-probe.py')='/tmp/pi-kether-install/multilspy-probe.py'
     (Join-Path $payload 'multilspy-requirements.txt')='/tmp/pi-kether-install/multilspy-requirements.txt'
     (Join-Path $pluginTarget 'scripts\secure-pi-bootstrap.mjs')='/tmp/pi-kether-install/secure-pi-bootstrap.mjs'
+    (Join-Path $pluginTarget 'scripts\pi-single-shot-lifecycle.mjs')='/tmp/pi-kether-install/pi-single-shot-lifecycle.mjs'
+    (Join-Path $pluginTarget 'extensions\single-shot-lifecycle.js')='/tmp/pi-kether-install/single-shot-lifecycle.js'
     (Join-Path $pluginTarget 'scripts\editor-pi-bootstrap.mjs')='/tmp/pi-kether-install/editor-pi-bootstrap.mjs'
     (Join-Path $pluginTarget 'scripts\lsp-sandbox-broker.mjs')='/tmp/pi-kether-install/lsp-sandbox-broker.mjs'
     (Join-Path $pluginTarget 'scripts\run-check-broker.mjs')='/tmp/pi-kether-install/run-check-broker.mjs'

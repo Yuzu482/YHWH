@@ -1,4 +1,5 @@
 import {createExecutionTimeline} from '../extensions/execution-timeline.js';
+import {createLifecycleFilter} from './pi-single-shot-lifecycle.mjs';
 import {validateFixtureScope} from '../extensions/kether-envelope.js';
 import {createEditorRpc} from './editor-rpc.mjs';
 import { createHash, randomUUID } from 'node:crypto';
@@ -130,7 +131,7 @@ export function buildSandboxScopeManifest({readScope = [], writeScope = [], fixt
 }
 
 // Bound retained evidence separately from repetitive Pi progress and the 4 MiB patch transport.
-export function createJsonOutputCollector(limit) {
+export function createJsonOutputCollector(limit,{onLifecycle=()=>{}}={}) {
   if(!Number.isSafeInteger(limit)||limit<1)throw new RangeError('Invalid output budget');
   const patchLimit=6*1024*1024, wireLimit=16*limit+patchLimit;
   let stdout='',stderr='',pending='',patch='',wire=0,retained=0,patchBytes=0,failure=null,patching=false,outputLimitObservation;
@@ -138,6 +139,7 @@ export function createJsonOutputCollector(limit) {
   const append=(stream,text)=>{
     if(failure)return;
     if(stream==='patch'){patchBytes+=Buffer.byteLength(text);if(patchBytes>patchLimit)exceeded('patch',patchLimit);else patch+=text;return;}
+    if(stream==='stderr'){stderr+=text;return;}
     retained+=Buffer.byteLength(text);
     if(retained>limit){exceeded('retained',limit);return;}
     if(stream==='stdout')stdout+=text;else stderr+=text;
@@ -148,11 +150,16 @@ export function createJsonOutputCollector(limit) {
     if(['message_update','message_start','tool_execution_update'].includes(type))return;
     append('stdout',type==='agent_end'?'{"type":"agent_end"}\n':text);
   };
+  const stderrFilter=createLifecycleFilter({onEvent:onLifecycle,onOutput:text=>append('stderr',text)});
   return {
     feed(stream,chunk){
       if(failure)return;
       wire+=Buffer.byteLength(chunk);if(wire>wireLimit){exceeded('wire',wireLimit);return;}
-      if(stream==='stderr'||patching){append(stream==='stderr'?'stderr':'patch',chunk);return;}
+      if(stream==='stderr'){
+        // Suppressed diagnostics still consume the retained output allowance.
+        retained+=Buffer.byteLength(chunk);if(retained>limit)exceeded('retained',limit);else stderrFilter.feed(chunk);return;
+      }
+      if(patching){append('patch',chunk);return;}
       pending+=chunk;
       let end;
       while(!failure&&(end=pending.indexOf('\n'))>=0){
@@ -164,7 +171,7 @@ export function createJsonOutputCollector(limit) {
       const pendingBytes=Buffer.byteLength(pending),pendingLimit=pending.startsWith(PATCH_MARKER.slice(1))?patchLimit:limit;
       if(!failure&&pendingBytes>pendingLimit)exceeded('pending',pendingLimit,{pendingBytes});
     },
-    close(){if(pending&&!failure)line(pending);pending='';return {stdout:stdout+(failure?'':patch),stderr,failure,...(outputLimitObservation?{outputLimitObservation}: {})};},
+    close(){stderrFilter.close();if(pending&&!failure)line(pending);pending='';return {stdout:stdout+(failure?'':patch),stderr,failure,...(outputLimitObservation?{outputLimitObservation}: {})};},
     failed(){return failure;},
   };
 }
@@ -193,7 +200,8 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
     const commandArgs = wslSandboxArgs(distro, [configuration.launcher, 'run', job, drive, rel, access, resourceLimits.profile, String(resourceLimits.timeoutSeconds), hostUser, scopeManifest, gatewayInstanceId, String(gatewayWindowsPid), ...runtimeArgs, ...(receipts?['--run-check']:[]), ...(apiPacket?['--api-pipe']:[]), ...(editorBroker?['--editor-bridge']:[]), ...args]);
     const timeline=createExecutionTimeline({onProgress});
     let stdout = '', stderr = '', bytes = 0, failure = null, settled = false, killing = false,outputLimitObservation;
-    const collector=!editorBroker&&args.includes('--mode')&&args[args.indexOf('--mode')+1]==='json'?createJsonOutputCollector(resourceLimits.outputBytes):null;
+    const collector=!editorBroker&&args.includes('--mode')&&args[args.indexOf('--mode')+1]==='json'?createJsonOutputCollector(resourceLimits.outputBytes,{onLifecycle:v=>timeline.lifecycle(v)}):null;
+    const directStderr=createLifecycleFilter({onEvent:v=>timeline.lifecycle(v),onOutput:text=>{stderr+=text;}});
     const child = spawn('wsl.exe', commandArgs, { env, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     const stop = (reason) => {
       if (killing || settled) return;
@@ -216,6 +224,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
       timeline.close();
       if(receiptPending){if(receiptPending.startsWith(RECEIPT_FRAME))receipts?.feed(receiptPending);else collectOutput('stdout',receiptPending);receiptPending='';}
       await editorRpc?.close();
+      if(!collector)directStderr.close();
       if(collector){const captured=collector.close();stdout=captured.stdout;stderr=captured.stderr;failure ||= captured.failure;outputLimitObservation=captured.outputLimitObservation??outputLimitObservation;}
       const patchFailure = (() => {
         const terminal = stderr.endsWith('\n') ? stderr.slice(0, -1).split('\n').at(-1) : stderr.split('\n').at(-1);
@@ -249,7 +258,7 @@ export function runWslSandbox(args, { cwd, access, input = '', resourceLimits, w
       if(collector){if(stream==='stdout')timeline.feed(chunk);collector.feed(stream,chunk);if(collector.failed())stop(collector.failed());return;}
       bytes += Buffer.byteLength(chunk);
       if (bytes > resourceLimits.outputBytes) { outputLimitObservation={bucket:'direct',directBytes:bytes,limitBytes:resourceLimits.outputBytes};stop('output-limit'); return; }
-      if (stream === 'stdout') {if(editorRpc)editorRpc.feed(chunk);else {stdout += chunk;timeline.feed(chunk);}} else stderr += chunk;
+      if (stream === 'stdout') {if(editorRpc)editorRpc.feed(chunk);else {stdout += chunk;timeline.feed(chunk);}} else directStderr.feed(chunk);
     };
     const collect = stream => chunk => {
       if(stream!=='stdout'||!receipts){collectOutput(stream,chunk);return;}

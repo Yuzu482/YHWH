@@ -8,7 +8,7 @@ import{resolveRuntime}from'../../scripts/worker-runtime/index.mjs';
 import{prepareCandidate}from'./run-check-candidate.mjs';
 const sha=v=>createHash('sha256').update(v).digest('hex');
 export const parseMcp=r=>{if(r.structuredContent)return r.structuredContent;const value=r.content.find(c=>c.type==='text')?.text??'';try{return JSON.parse(value);}catch{throw Error('MCP response was not JSON: '+value.slice(0,1800));}};
-export async function candidateGateway({directory,workspaces,policyPath,projectFiles=[],toolEnabled,onExecutionProgress}){
+export async function candidateGateway({directory,storageDirectory=directory,workspaces,policyPath,projectFiles=[],toolEnabled,onExecutionProgress}){
   fs.mkdirSync(directory,{recursive:true});const candidate=await prepareCandidate({policyPath,projectFiles});
   fs.writeFileSync(path.join(directory,'candidate.json'),JSON.stringify(candidate,null,2));
   const sandboxStatus=probeWslSandbox(process.env,{candidate:candidate.configuration});
@@ -16,7 +16,7 @@ export async function candidateGateway({directory,workspaces,policyPath,projectF
   const token=randomBytes(32).toString('hex');
   const runtimeResolver=request=>request.provider==='claude-code-cli'?resolveRuntime(request):({...piRuntime,run:(prepared,options)=>piRuntime.run(prepared,{...options,candidate:candidate.configuration,disableChecks:!toolEnabled})});
   const {app,runtime}=createGatewayApp({host:'127.0.0.1',port:0,roots:workspaces,token,sandboxStatus,maxConcurrency:1,
-    auditFile:path.join(directory,'audit.jsonl'),requestLedgerDir:path.join(directory,'ledger'),
+    auditFile:path.join(storageDirectory,'audit.jsonl'),requestLedgerDir:path.join(storageDirectory,'ledger'),
     dispatchFn:(request,signal,task,options)=>dispatch(request,signal,task,{...options,runtimeResolver,onProgress:value=>{options.onProgress?.(value);onExecutionProgress?.(value,candidate);}})});
   const server=await new Promise((resolve,reject)=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));s.once('error',reject);});
   const client=new Client({name:'yhwh-run-check-replay',version:'1'});

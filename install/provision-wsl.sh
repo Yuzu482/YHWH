@@ -67,6 +67,8 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/direct-lsp-bootstrap.mjs 
 install -o root -g root -m 0644 /tmp/pi-kether-install/legacy-structural-bootstrap.mjs /opt/pi-kether/scripts/legacy-structural-bootstrap.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/multilspy-probe.py /opt/pi-kether/scripts/multilspy-probe.py
 install -o root -g root -m 0644 /tmp/pi-kether-install/secure-pi-bootstrap.mjs /opt/pi-kether/scripts/secure-pi-bootstrap.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/pi-single-shot-lifecycle.mjs /opt/pi-kether/scripts/pi-single-shot-lifecycle.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/single-shot-lifecycle.js /opt/pi-kether/extensions/single-shot-lifecycle.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/editor-pi-bootstrap.mjs /opt/pi-kether/scripts/editor-pi-bootstrap.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/lsp-sandbox-broker.mjs /opt/pi-kether/scripts/lsp-sandbox-broker.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/run-check-broker.mjs /opt/pi-kether/scripts/run-check-broker.mjs
