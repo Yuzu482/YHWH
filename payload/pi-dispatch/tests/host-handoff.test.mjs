@@ -178,3 +178,16 @@ test('manifest gathers exact admitted current source ranges; rejects stale/unadm
   }
   writeFileSync(join(dir,'a.js'),'drift');assert.throws(()=>loadReviewInput(manifest),/hash mismatch/);
 });
+
+
+test('branded complete results reuse Unicode pages with fresh handoff and detached result',async()=>{
+ const {fetchCompleteResult,collectHostCandidate}=await import('../scripts/host-handoff.mjs');
+ for(const large of [false,true]){const f=fixture();if(large)f.result.padding='😀漢'.repeat(30000);const complete=await fetchCompleteResult(f.call,f.requestId);const count=f.calls.length;
+ const candidate=await collectHostCandidate(f.call,{requestId:f.requestId,complete});assert.equal(f.calls.length,count+1);assert.equal(f.calls.at(-1).name,'get_task_handoff');assert.notEqual(candidate.result,complete.result);assert.equal(sha256(JSON.stringify(candidate.result)),complete.resultSha256);complete.result.patch='changed';assert.notEqual(candidate.result.patch,'changed');}
+});
+test('reuse rejects forged, copied, changed, expired, wrong reader, request identity and stale handoff',async()=>{
+ const {fetchCompleteResult,collectHostCandidate}=await import('../scripts/host-handoff.mjs');
+ for(const kind of ['clone','tamper','reader','expired','identity','handoff']){const f=fixture();let time=0;let complete=await fetchCompleteResult(f.call,f.requestId,{clock:()=>time});let reader=f.call;
+ if(kind==='clone')complete=structuredClone(complete);if(kind==='tamper')complete.result.text='mutated';if(kind==='reader')reader=(...args)=>f.call(...args);if(kind==='expired')time=90001;if(kind==='identity')complete.result.requestId='different';if(kind==='handoff')f.handoff.artifactSha256='a'.repeat(64);
+ const reads=f.calls.filter(c=>c.name==='get_subagent_result').length;await assert.rejects(collectHostCandidate(reader,{requestId:f.requestId,complete}));assert.equal(f.calls.filter(c=>c.name==='get_subagent_result').length,reads);}
+});

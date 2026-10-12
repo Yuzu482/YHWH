@@ -60,7 +60,7 @@ test('missing, blank and non-string compiled packets never launch a process', as
 test('success uses strict no-tools argv, stdin-only packet, sanitized environment and removes empty cwd', async t => {
   const f = fixture(t), before = new Set(fs.readdirSync(os.tmpdir()));
   const result = await invoke(f);
-  assert.deepEqual(result, { runtime: 'host-cli', modelExecutionStarted:true, status: 'completed', text: 'review packet only', usage: { input_tokens: 2 } });
+  const {phaseTimings,...legacy}=result;assert.ok(phaseTimings.reviewer.cliExecutionMs>=0);assert.deepEqual(legacy, { runtime: 'host-cli', modelExecutionStarted:true, status: 'completed', text: 'review packet only', usage: { input_tokens: 2 } });
   const observed = JSON.parse(fs.readFileSync(path.join(f.root, 'observed.json'), 'utf8'));
   assert.equal(observed.input, 'review packet only');
   assert.deepEqual(observed.args, ['--print','--output-format','json','--no-session-persistence','--model','sonnet','--effort','medium','--safe-mode','--tools','','--strict-mcp-config','--mcp-config','{"mcpServers":{}}','--disallowedTools','mcp__*','--permission-mode','dontAsk']);
@@ -195,4 +195,14 @@ test('timeout and malformed JSON are distinct sanitized failures', async t => {
   const original = f.wrapped;
   f.wrapped = async (...args) => { const r = await original(...args); if (args[1].includes('--print')) r.stdout = '{"type":"result"'; return r; };
   assert.equal((await invoke(f)).reason, 'incomplete_output');
+});
+
+
+test('reviewer measures all phases and failure cleanup without changing subprocess order',async t=>{
+ const f=fixture(t);for(const fail of [null,'help','auth','model','parse']){let tick=0;const calls=[];const result=await invoke(f,{timingNowImpl:()=>++tick,runProcessImpl:async(_exe,args,o)=>{
+ const phase=args.includes('--help')?'help':args.includes('auth')?'auth':'model';calls.push(phase);if(fail===phase)return {failure:'timeout',exitCode:124,stdout:'',stderr:''};
+ if(phase==='help')return {exitCode:0,stdout:'--print --output-format --tools --strict-mcp-config --safe-mode --mcp-config --disallowedTools --permission-mode --no-session-persistence --model --effort',stderr:''};
+ if(phase==='auth')return {exitCode:0,stdout:'{"loggedIn":true}',stderr:''};o.onStdout('json');return {exitCode:0,stdout:fail==='parse'?'{bad':JSON.stringify({type:'result',subtype:'success',is_error:false,result:'ok',duration_api_ms:9,usage:{input_tokens:1}}),stderr:''};}});
+ const p=result.phaseTimings.reviewer;assert.ok(p.helpMs>0);assert.ok(p.cleanupMs>0);assert.ok(p.totalMs>0);assert.deepEqual(calls,fail==='help'?['help']:fail==='auth'?['help','auth']:['help','auth','model']);assert.equal(result.modelExecutionStarted,!['help','auth'].includes(fail));if(calls.includes('model'))assert.ok(p.firstOutputMs>0||fail==='model');if(fail===null)assert.equal(p.providerReported.duration_api_ms,9);
+ }
 });

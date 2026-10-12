@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {performance} from 'node:perf_hooks';
 import os from 'node:os';
 import path from 'node:path';
 import { adapters, invocation, parseResult } from './headless-adapters.mjs';
@@ -56,8 +57,12 @@ function classifyOutput(stderr, stdout = '') {
   return null;
 }
 
-export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeoutMs, preflightBudgetMs = 10000, signal, env, thinking='medium', resultSchema, onModelStart, runProcessImpl = runProcess, cleanupImpl = fs.rmSync, nowImpl = Date.now } = {}) {
+export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeoutMs, preflightBudgetMs = 10000, signal, env, thinking='medium', resultSchema, onModelStart, runProcessImpl = runProcess, cleanupImpl = fs.rmSync, nowImpl = Date.now, timingNowImpl = ()=>performance.now() } = {}) {
+  const timingStarted=timingNowImpl(), timings={helpMs:null,authStatusMs:null,cliExecutionMs:null,parseMs:null,cleanupMs:null,totalMs:null,firstOutputMs:null};
+  const duration=start=>{const end=timingNowImpl();return Number.isFinite(start)&&Number.isFinite(end)&&end>=start?end-start:null;};
+  const timed=async(key,fn)=>{const start=timingNowImpl();try{return await fn();}finally{timings[key]=duration(start);}};
   let modelExecutionStarted = false;
+  const run=async()=>{
   const output = fields => ({ ...clean(fields), modelExecutionStarted });
   if (signal?.aborted) return clean({ status: 'failed', reason: 'cancelled' });
   if (!['medium','high','xhigh'].includes(thinking) || typeof packet !== 'string' || !packet.trim() || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
@@ -70,13 +75,14 @@ export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeou
   const remaining = () => Math.max(0, timeoutMs - (nowImpl() - startedAt));
   try {
     cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-claude-review-'));
-    const execute = options => runProcessImpl(nodePath, options.args, {
+    const execute = options => timed(options.phase,()=>runProcessImpl(nodePath, options.args, {
       cwd, input: options.input, timeoutMs: options.timeoutMs, maxOutputBytes: MAX_OUTPUT_BYTES, signal,
       processTreeMode: 'job-object', jobMemoryBytes: JOB_MEMORY_BYTES, env: safeEnv,
-    });
+      ...(options.phase==='cliExecutionMs'?{onStdout:()=>{if(timings.firstOutputMs===null)timings.firstOutputMs=duration(timingStarted);}}:{}),
+    }));
     const helpBudget = Math.min(remaining(), preflightBudgetMs);
     if (!helpBudget) return clean({ status: 'failed', reason: 'preflight_timeout' });
-    const help = await execute({ args: [cliScript, '--help'], input: '', timeoutMs: helpBudget });
+    const help = await execute({ phase:'helpMs', args: [cliScript, '--help'], input: '', timeoutMs: helpBudget });
     if (help.failure) return clean({ status: 'failed', reason: help.failure === 'timeout' ? 'preflight_timeout' : 'preflight_failed' });
     if (help.exitCode !== 0) return clean({ status: 'failed', reason: 'preflight_failed' });
     if (adapters.claude.requiredFlags.some(flag => !help.stdout.includes(flag)) || resultSchema && !help.stdout.includes('--json-schema')) return clean({ status: 'failed', reason: 'unsupported_cli' });
@@ -84,7 +90,7 @@ export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeou
 
     const statusBudget = Math.min(remaining(), preflightBudgetMs);
     if (!statusBudget) return clean({ status: 'failed', reason: 'preflight_timeout' });
-    const auth = await execute({ args: [cliScript, 'auth', 'status', '--json'], input: '', timeoutMs: statusBudget });
+    const auth = await execute({ phase:'authStatusMs', args: [cliScript, 'auth', 'status', '--json'], input: '', timeoutMs: statusBudget });
     if (auth.failure) return clean({ status: 'failed', reason: auth.failure === 'timeout' ? 'preflight_timeout' : 'preflight_failed' });
     if (auth.exitCode !== 0) return clean({ status: 'failed', reason: 'preflight_failed' });
     let authStatus;
@@ -102,15 +108,19 @@ export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeou
     if (typeof onModelStart === 'function') await onModelStart();
     if (signal?.aborted) return clean({ status: 'failed', reason: 'cancelled' });
     modelExecutionStarted = true;
-    const result = await execute({ args: [cliScript, ...call.args], input: call.input, timeoutMs: callBudget });
+    const result = await execute({ phase:'cliExecutionMs', args: [cliScript, ...call.args], input: call.input, timeoutMs: callBudget });
     if (result.failure) return output({ status: 'failed', reason: result.failure === 'timeout' ? 'execution_timeout' : result.failure });
     if (result.exitCode !== 0) {
       const classified = classifyOutput(result.stderr || '', result.stdout || '');
       return output({ status: 'failed', ...(classified || { reason: 'cli_execution_failed' }) });
     }
     let parsed;
+    const parseStarted=timingNowImpl();
     try {
       parsed = parseResult('claude', result.stdout);
+      const provider=JSON.parse(result.stdout);
+      const reported=Object.fromEntries(['duration_ms','duration_api_ms','num_turns'].filter(k=>typeof provider[k]==='number'&&Number.isFinite(provider[k])&&provider[k]>=0).map(k=>[k,provider[k]]));
+      if(Object.keys(reported).length)timings.providerReported=reported;
       if (resultSchema) {
         const wrapper = JSON.parse(result.stdout);
         const structured = wrapper?.structured_output;
@@ -125,12 +135,17 @@ export async function runClaudeReviewerCli({ packet, nodePath, cliScript, timeou
       }
       return output({ status: 'failed', reason: incomplete ? 'incomplete_output' : 'invalid_json' });
     }
-    try { cleanupImpl(cwd, { recursive: true, force: true }); cwd = null; }
+    finally {timings.parseMs=duration(parseStarted);}
+    try { measuredCleanup(cwd, { recursive: true, force: true }); cwd = null; }
     catch { return output({ status: 'failed', reason: 'temporary_directory_cleanup_failed' }); }
     return output({ status: 'completed', text: parsed.text, usage: parsed.usage });
   } catch {
     return output({ status: 'failed', reason: 'runner_error' });
   } finally {
-    if (cwd) { try { cleanupImpl(cwd, { recursive: true, force: true }); } catch { /* Never expose filesystem details. */ } }
+    if (cwd) { try { measuredCleanup(cwd, { recursive: true, force: true }); } catch { /* Never expose filesystem details. */ } }
   }
+  };
+  function measuredCleanup(...args){const start=timingNowImpl();try{return cleanupImpl(...args);}finally{const elapsed=duration(start);timings.cleanupMs=elapsed===null?null:(timings.cleanupMs??0)+elapsed;}}
+  const result=await run();timings.totalMs=duration(timingStarted);
+  return {...result,phaseTimings:{reviewer:timings}};
 }

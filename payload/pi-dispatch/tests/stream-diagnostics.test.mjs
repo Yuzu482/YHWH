@@ -69,3 +69,20 @@ test('uses nonempty assistant text and leaves unfinished generation null',()=>{
   assert.equal(snapshot.generationMs,null);
   assert.equal(snapshot.processTailMs,null);
 });
+
+
+test('tool spans use bounded unique IDs, overlap-safe union and no private names',()=>{
+ let tick=0;const t=createExecutionTimeline({now:()=>tick});
+ t.event({type:'text_delta'});tick=1;t.event({type:'tool_start',callId:'a',name:'read'});tick=2;t.event({type:'tool_start',callId:'b',name:'secret / argument'});tick=4;t.event({type:'tool_end',callId:'a',name:'read'});tick=5;t.event({type:'tool_end',callId:'b',name:'secret / argument'});tick=6;t.event({type:'end'});
+ const s=t.snapshot();assert.equal(s.toolTiming.sumMs,6);assert.equal(s.toolTiming.wallMs,4);assert.equal(s.toolTiming.nonToolGenerationMs,2);assert.equal(JSON.stringify(s).includes('secret'),false);s.toolTiming.byName.read.sumMs=999;assert.equal(t.snapshot().toolTiming.byName.read.sumMs,3);
+});
+test('ambiguous, unfinished, reversed and overflowed tool intervals never manufacture durations',()=>{
+ for(const kind of ['missing','duplicate','unfinished','reverse','overflow']){
+ let tick=0;const t=createExecutionTimeline({now:()=>tick++});t.event({type:'tool_start',callId:kind==='missing'?undefined:'a',name:'read'});
+ if(kind==='duplicate')t.event({type:'tool_start',callId:'a',name:'read'});
+ if(kind==='reverse')tick=-10;
+ if(kind==='overflow')for(let i=0;i<130;i++)t.event({type:'tool_start',callId:'extra'+i,name:'read'});
+ if(kind!=='unfinished')t.event({type:'tool_end',callId:'a',name:'read'});
+ const s=t.snapshot();assert.equal(s.toolTiming.complete,false,kind);assert.equal(s.toolTiming.sumMs,null,kind);assert.ok(s.toolTiming.retainedSpans<=128);
+ }
+});

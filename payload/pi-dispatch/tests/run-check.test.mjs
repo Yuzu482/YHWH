@@ -5,6 +5,18 @@ import {validateKetherTask,compileKetherTask} from '../extensions/kether-envelop
 
 const verify={commands:[{id:'unit-test',argv:['npm','test'],cwd:'.'}]};
 const policy={version:1,projects:[{workspace:'/work/project',commands:[{argv:['npm','test'],cwd:'.',runnerId:'node-runner',cacheId:'npm-cache'}]}]};
+
+test('compiled Chesed guidance bounds names and allows only explicit same-turn schema corrections',()=>{
+  const task={role:'Chesed',objective:'Bounded fixture',writeScope:['file.js'],acceptance:['host regression']};
+  const prompt=compileKetherTask(task,{structuredResultTool:true});
+  assert.match(prompt,/at most 128 UTF-16 units/);assert.match(prompt,/unique, nonblank, non-NUL names/);
+  assert.match(prompt,/exactly one successful yhwh_submit_result submission/);
+  assert.match(prompt,/Only an explicit kether_result_rejection \/ RESULT_ROLE_SCHEMA_INVALID response/);
+  assert.match(prompt,/error, timeout, unknown outcome, or successful submission does not permit retry/);
+  const schema=JSON.parse(prompt.split('\n').find(l=>l.startsWith('RESULT_SCHEMA_JSON=')).slice('RESULT_SCHEMA_JSON='.length));
+  assert.equal(schema.properties.deliverable.properties.checks.items.properties.name.maxLength,128);
+  assert.equal(schema.properties.deliverable.properties.checks.maxItems,32);
+});
 test('verify is strict and rejects malicious shapes and command aliases',()=>{
   assert.equal(validateVerify(undefined),undefined);
   assert.deepEqual(validateVerify(verify),verify);

@@ -10,6 +10,35 @@ import {createRequestLedger,requestDigest} from '../extensions/request-ledger.js
 import {validateKetherTask} from '../extensions/kether-envelope.js';
 import {roleValue,handoff,ref} from './contract-fixtures.mjs';
 
+test('Chesed submission and final validation share host name and count bounds without changing other roles',()=>{
+  const schema=roleResultSchema('Chesed').properties.deliverable.properties.checks;
+  assert.equal(schema.maxItems,32);assert.equal(schema.items.properties.name.maxLength,128);
+  const value=roleValue('Chesed');
+  for(const outcome of ['passed','failed','unverified'])for(const name of ['x'.repeat(128),'😀'.repeat(64)]){
+    value.deliverable.checks=[{name,outcome,evidence:'Observed fixture'}];
+    assert.equal(validateRoleSubmission(value,'Chesed').ok,true);
+    assert.equal(validateRoleResult(value,'Chesed').ok,true);
+  }
+  for(const name of ['x'.repeat(129),'😀'.repeat(64)+'x','\0','   ']){
+    value.deliverable.checks=[{name,outcome:'passed',evidence:'Observed fixture'}];
+    assert.equal(validateRoleSubmission(value,'Chesed').ok,false);
+    assert.equal(validateRoleResult(value,'Chesed').ok,false);
+  }
+  value.deliverable.checks=Array.from({length:32},(_,i)=>({name:'check '+i,outcome:'passed',evidence:'Observed'}));
+  assert.equal(validateRoleSubmission(value,'Chesed').ok,true);
+  value.deliverable.checks.push({name:'check 32',outcome:'passed',evidence:'Observed'});
+  assert.match(validateRoleSubmission(value,'Chesed').message,/checks item count 33 exceeds maxItems 32/);
+  value.deliverable.checks=[{name:'x',outcome:'passed',evidence:'Observed'},{name:'x',outcome:'passed',evidence:'Observed'}];
+  assert.match(validateRoleResult(value,'Chesed').message,/checks\[1\].name duplicates/);
+  value.deliverable.checks[1].name='x ';
+  const unchanged=structuredClone(value);assert.equal(validateRoleSubmission(value,'Chesed').ok,true);assert.deepEqual(value,unchanged);
+  value.deliverable.checks=[];assert.equal(validateRoleSubmission(value,'Chesed').ok,true);
+  const netzach=roleValue('Netzach');netzach.deliverable.checks[0].name='x'.repeat(129);
+  assert.equal(validateRoleSubmission(netzach,'Netzach').ok,true);
+  assert.equal(roleResultSchema('Netzach').properties.deliverable.properties.checks.maxItems,256);
+  assert.equal(roleResultSchema('Netzach').properties.deliverable.properties.checks.items.properties.name.maxLength,262144);
+});
+
 test('legacy contract-2 request and result digests remain stable without typed metadata',()=>{
   const raw={contractVersion:2,role:'Chesed',objective:'Legacy digest fixture',acceptance:['host check'],readScope:['fixture.js'],writeScope:['fixture.js']};
   const task=validateKetherTask(raw);

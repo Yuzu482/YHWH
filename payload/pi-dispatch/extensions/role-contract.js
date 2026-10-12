@@ -12,7 +12,7 @@ const object = (properties, required=Object.keys(properties)) => ({type:'object'
 const array = items => ({type:'array', items, maxItems:256});
 const hostEvidence = object({requestId:{type:'string', pattern:/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/}, artifactSha256:{type:'string', pattern:/^[a-f0-9]{64}$/}, recordSha256:{type:'string', pattern:/^[a-f0-9]{64}$/}, checkName:{type:'string', minLength:1, maxLength:128}});
 const executionLimitation = {};
-const chesedCheck = object({name:nonempty, outcome:enumeration(['passed','failed','unverified']), evidence:text, hostEvidence, executionLimitation}, ['name','outcome','evidence']);
+const chesedCheck = object({name:{...nonempty,maxLength:128}, outcome:enumeration(['passed','failed','unverified']), evidence:text, hostEvidence, executionLimitation}, ['name','outcome','evidence']);
 const check = object({name:nonempty, outcome:enumeration(['passed','failed','unverified']), evidence:text, hostEvidence}, ['name','outcome','evidence']);
 const ROLES = ['Yesod','Binah','Hod','Malkuth','Chochmah','Chesed','Netzach','Geburah'];
 const deliverables = {
@@ -21,7 +21,7 @@ const deliverables = {
   Hod:object({complexity:enumeration(['low','medium','high']), risk:enumeration(['low','medium','high']), rationale:nonempty, dependencies:strings}),
   Malkuth:object({observations:strings, sources:strings, limitations:strings}),
   Chochmah:object({steps:array(object({id:nonempty, role:enumeration(ROLES), objective:nonempty, readScope:strings, writeScope:strings, dependsOn:strings, acceptance:strings})), verification:strings}),
-  Chesed:object({summary:nonempty, changes:strings, checks:array(chesedCheck)}),
+  Chesed:object({summary:nonempty, changes:strings, checks:{...array(chesedCheck),maxItems:32}}),
   Netzach:object({verdict:enumeration(['passed','failed','unverified']), checks:array(check)}),
   Geburah:object({findings:array(object({severity:enumeration(['info','low','medium','high','critical']), description:nonempty, evidence:text, blocking:{type:'boolean'}}, ['severity','description','evidence'])), recommendations:strings}),
 };
@@ -51,10 +51,13 @@ function validate(value, schema, path='$') {
     if (schema.required.some(k=>!Object.hasOwn(value,k)) || keys.some(k=>!Object.hasOwn(schema.properties,k))) throw new Error(`${path} has missing or extra fields`);
     for (const key of keys) validate(value[key],schema.properties[key],`${path}.${key}`);
   } else if (schema.type==='array') {
-    if (!Array.isArray(value) || value.length>schema.maxItems) throw new Error(`${path} must be a bounded array`);
+    if (!Array.isArray(value)) throw new Error(`${path} must be a bounded array`);
+    if (value.length>schema.maxItems) throw new Error(`${path} item count ${value.length} exceeds maxItems ${schema.maxItems}`);
     value.forEach((item,i)=>validate(item,schema.items,`${path}[${i}]`));
   } else if (schema.type==='string') {
-    if (typeof value!=='string' || (schema.minLength && !value.trim()) || (schema.maxLength && value.length>schema.maxLength) || (schema.enum && !schema.enum.includes(value)) || (schema.pattern && !schema.pattern.test(value))) throw new Error(`${path} has an invalid string value`);
+    if (typeof value!=='string') throw new Error(`${path} has an invalid string value`);
+    if (schema.maxLength && value.length>schema.maxLength) throw new Error(`${path} length ${value.length} exceeds maxLength ${schema.maxLength} (UTF-16 units)`);
+    if ((schema.minLength && !value.trim()) || (schema.enum && !schema.enum.includes(value)) || (schema.pattern && !schema.pattern.test(value))) throw new Error(`${path} has an invalid string value`);
   } else if (typeof value!==schema.type) throw new Error(`${path} must be ${schema.type}`);
 }
 
@@ -72,6 +75,15 @@ function validateRoleResultAtStage(value, role, {hostEvidenceResolver, submissio
   role = canonicalRole(role);
   try {
     validate(value,roleResultSchema(role));
+    if (role==='Chesed') {
+      const names=new Set();
+      value.deliverable.checks.forEach((check,index)=>{
+        const field=`$.deliverable.checks[${index}].name`;
+        if (check.name.includes('\0')) throw new Error(`${field} must not contain NUL`);
+        if (names.has(check.name)) throw new Error(`${field} duplicates an earlier check name; names must be unique`);
+        names.add(check.name);
+      });
+    }
     if (role!=='Netzach' && value?.deliverable?.checks?.some(c=>Object.hasOwn(c,'hostEvidence'))) throw Object.assign(new Error('hostEvidence is Netzach-only'),{code:'HOST_EVIDENCE_ROLE_INVALID'});
     if (role!=='Chesed' && value?.deliverable?.checks?.some(c=>Object.hasOwn(c,'executionLimitation'))) throw new Error('executionLimitation is Chesed-only');
     const metadataWarnings=[];

@@ -85,7 +85,8 @@ test('active dispatch and its result-recording tail both block replacement', asy
 
 test('queued monitor admissions block replacement even before their runner starts', async () => {
   const tasks = [{ state:'queued' }];
-  const monitor = { get size() { return tasks.length; }, list:() => tasks };
+  const monitor = { get size() { return tasks.length; }, list:() => tasks,
+    resultCache:{accepting:true},drain:async()=>({protectedResults:0,pendingWrites:0,lossRisk:false,timedOut:false}) };
   const runtime = createGatewayRuntime({ ...baseOptions(), taskMonitor:monitor });
   await assert.rejects(runtime.replaceAdapter('dispatch', { create:() => () => {} }), { code:'GATEWAY_BUSY' });
   tasks.length = 0;
