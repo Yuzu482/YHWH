@@ -49,9 +49,52 @@ export function measureReviewPacket(packet,{trustedPatch}={}) {
   return {totalUtf8Bytes:Buffer.byteLength(full,'utf8'),nonDiffUtf8Bytes:Buffer.byteLength(JSON.stringify(withoutDiff),'utf8'),validatedDiff};
 }
 
+// Read-only diagnostics. Caller equality is not trusted ledger provenance.
+// Without a bound diff we show a conservative measurement and a separately
+// labelled estimate; we never mistake the estimate for review admission.
+export function inspectReviewPacketBudget(packet,{tier='T2',trustedPatch}={}) {
+  if(!['T1','T2'].includes(tier))throw new Error('Invalid review tier');
+  const invalid=(location,message)=>({ok:false,readOnly:true,modelCalls:0,admissionReady:false,budget:null,sections:[],
+    violations:[{code:'REVIEW_MATERIALS_INVALID',location,message,blocking:true}],nextAction:'correct-materials-before-dispatch'});
+  if(!packet||typeof packet!=='object'||Array.isArray(packet))return invalid('reviewPacket','Review packet must be an object');
+  for(const name of REVIEW_SECTIONS){
+    const part=packet[name];
+    if(part!==undefined&&(!part||typeof part!=='object'||Array.isArray(part)||!Array.isArray(part.content??[])))
+      return invalid(`reviewPacket.${name}.content`,'Review section content must be an array');
+  }
+  const measured=measureReviewPacket(packet,{trustedPatch});
+  const diffBound=trustedPatch!==undefined&&measured.validatedDiff;
+  const budget={...measured,nonDiffUtf8Bytes:diffBound?measured.nonDiffUtf8Bytes:measured.totalUtf8Bytes,
+    projectedNonDiffUtf8Bytes:measured.nonDiffUtf8Bytes,diffBound,
+    nonDiffMaxUtf8Bytes:tier==='T1'?T1_REVIEW_BUDGET.nonDiffMaxUtf8Bytes:null,
+    totalMaxUtf8Bytes:tier==='T1'?T1_REVIEW_BUDGET.totalMaxUtf8Bytes:131072};
+  budget.remainingUtf8Bytes={total:Math.max(0,budget.totalMaxUtf8Bytes-budget.totalUtf8Bytes),
+    nonDiff:budget.nonDiffMaxUtf8Bytes===null?null:Math.max(0,budget.nonDiffMaxUtf8Bytes-budget.nonDiffUtf8Bytes)};
+  budget.overByUtf8Bytes={total:Math.max(0,budget.totalUtf8Bytes-budget.totalMaxUtf8Bytes),
+    nonDiff:budget.nonDiffMaxUtf8Bytes===null?null:Math.max(0,budget.nonDiffUtf8Bytes-budget.nonDiffMaxUtf8Bytes)};
+  const violations=[];
+  const add=(code,location,actual,limit,unit='utf8-bytes',blocking=true)=>violations.push({code,location,actual,limit,unit,blocking});
+  if(tier==='T1'&&packet.stage!=='post-change')violations.push({code:'REVIEW_MATERIALS_INVALID',location:'reviewPacket.stage',message:'T1 requires post-change review',blocking:true});
+  if(budget.totalUtf8Bytes>budget.totalMaxUtf8Bytes)add(tier==='T1'?'REVIEW_PACKET_T1_LIMIT':'REVIEW_PACKET_TOO_LARGE','reviewPacket.total',budget.totalUtf8Bytes,budget.totalMaxUtf8Bytes);
+  if(tier==='T1'&&budget.nonDiffUtf8Bytes>budget.nonDiffMaxUtf8Bytes)
+    add('REVIEW_PACKET_T1_LIMIT','reviewPacket.nonDiff',budget.nonDiffUtf8Bytes,budget.nonDiffMaxUtf8Bytes,'utf8-bytes',diffBound||!measured.validatedDiff||measured.nonDiffUtf8Bytes>budget.nonDiffMaxUtf8Bytes);
+  const sections=REVIEW_SECTIONS.map(name=>{
+    const part=packet[name],content=part?.content??[];
+    if(content.length>32)add('REVIEW_SECTION_STRING_LIMIT',`reviewPacket.${name}.content`,content.length,32,'strings');
+    content.forEach((s,i)=>{if(typeof s==='string'&&s.length>8000)add('REVIEW_STRING_LIMIT',`reviewPacket.${name}.content[${i}]`,s.length,8000,'utf16-units');});
+    return {location:`reviewPacket.${name}`,utf8Bytes:Buffer.byteLength(JSON.stringify(part??null),'utf8'),strings:content.length};
+  });
+  const hard=violations.some(v=>v.blocking);
+  return {ok:!hard,readOnly:true,modelCalls:0,budget,sections,violations,
+    requiresTrustedDiffBinding:tier==='T1'&&measured.validatedDiff&&!diffBound,
+    admissionReady:false,nextAction:hard?'organize-complete-reviews-by-commit-preserve-goal-quota':
+      tier==='T1'&&!diffBound?'bind-complete-diff-to-trusted-artifact-before-admission':'validate-materials-and-trusted-artifact-before-dispatch'};
+}
+
 export function enforceT1ReviewBudget(packet,options={}) {
   const measured=measureReviewPacket(packet,options);
-  if(packet.stage!=='post-change'||measured.totalUtf8Bytes>T1_REVIEW_BUDGET.totalMaxUtf8Bytes||measured.nonDiffUtf8Bytes>T1_REVIEW_BUDGET.nonDiffMaxUtf8Bytes)throw Object.assign(new Error(`T1 post-change reviewPacket requires non-diff <= 8192 and total <= 24576 UTF-8 bytes (non-diff=${measured.nonDiffUtf8Bytes}, total=${measured.totalUtf8Bytes}); organize complete reviews by commit without resetting whole-goal tier, identity or quota`),{code:'REVIEW_PACKET_T1_LIMIT',...measured});
+  if(packet.stage!=='post-change'||measured.totalUtf8Bytes>T1_REVIEW_BUDGET.totalMaxUtf8Bytes||measured.nonDiffUtf8Bytes>T1_REVIEW_BUDGET.nonDiffMaxUtf8Bytes)throw Object.assign(new Error(`T1 post-change reviewPacket requires non-diff <= 8192 and total <= 24576 UTF-8 bytes (non-diff=${measured.nonDiffUtf8Bytes}, total=${measured.totalUtf8Bytes}); organize complete reviews by commit without resetting whole-goal tier, identity or quota`),{code:'REVIEW_PACKET_T1_LIMIT',...measured,
+    ...inspectReviewPacketBudget(packet,{tier:'T1',trustedPatch:options.trustedPatch??(measured.validatedDiff?packet.changes.content.join(''):undefined)})});
   return measured;
 }
 
@@ -109,7 +152,8 @@ export function validateReviewPacket(packet, {tier='T2'}={}) {
   }
   const serializedBytes=Buffer.byteLength(JSON.stringify(result),'utf8');
   if (tier==='T1') enforceT1ReviewBudget(result);
-  if (serializedBytes>128*1024) throw new Error('reviewPacket exceeds 128 KiB');
+  if (serializedBytes>128*1024) throw Object.assign(new Error('reviewPacket exceeds 128 KiB'),{code:'REVIEW_PACKET_TOO_LARGE',
+    ...inspectReviewPacketBudget(result,{tier})});
   return result;
 }
 

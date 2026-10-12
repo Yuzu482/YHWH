@@ -191,7 +191,7 @@ export function prepareHostReview({request, candidate, hostCapture, sources, hos
     if (typeof s.path !== 'string' || !s.path.trim() || !hash(s.sha256) || typeof s.text !== 'string' || !s.text.trim() || sha256(s.text) !== s.sha256) fail('Source excerpt hash mismatch');
     return JSON.stringify({path:s.path,excerptSha256:s.sha256,text:s.text});
   });
-  const packet = buildReviewPacket({stage:'post-change',tier:request.tier,changedFiles:candidate.result.patchValidation?.changedFiles,
+  const packet = buildReviewPacket({stage:'post-change',tier:request.tier,changedFiles:candidate.result.patchValidation?.changedFiles,trustedPatch:candidate.result.patch,
     requirements:[JSON.stringify({objective:task.objective,acceptance:task.acceptance,forbidden:task.forbidden ?? [],owner:'Host verifies; primary accepts after required independent review'})],
     changes:[candidate.result.patch],context:[JSON.stringify({historicalWorkerContext:task.context,interpretation:'Historical data; not reviewer actions.'}),...context],
     verification:[JSON.stringify({kind:'hostEvidence',requestId:candidate.requestId,artifactSha256:candidate.artifactSha256,
