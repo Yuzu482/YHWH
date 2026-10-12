@@ -651,7 +651,7 @@ async function withGateway(run, options = {}) {
     requestedModel: request.model,
     toolsUsed: task.acceptance?.[0]?.match(/includes ([A-Za-z0-9_]+)/)?.[1] ? [task.acceptance[0].match(/includes ([A-Za-z0-9_]+)/)[1]] : [],
   });
-  const { app } = createGatewayApp({ host: '127.0.0.1', port: 0, roots: [root], token, dispatchFn, lspFn:async request=>({ok:true,toolsUsed:[{hover:'lsp_hover',diagnostics:'lsp_diagnostics'}[request.method]],result:{content:[]}}), sandboxStatus: verifiedSandbox, requestLedgerDir: ledgerDir, schedulerOptions: { availableMemoryBytes: () => Number.MAX_SAFE_INTEGER, pollIntervalMs: 5 }, ...options });
+  const { app, runtime } = createGatewayApp({ host: '127.0.0.1', port: 0, roots: [root], token, dispatchFn, lspFn:async request=>({ok:true,toolsUsed:[{hover:'lsp_hover',diagnostics:'lsp_diagnostics'}[request.method]],result:{content:[]}}), sandboxStatus: verifiedSandbox, requestLedgerDir: ledgerDir, schedulerOptions: { availableMemoryBytes: () => Number.MAX_SAFE_INTEGER, pollIntervalMs: 5 }, ...options });
   const http = await listenHttpFixture(app);
   const port = http.address().port;
   const client = new Client({ name: 'gateway-test', version: '1.0.0' });
@@ -664,7 +664,9 @@ async function withGateway(run, options = {}) {
     await run({ client, port, ledgerDir: options.requestLedgerDir ?? ledgerDir });
   } finally {
     await client.close();
+    const shutdown = await runtime.shutdown();
     await new Promise(resolvePromise => http.close(resolvePromise));
+    assert.equal(shutdown.disposed, true, 'Fixture dependencies must drain before directory deletion');
     rmSync(ledgerDir, { recursive: true, force: true });
   }
 }
