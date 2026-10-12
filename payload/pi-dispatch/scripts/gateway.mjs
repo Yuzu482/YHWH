@@ -33,6 +33,7 @@ import {exportResult} from '../extensions/result-export.js';
 import { createRequestLedger, RequestLedgerError } from '../extensions/request-ledger.js';
 import {createMilestoneLedger,describeMilestone} from '../extensions/milestone-ledger.js';
 import {inspectMilestoneRecovery,finalizeMilestoneRecovery} from './milestone-recovery.mjs';
+import {assertMilestoneAcceptance} from '../extensions/milestone-acceptance.js';
 import { createReviewAttemptLedger, REVIEW_QUOTA_POLICY, reviewBlockers } from './tier-review-policy.mjs';
 import { calculateExecutionBudget } from '../extensions/execution-budget.js';
 import { ResourceAwareExecutor, SCHEDULER_POLICY } from '../extensions/admission-scheduler.js';
@@ -492,9 +493,11 @@ export function createGatewayRuntime(options) {
     if(trackedAcceptance)task.milestone=trackedAcceptance.identity.milestone;
     if(trackedAcceptance?.status==='accepted'&&trackedAcceptance.artifactSha256!==artifactSha256)throw Object.assign(new Error('Accepted artifact mismatch'),{code:'PI_MILESTONE_CONFLICT'});
     if(trackedAcceptance&&trackedAcceptance.status!=='accepted')milestones.assertOpen(implementationRequestId,artifactSha256);
+    assertMilestoneAcceptance(trackedAcceptance,artifactSha256,{replaying:true,acceptanceState:trackedAcceptance?.status==='accepted'?ledger.getAcceptanceRecord(implementationRequestId).state:undefined});
     const acceptanceId=`acceptance-${createHash('sha256').update(`${implementationRequestId}\n${template.mode==='linked'?template.runAnchorSha256:template.taskAnchorSha256}\ntask_accepted`,'utf8').digest('hex')}`;
     const input={parentRunId:pending.parentRunId,workspaceSha256,anchor,artifactSha256,recordSha256,tier:template.tier};
     const execution=await ledger.execute({requestId:acceptanceId,operation:'task_accepted',input},async()=>{
+      assertMilestoneAcceptance(milestones?.get(implementationRequestId),artifactSha256);
       audit.record(buildAuditRecord({requestId:implementationRequestId,operation:'task_accepted',input:{access:'workspace-write'},task,result:{ok:true,status:'completed',hostVerification:source==='host'?{state:'completed',artifactSha256,recordSha256}:undefined},durationMs:0,telemetry:{taskAccepted:true,acceptedAt,parentRunId:pending.parentRunId,workspaceSha256,runAnchorSha256:anchor,tier:template.tier,counts:{files:template.files,addedLines:template.addedLines,deletedLines:template.deletedLines,estimatedLines:template.estimatedLines},baseTier:template.baseTier,riskProfile:template.riskProfile,semanticRisks:template.semanticRisks,implementationRequestIds,verification:{state:'completed',source,artifactSha256,recordSha256},hostVerification:source==='host'?{state:'completed',artifactSha256,recordSha256}:undefined}}));
       return {ok:true,acceptedAt};
     });
