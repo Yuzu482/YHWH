@@ -6,6 +6,52 @@ import {main} from '../scripts/host-handoff-client.mjs';
 import {mkdtempSync,writeFileSync,readFileSync,rmSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {execFileSync,spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+
+test('native review-budget CLI is offline, exclusive and returns actionable diagnostics',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'review-budget-cli-'));
+ try {
+  const patch='--- a/x.js\n+++ b/x.js\n@@ -0,0 +1 @@\n+x\n';
+  const input={stage:'post-change',tier:'T1',requirements:['Fixture'],changes:[patch],context:['漢'.repeat(4000)],verification:['Host exit0'],changedFiles:['x.js'],trustedPatch:patch};
+  const source=join(dir,'input.json'),output=join(dir,'output.json'),cli=fileURLToPath(new URL('../scripts/host-handoff-client.mjs',import.meta.url));
+  writeFileSync(source,JSON.stringify(input));
+  const result=JSON.parse(execFileSync(process.execPath,[cli,'review-budget',source,output],{encoding:'utf8',env:{...process.env,PI_GATEWAY_CONFIG:''}}));
+  assert.equal(result.ready,false);assert.equal(result.modelCalls,0);
+  const report=JSON.parse(readFileSync(output));assert.equal(report.ok,false);assert.equal(report.readOnly,true);assert.ok(report.budget.nonDiffUtf8Bytes>8192);
+  const first=readFileSync(output,'utf8');
+  const duplicate=spawnSync(process.execPath,[cli,'review-budget',source,output],{encoding:'utf8'});assert.equal(duplicate.status,1);assert.equal(readFileSync(output,'utf8'),first);
+  const bad=spawnSync(process.execPath,[cli,'review-budget',join(dir,'missing.json'),join(dir,'absent.json')],{encoding:'utf8'});assert.equal(bad.status,1);assert.equal(existsSync(join(dir,'absent.json')),false);
+  const usage=spawnSync(process.execPath,[cli,'review-budget'],{encoding:'utf8'});assert.equal(usage.status,1);assert.match(usage.stderr,/Usage/);
+  writeFileSync(source,'{bad-json');assert.equal(spawnSync(process.execPath,[cli,'review-budget',source,join(dir,'corrupt.json')]).status,1);assert.equal(existsSync(join(dir,'corrupt.json')),false);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test('review dispatch readiness returns malformed and hard budget issues without a model',()=>{
+ const request={tier:'T1',task:{reviewPacket:{changes:{content:'not-an-array'}}}};
+ assert.doesNotThrow(()=>inspectDispatchReadiness({request}));
+ assert.equal(inspectDispatchReadiness({request}).ok,false);
+ const oversized={version:1,stage:'post-change'};
+ for(const name of ['requirements','changes','context','verification'])oversized[name]={status:'provided',content:['x']};
+ oversized.context.content=['漢'.repeat(8000),'漢'.repeat(400)];request.task.reviewPacket=oversized;
+ const result=inspectDispatchReadiness({request});
+ assert.equal(result.ok,false);assert.equal(result.modelCalls,0);
+ assert.ok(result.issues.some(v=>v.location==='reviewPacket.total'&&v.unit==='utf8-bytes'));
+});
+
+test('offline budget-fit summary never claims review admission or accepts a task',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'review-fit-cli-'));
+ try{
+  const patch='--- a/x.js\n+++ b/x.js\n@@ -0,0 +1 @@\n+x\n';
+  const input={stage:'post-change',tier:'T1',requirements:['R'],changes:[patch],context:['C'],verification:['host exit0'],changedFiles:['x.js']};
+  const source=join(dir,'input.json'),output=join(dir,'report.json');writeFileSync(source,JSON.stringify(input));
+  const cli=fileURLToPath(new URL('../scripts/host-handoff-client.mjs',import.meta.url));
+  const summary=JSON.parse(execFileSync(process.execPath,[cli,'review-budget',source,output],{encoding:'utf8',env:{...process.env,PI_GATEWAY_CONFIG:''}}));
+  assert.equal(summary.budgetFits,true);assert.equal(summary.ready,false);assert.equal(summary.admissionReady,false);
+  assert.equal(summary.requiresTrustedDiffBinding,true);assert.equal(summary.modelCalls,0);
+  assert.equal(JSON.parse(readFileSync(output)).admissionReady,false);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
 
 export async function sessionFixture() {
   const cwd=process.cwd(),requestId='session-implementation',parentRunId='session-parent';

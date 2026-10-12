@@ -5,6 +5,7 @@ import {sha256,assertCandidate,assertHostCapture} from './host-handoff.mjs';
 import {prepareReviewBundle} from './host-handoff-flow.mjs';
 import {inspectPrimaryPacket,runtimePreflight} from './runtime-preflight.mjs';
 import {validateKetherInvocation} from './dispatch.mjs';
+import {inspectReviewPacketBudget,T1_REVIEW_BUDGET} from '../extensions/review-contract.js';
 
 const fail = message => {throw new Error(message);};
 const clone = value => structuredClone(value);
@@ -44,15 +45,24 @@ export function resumeStage(checkpoint,input) {
 export function reviewReadiness(input,options) {
   try {const bundle=prepareReviewBundle(input,options);return {ok:true,bundle,budget:bundle.budget,issues:[]};}
   catch(error) {
-    return {ok:false,modelCalls:0,issues:[{code:error.code??'HOST_REVIEW_NOT_READY',location:/8192|24576|budget/i.test(error.message)?'reviewPacket':'hostReviewInput',message:error.message}],
-      budget:{nonDiffMaxUtf8Bytes:8192,totalMaxUtf8Bytes:24576,nonDiffUtf8Bytes:error.nonDiffUtf8Bytes??null,totalUtf8Bytes:error.totalUtf8Bytes??null},
-      nextAction:/8192|24576|budget/i.test(error.message)?'organize-complete-reviews-by-commit-preserve-goal-quota':'correct-input-before-dispatch'};
+    const budgetFailure=['REVIEW_PACKET_T1_LIMIT','REVIEW_PACKET_TOO_LARGE','REVIEW_SECTION_STRING_LIMIT','REVIEW_STRING_LIMIT'].includes(error.code);
+    return {ok:false,modelCalls:0,issues:[{code:error.code??'HOST_REVIEW_NOT_READY',location:error.location??(budgetFailure?'reviewPacket':'hostReviewInput'),message:error.message}],
+      budget:error.budget??{nonDiffMaxUtf8Bytes:input?.request?.tier==='T1'?T1_REVIEW_BUDGET.nonDiffMaxUtf8Bytes:null,
+        totalMaxUtf8Bytes:input?.request?.tier==='T1'?T1_REVIEW_BUDGET.totalMaxUtf8Bytes:131072,
+        nonDiffUtf8Bytes:error.nonDiffUtf8Bytes??null,totalUtf8Bytes:error.totalUtf8Bytes??null},
+      violations:error.violations??[],sections:error.sections??[],
+      nextAction:budgetFailure?'organize-complete-reviews-by-commit-preserve-goal-quota':'correct-input-before-dispatch'};
   }
 }
 
 // The host supplies already-inspected source and command availability, not task text.
 export function inspectDispatchReadiness({request,sourceFacts=[],authorization,hostCommands=[],checkAvailability={available:false,reason:'not-inspected'}}) {
   const issues=[],packetCheck=inspectPrimaryPacket(request?.task);
+  let reviewBudget=null;
+  try {
+    if(request?.task?.reviewPacket)reviewBudget=inspectReviewPacketBudget(request.task.reviewPacket,{tier:request.tier??'T2'});
+    if(reviewBudget)issues.push(...reviewBudget.violations.filter(v=>v.blocking));
+  }catch(error){issues.push({code:'REVIEW_MATERIALS_INVALID',location:'task.reviewPacket',message:error.message});}
   if(!packetCheck.ok)issues.push(...packetCheck.criticalCodes.map(code=>({code,location:'task'})));
   try {
     const {cwd,access,provider,model,thinking,timeoutSeconds,resourceProfile,task}=request??{};
@@ -77,7 +87,7 @@ export function inspectDispatchReadiness({request,sourceFacts=[],authorization,h
   else for(const command of hostCommands)if(command.available!==true||typeof command.name!=='string'||!command.name.trim()||!Array.isArray(command.argv)||!command.argv.length||command.argv.some(a=>typeof a!=='string'||a.includes('\0'))||typeof command.cwd!=='string'||command.cwd!==request?.cwd)
     issues.push({code:'HOST_CHECK_UNAVAILABLE',location:'hostCommands',checkName:command.name??null});
   return {ok:issues.length===0,readOnly:true,modelCalls:0,issues,packetCheck,preflight:runtimePreflight(request?.task),
-    sandboxChecks:{available:checkAvailability.available===true,reason:checkAvailability.reason??null,advisory:true,hostVerificationRequired:true}};
+    reviewBudget,sandboxChecks:{available:checkAvailability.available===true,reason:checkAvailability.reason??null,advisory:true,hostVerificationRequired:true}};
 }
 
 export function timingBreakdown({events=[],intervals=[]}) {

@@ -1,4 +1,5 @@
 import {validateRoleResult,ROLE_SCHEMAS,resultDigest} from '../extensions/role-contract.js';
+import {assertReadableResult} from '../extensions/result-export.js';
 import {prepareHandoff,completedContract,collectHandoffResults,HANDOFF_POLICY,runAnchor} from '../extensions/stage-handoff.js';
 import {checkClaudeAuth,CLAUDE_API_POLICY} from './claude-api-auth.mjs';
 import {OPENAI_AUTH_POLICY} from './openai-auth-store.mjs';
@@ -741,7 +742,8 @@ export function createGatewayRuntime(options) {
               const originalResult={...response,trustedWriteScope:[...invocation.task.writeScope],structuredResult:validation.value,hostVerification:{state:'awaiting-host-verification',artifactSha256:response.patchValidation.patchSha256,requiredCheckNames:[...candidate.requiredCheckNames]},...(recoverableFileOnly?{artifactRecovery:true,recoveredErrors:response.toolErrors,unrecoveredErrors:0}:{})};
               const contractTemplate=completedContract(invocation.task,input,cwd,validation.value);
               if (tierDecision && actualTier) Object.assign(contractTemplate,tierContractMetadata({...actualTier,effective:response.tier}),{tierPolicyVersion:1});
-              const pending=ledger.registerHostPending({
+              let pending;
+              try { pending=ledger.registerHostPending({
                 requestId,
                 artifactSha256:response.patchValidation.patchSha256,
                 resultSha256:hostRecordDigest(originalResult),
@@ -750,11 +752,20 @@ export function createGatewayRuntime(options) {
                 goal:invocation.task.handoff?.runGoal??invocation.task.objective,
                 phase:invocation.task.handoff?.version===2?invocation.task.handoff.phaseIndex:1,
                 requiredCheckNames:candidate.requiredCheckNames,
-              },{originalResult,contractTemplate});
+              },{originalResult,contractTemplate}); }
+              catch(error) {
+                if(!['PI_RESULT_CAPACITY_EXCEEDED','PI_RESULT_OVERSIZED'].includes(error.code))throw error;
+                // Preserve the real execution and its complete artifact in the failure
+                // cache/ledger. This is NOT a zero-model-execution admission failure.
+                Object.assign(response,{ok:false,status:'failed',failure:error.code,failureCode:error.code,
+                  capacity:{location:error.location,unit:error.unit,actual:error.actual,limit:error.limit}});
+              }
+              if(pending) {
               response.status='awaiting-host-verification';
               response.ok=false;
               response.failure='awaiting-host-verification';
               response.hostVerification={state:'awaiting-host-verification',artifactSha256:pending.artifactSha256,requiredCheckNames:[...pending.requiredCheckNames]};
+              }
             } else if (tierGateFailed) { /* preserve the authoritative patch/tier failure */ }
             else if (validation.value.status!=='completed') {
               response.ok=false;
@@ -796,6 +807,15 @@ export function createGatewayRuntime(options) {
         }
         if (response.ok===true && invocation.task.role==='Chesed' && response.contract.tier==='T2' && response.contract.mode==='linked' && trustedPatchProof(response,requestId,invocation.task.writeScope)) {
           response.contract.artifactSha256=response.patchValidation.patchSha256;
+        }
+      }
+      if(operation!=='probe_model'&&response.ok===true) {
+        try {assertReadableResult(response,'dispatch.completedResult');}
+        catch(error) {
+          if(error.code!=='PI_RESULT_CAPACITY_EXCEEDED')throw error;
+          Object.assign(response,{ok:false,status:'failed',failure:error.code,failureCode:error.code,
+            capacity:{location:error.location,unit:error.unit,actual:error.actual,limit:error.limit}});
+          delete response.contract;
         }
       }
       if (verifierSource && response.ok===true && response.contract) {

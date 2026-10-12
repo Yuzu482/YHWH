@@ -4,12 +4,13 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { redactSensitiveText } from '../extensions/audit-log.js';
 import { describeSandboxFiles } from './artifact-apply.mjs';
+import { DATA_CAPACITY } from '../extensions/data-capacity.js';
 
 export const ISSUED_BLOCK = 'PI_PATCH_CONTAINS_ISSUED_CREDENTIAL';
 export const TOKEN_INVALID = 'PI_PATCH_TOKEN_INVALID';
 export const PATCH_INVALID = 'PI_PATCH_INVALID_BYTES';
 export const PATCH_POLICY = 'issued-credential-v1';
-const MAX_BYTES = 4 * 1024 * 1024;
+const MAX_BYTES = DATA_CAPACITY.patchMaxUtf8Bytes;
 
 function formsFor(value) {
   const forms = new Set([value, Buffer.from(value, 'utf8').toString('base64')]);

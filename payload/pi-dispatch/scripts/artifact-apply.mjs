@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { lstatSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { DATA_CAPACITY } from '../extensions/data-capacity.js';
 import { assertSafeFilesystemTarget, compileWriteScope, isAllowedPath, normalizeScopedPath } from '../extensions/write-scope-guard.js';
 
 const HEX = /^[a-f0-9]{64}$/;
@@ -34,7 +35,7 @@ function safePath(value) {
 
 // Count hunk lines before interpreting headers; hunk data remains byte-for-byte intact.
 export function parsePatchHeaders(patch) {
-  if (typeof patch !== 'string' || patch.includes('\0') || Buffer.byteLength(patch) > 4 * 1024 * 1024) throw new Error('invalid patch text');
+  if (typeof patch !== 'string' || patch.includes('\0') || Buffer.byteLength(patch) > DATA_CAPACITY.patchMaxUtf8Bytes) throw new Error('invalid patch text');
   const lines = patch.split('\n'), pairs = [], metadata = [];
   let old = 0, current = 0;
   for (let i = 0; i < lines.length; i++) {
