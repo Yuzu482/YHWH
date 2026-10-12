@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createHostPending, createHostAttestation, verifyHostPending, verifyHostAttestation, hostRecordDigest, hostSubmissionDigest, HostVerificationError} from '../extensions/host-verification.js';
+import {createHostPending, createHostAttestation, verifyHostPending, verifyHostAttestation, hostRecordDigest, hostSubmissionDigest, HostVerificationError,HOST_VERIFICATION_LIMITS} from '../extensions/host-verification.js';
+import {sanitizeResult} from '../extensions/result-export.js';
+
+test('shared proof budgets stay unchanged and redaction is bounded below JSON worst-case escaping',()=>{
+  assert.deepEqual(HOST_VERIFICATION_LIMITS,{maxCommands:32,commandUtf16Units:2048,outputUtf16Units:4096,checkNameUtf16Units:128});
+  assert.equal(Object.isFrozen(HOST_VERIFICATION_LIMITS),true);
+  for(const text of ['secret:x','Bearer x','"secret":""','a://u:p@','password=x;secret:y','\u0001','😀']){
+    const clean=sanitizeResult(text);assert.ok(JSON.stringify(clean).length-2<=6*text.length);
+    assert.equal(sanitizeResult(clean),clean);
+  }
+  const p=pending({requiredCheckNames:['secret:x']});assert.equal(sanitizeResult(p.requiredCheckNames[0]),p.requiredCheckNames[0]);
+});
 
 const hex = n => String(n).repeat(64);
 function pending(overrides = {}) { return createHostPending({requestId:'req-1', artifactSha256:hex('a'), resultSha256:hex('b'), workspace:'/tmp/work', parentRunId:'parent-1', goal:'test objective', phase:1, requiredCheckNames:['focused tests','build'], ...overrides}); }

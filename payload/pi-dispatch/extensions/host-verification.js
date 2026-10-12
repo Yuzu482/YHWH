@@ -3,10 +3,11 @@ import {sanitizeResult} from './result-export.js';
 
 const HEX = /^[a-f0-9]{64}$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const MAX_COMMANDS = 32;
-const MAX_COMMAND = 2048;
-const MAX_OUTPUT = 4096;
-const MAX_NAME = 128;
+export const HOST_VERIFICATION_LIMITS = Object.freeze({maxCommands:32,commandUtf16Units:2048,outputUtf16Units:4096,checkNameUtf16Units:128});
+const MAX_COMMANDS = HOST_VERIFICATION_LIMITS.maxCommands;
+const MAX_COMMAND = HOST_VERIFICATION_LIMITS.commandUtf16Units;
+const MAX_OUTPUT = HOST_VERIFICATION_LIMITS.outputUtf16Units;
+const MAX_NAME = HOST_VERIFICATION_LIMITS.checkNameUtf16Units;
 
 export class HostVerificationError extends Error {
   constructor(code, message = code) { super(message); this.name = 'HostVerificationError'; this.code = code; }

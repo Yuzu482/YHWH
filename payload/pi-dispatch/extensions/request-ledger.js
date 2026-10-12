@@ -1,4 +1,5 @@
-import {sanitizeResult, sanitizeCapturedResult} from './result-export.js';
+import {sanitizeResult, sanitizeCapturedResult, assertReadableResult} from './result-export.js';
+import {DATA_CAPACITY, assertPersistentRecord, measureCapacity} from './data-capacity.js';
 import { createHash, randomUUID } from 'node:crypto';
 import {validateRoleResult, resultDigest} from './role-contract.js';
 import {
@@ -7,10 +8,10 @@ import {
 import { join, resolve, sep } from 'node:path';
 import {writeFile as writeFileAsync,rename as renameAsync,unlink as unlinkAsync} from 'node:fs/promises';
 import { redactSensitiveText } from './audit-log.js';
-import { createHostPending, createHostAttestation, verifyHostPending, verifyHostAttestation, hostRecordDigest, hostSubmissionDigest } from './host-verification.js';
+import { createHostPending, createHostAttestation, verifyHostPending, verifyHostAttestation, hostRecordDigest, hostSubmissionDigest, HOST_VERIFICATION_LIMITS } from './host-verification.js';
 
 export const REQUEST_LEDGER_VERSION = 1;
-export const REQUEST_LEDGER_MAX_RESULT_BYTES = 32 * 1024 * 1024;
+export const REQUEST_LEDGER_MAX_RESULT_BYTES = DATA_CAPACITY.persistentRecordMaxUtf8Bytes;
 export const REQUEST_LEDGER_RETENTION_POLICY = Object.freeze({ completedDays: 14, criticalDays: 90, totalBytes: 512 * 1024 * 1024 });
 
 function canonicalize(value) {
@@ -46,9 +47,7 @@ function sanitizeForPersistence(value) {
 
 function atomicWriteJson(path, value) {
   const body = `${JSON.stringify(value)}\n`;
-  if (Buffer.byteLength(body, 'utf8') > REQUEST_LEDGER_MAX_RESULT_BYTES) {
-    throw new Error('request ledger result exceeds the persistent cache limit');
-  }
+  assertPersistentRecord(body);
   const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temp, body, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
@@ -67,6 +66,49 @@ export class RequestLedgerError extends Error {
     this.code = code;
     Object.assign(this, details);
   }
+}
+
+// Pure projection used both BEFORE proof writes and AFTER durable proof validation.
+// Its inputs are internal validated records; it grants no authority by itself.
+export function projectEffectiveResult(stored, pending, {attestation:record, verifier} = {}) {
+  if (!record) {
+    if (verifier) {
+      const source=stored.result?.structuredResult ?? stored.result?.response ?? stored.result;
+      const structuredResult={...(source && typeof source==='object' ? source : {}),status:'completed'};
+      if (!validateRoleResult(structuredResult,'Chesed').ok) return null;
+      const contract={...stored.contractTemplate,resultSha256:resultDigest(structuredResult)};
+      return sanitizeCapturedResult({...stored.result,status:'completed',state:'completed',ok:true,failure:null,contract,structuredResult,verificationSource:'netzach',verifierRequestId:verifier.verifierRequestId,verifierProofSha256:verifier.recordSha256,verifiedArtifactSha256:pending.artifactSha256,hostVerification:{state:'completed',artifactSha256:pending.artifactSha256,recordSha256:verifier.recordSha256,requiredCheckNames:[...pending.requiredCheckNames],source:'netzach'}},{mode:'stored'});
+    }
+    return sanitizeCapturedResult({...stored.result,status:'awaiting-host-verification',state:'awaiting-host-verification',ok:false,failure:null,contract:undefined},{mode:'stored'});
+  }
+  if (record.outcome !== 'completed') return sanitizeCapturedResult({...stored.result,status:'failed',state:'failed',ok:false,failure:null,contract:undefined,hostVerification:{state:'failed',artifactSha256:record.artifactSha256,recordSha256:record.recordSha256,requiredCheckNames:[...pending.requiredCheckNames],source:'host'}},{mode:'stored'});
+  const source = stored.result?.structuredResult ?? stored.result?.response ?? stored.result;
+  const structuredResult = {...(source && typeof source === 'object' ? source : {}), status:'completed'};
+  if (!validateRoleResult(structuredResult, 'Chesed').ok) return null;
+  const contract = {...stored.contractTemplate, resultSha256:resultDigest(structuredResult)};
+  const hostEvidence = record.commands.map(({checkName,command,exitCode,outputSummary})=>({checkName,command,exitCode,outputSummary}));
+  return sanitizeCapturedResult({...stored.result,status:'completed',state:'completed',ok:true,failure:null,contract,structuredResult,hostEvidence,hostVerification:{state:'completed',artifactSha256:record.artifactSha256,recordSha256:record.recordSha256,requiredCheckNames:[...pending.requiredCheckNames],source:'host'},verificationSource:'host',verificationRecordSha256:record.recordSha256,verifiedArtifactSha256:record.artifactSha256},{mode:'stored'});
+}
+
+// Sizing shapes only: never persisted, validated as facts, or used for acceptance.
+// Six JSON units per input unit (U+0001) dominates existing redaction expansion.
+export function inspectHostCompletionCapacity(stored, pending) {
+  const limits=HOST_VERIFICATION_LIMITS,hash='0'.repeat(64);
+  const record={outcome:'completed',artifactSha256:pending.artifactSha256,recordSha256:hash,
+    commands:pending.requiredCheckNames.map(checkName=>({checkName,command:'\u0001'.repeat(limits.commandUtf16Units),exitCode:0,outputSummary:'\u0001'.repeat(limits.outputUtf16Units)}))};
+  const measure=(kind,value)=>value===null?{kind,computable:false,actual:null}:
+    {kind,computable:true,...measureCapacity(JSON.stringify(sanitizeCapturedResult(value,{mode:'export'})),
+      {location:'host.completionReserve.'+kind,unit:'utf16-units',limit:DATA_CAPACITY.fullResultMaxUtf16Units})};
+  const projections=[measure('awaiting',projectEffectiveResult(stored,pending)),
+    measure('hostCompleted',projectEffectiveResult(stored,pending,{attestation:record})),
+    measure('hostFailed',projectEffectiveResult(stored,pending,{attestation:{...record,outcome:'failed'}}))];
+  if(['T0','T1'].includes(stored.contractTemplate?.tier))projections.push(measure('netzachCompleted',projectEffectiveResult(stored,pending,{verifier:{verifierRequestId:'v'.repeat(128),recordSha256:hash}})));
+  const actual=Math.max(...projections.filter(p=>p.computable).map(p=>p.actual));
+  const limit=DATA_CAPACITY.fullResultMaxUtf16Units;
+  return {ok:actual<=limit,location:'host.completionReserve',unit:'utf16-units',actual,limit,
+    checkCount:pending.requiredCheckNames.length,awaitingUnits:projections[0].actual,
+    reservedGrowthUnits:Math.max(0,actual-projections[0].actual),remainingUnits:Math.max(0,limit-actual),
+    completedProjectionComputable:projections[1].computable,projections};
 }
 
 export function createRequestLedger(directory, options = {}) {
@@ -245,7 +287,7 @@ export function createRequestLedger(directory, options = {}) {
       const body={version:1,requestId,state,result:safe,completedAt:new Date().toISOString()};
       const record={...body,digest:createHash('sha256').update(JSON.stringify(canonicalize(body)),'utf8').digest('hex')};
       atomicWriteJson(path,record); notify(requestId); return true;
-    } catch { return false; }
+    } catch (error) { if(error.code==='PI_RESULT_OVERSIZED')throw error; return false; }
   }
 
   async function saveMonitorResultAsync(requestId,{state,result}) {
@@ -253,7 +295,7 @@ export function createRequestLedger(directory, options = {}) {
     const safe=sanitizeCapturedResult(result,{mode:'capture'}),body={version:1,requestId,state,result:safe,completedAt:new Date().toISOString()};
     const record={...body,digest:createHash('sha256').update(JSON.stringify(canonicalize(body)),'utf8').digest('hex')};
     const serialized=JSON.stringify(record)+'\n';
-    if(Buffer.byteLength(serialized,'utf8')>REQUEST_LEDGER_MAX_RESULT_BYTES)throw Object.assign(new Error('PI_RESULT_OVERSIZED'),{code:'PI_RESULT_OVERSIZED'});
+    assertPersistentRecord(serialized);
     const target=cachePath(requestId),temp=`${target}.${process.pid}.${randomUUID()}.tmp`;
     try {await writeFileAsync(temp,serialized,{encoding:'utf8',mode:0o600,flag:'wx'});await renameAsync(temp,target);notify(requestId);return true;}
     catch {await unlinkAsync(temp).catch(()=>{});return false;}
@@ -319,6 +361,7 @@ export function createRequestLedger(directory, options = {}) {
     const pending = createHostPending({...input, contractTemplateSha256:hostRecordDigest(templateSnapshot)});
     if (hostRecordDigest(originalResult) !== pending.resultSha256) throw new RequestLedgerError('host_result_binding_mismatch', 'original result does not match pending digest');
     const snapshot = sanitizeCapturedResult(originalResult,{mode:'capture'});
+    const stored = {result:snapshot, contractTemplate:templateSnapshot};
     const paths = hostPaths(pending.requestId);
     if (existsSync(paths.pending)) {
       const prior = loadHostPending(pending.requestId);
@@ -329,6 +372,16 @@ export function createRequestLedger(directory, options = {}) {
       } catch { throw new RequestLedgerError('host_pending_conflict', 'original result conflicts or is tampered'); }
       return prior;
     }
+    // Old immutable pending records retain replay semantics; only NEW admissions
+    // reserve future proof growth. Exact proof-time capacity checks still apply.
+    assertReadableResult(projectEffectiveResult(stored,pending), 'host.awaitingResult');
+    assertReadableResult({...originalResult,status:'awaiting-host-verification',ok:false,failure:'awaiting-host-verification'}, 'host.liveAwaitingResult');
+    assertPersistentRecord(JSON.stringify(stored)+'\n','host.original');
+    assertPersistentRecord(JSON.stringify(pending)+'\n','host.pending');
+    const reserve=inspectHostCompletionCapacity(stored,pending);
+    if(!reserve.ok)throw new RequestLedgerError('PI_RESULT_CAPACITY_EXCEEDED',
+      'Result leaves insufficient capacity for bounded completion evidence',
+      {location:reserve.location,unit:reserve.unit,actual:reserve.actual,limit:reserve.limit,reservation:reserve});
     mkdirSync(paths.dir, {recursive:true, mode:0o700});
     atomicWriteJson(paths.original, {result:snapshot, contractTemplate:templateSnapshot});
     atomicWriteJson(paths.pending, pending);
@@ -370,7 +423,7 @@ export function createRequestLedger(directory, options = {}) {
     const pending = loadHostPending(submission?.requestId);
     if (!pending) throw new RequestLedgerError('host_not_pending', 'host verification request is not pending');
     const paths = hostPaths(submission.requestId);
-    validateHostSource(paths, pending, {throwOnError:true});
+    const stored=validateHostSource(paths, pending, {throwOnError:true});
     if (existsSync(paths.verifier)) throw new RequestLedgerError('host_verification_conflict', 'verifier proof is already present');
     const normalizedRecord = createHostAttestation(pending, submission);
     const priorDigest = (() => { try { return readJson(paths.attestation).recordSha256; } catch { return null; } })();
@@ -382,6 +435,7 @@ export function createRequestLedger(directory, options = {}) {
     }
     if (existsSync(paths.attestation)) throw new RequestLedgerError('host_verification_tampered', 'host verification record is invalid');
     const record = createHostAttestation(pending, submission, {timestamp:Date.now()});
+    assertReadableResult(projectEffectiveResult(stored,pending,{attestation:record}), 'host.verifiedResult');
     atomicWriteJson(paths.attestation, record);
     notify(submission.requestId);
     return record;
@@ -446,6 +500,7 @@ export function createRequestLedger(directory, options = {}) {
       if (hostRecordDigest(priorContent)!==hostRecordDigest(currentContent)) throw new RequestLedgerError('verifier_record_conflict','stored verifier proof conflicts');
       return prior;
     }
+    assertReadableResult(projectEffectiveResult(stored,pending,{verifier:record}), 'host.verifierResult');
     atomicWriteJson(paths.verifier,record);
     notify(input.implementationRequestId);
     return record;
@@ -477,26 +532,14 @@ export function createRequestLedger(directory, options = {}) {
       const recordPath = paths.attestation;
       if (!existsSync(recordPath)) {
         const verifier=validVerifierRecord(paths,pending,stored);
-        if (verifier) {
-          const source=stored.result?.structuredResult ?? stored.result?.response ?? stored.result;
-          const structuredResult={...(source && typeof source==='object' ? source : {}),status:'completed'};
-          if (!validateRoleResult(structuredResult,'Chesed').ok) return null;
-          const contract={...stored.contractTemplate,resultSha256:resultDigest(structuredResult)};
-          return sanitizeCapturedResult({...stored.result,status:'completed',state:'completed',ok:true,failure:null,contract,structuredResult,verificationSource:'netzach',verifierRequestId:verifier.verifierRequestId,verifierProofSha256:verifier.recordSha256,verifiedArtifactSha256:pending.artifactSha256,hostVerification:{state:'completed',artifactSha256:pending.artifactSha256,recordSha256:verifier.recordSha256,requiredCheckNames:[...pending.requiredCheckNames],source:'netzach'}},{mode:'stored'});
-        }
+        if (verifier) return projectEffectiveResult(stored,pending,{verifier});
         if (existsSync(paths.verifier)) return null;
-        return sanitizeCapturedResult({...stored.result,status:'awaiting-host-verification',state:'awaiting-host-verification',ok:false,failure:null,contract:undefined},{mode:'stored'});
+        return projectEffectiveResult(stored,pending);
       }
       let recordSha256; try { recordSha256 = readJson(recordPath).recordSha256; } catch { return null; }
       const record = getHostVerification({requestId, artifactSha256:pending.artifactSha256, recordSha256});
       if (!record) return null;
-      if (record.outcome !== 'completed') return sanitizeCapturedResult({...stored.result,status:'failed',state:'failed',ok:false,failure:null,contract:undefined,hostVerification:{state:'failed',artifactSha256:record.artifactSha256,recordSha256:record.recordSha256,requiredCheckNames:[...pending.requiredCheckNames],source:'host'}},{mode:'stored'});
-      const source = stored.result?.structuredResult ?? stored.result?.response ?? stored.result;
-      const structuredResult = {...(source && typeof source === 'object' ? source : {}), status:'completed'};
-      if (!validateRoleResult(structuredResult, 'Chesed').ok) return null;
-      const contract = {...stored.contractTemplate, resultSha256:resultDigest(structuredResult)};
-      const hostEvidence = record.commands.map(({checkName,command,exitCode,outputSummary})=>({checkName,command,exitCode,outputSummary}));
-      return sanitizeCapturedResult({...stored.result,status:'completed',state:'completed',ok:true,failure:null,contract,structuredResult,hostEvidence,hostVerification:{state:'completed',artifactSha256:record.artifactSha256,recordSha256:record.recordSha256,requiredCheckNames:[...pending.requiredCheckNames],source:'host'},verificationSource:'host',verificationRecordSha256:record.recordSha256,verifiedArtifactSha256:record.artifactSha256},{mode:'stored'});
+      return projectEffectiveResult(stored,pending,{attestation:record});
     } catch { return null; }
   }
 
