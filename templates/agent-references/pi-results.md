@@ -1,5 +1,12 @@
 ## Async result acceptance and review timing
 
+### Closing work
+Before ending a work round, call get_workflow({topic:'task-tiers',includeOpenItems:true}) and page both cursor and legacyCursor. Process every actionable item: required host checks/review followed by genuine acceptance, explicit abandon_artifact with exact hash/reason, or a stated remaining decision/blocker. Unresolved items must appear in the report; candidate-ready does not mean completed.
+
+A new attempt supersedes only the same milestone's unapplied awaiting artifact, after model start is observed. Queue/admission/zero-start failures cannot supersede it. Applied or verified-unaccepted artifacts block another implementation pending reconciliation. Apply intents survive crashes conservatively; do not reapply an uncertain write. Superseded/abandoned artifacts cannot be applied, verified or accepted; original results and replay remain readable.
+
+Stale means at least two hours without closure. Absent or contradictory time is unknown, never zero. Old tasks retain milestone:null and their original proof/acceptance identity. verified-without-acceptance-proof means no durable acceptance was established by the query, not proof that an old audit event never existed. List damaged records and coverage limits. Explicit legacy abandonment appends a separate closure record; it never rewrites pending files, original patches, attestations or audit history.
+
 ### Strict no-polling policy for Astra (user decision 2026-09-21)
 
 Astra must not repeatedly poll Pi tasks. Do not run timed get_subagent_status, list_subagents or get_subagent_result loops for the same active requests, including sleep-then-query loops, repeated 50/60-second batches, or loops hidden inside functions.exec, shell scripts or background helpers. This is a prohibition, not a suggestion to poll less frequently. It supersedes the earlier tool-side aggregation and 60-second fallback permission. Render the monitor at most once per task group when useful; its independent UI refresh and Pi's deterministic supervisor heartbeat do not require Astra to inspect each update.
