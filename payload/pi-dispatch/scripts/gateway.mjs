@@ -166,24 +166,72 @@ function reviewMaterial(task) {
   return { materialDigest, materialSections: sections };
 }
 
-export function registerMcpResponseCleanup(res, transport, server) {
+// Response resources are distinct from durable task results. A failed/hung close
+// must remain observable and must never authorize disposal of task dependencies.
+export function createResponseSessionRegistry({now = () => performance.now()} = {}) {
+  const entries = new Set();
+  let completed = 0, failed = 0, lastError = null, totalCleanupMs = 0;
+  const increment = n => Math.min(Number.MAX_SAFE_INTEGER, n + 1);
+  const snapshot = () => ({active:entries.size, pendingCleanup:[...entries].filter(e => e.promise).length,
+    completed, failed, lastError, totalCleanupMs});
+  return {
+    register(close) {
+      const entry = {promise:null};
+      entries.add(entry);
+      entry.close = () => {
+        if (!entry.promise) {
+          const start = now();
+          entry.promise = Promise.resolve().then(close).then(value => {
+            entries.delete(entry); completed = increment(completed);
+            totalCleanupMs = Math.min(Number.MAX_SAFE_INTEGER, totalCleanupMs + Math.max(0, now() - start));
+            return value;
+          }, error => {
+            entries.delete(entry); failed = increment(failed); lastError = 'session-cleanup-failed';
+            throw error;
+          });
+        }
+        return entry.promise;
+      };
+      return entry.close;
+    },
+    async drain(timeoutMs) {
+      if (!Number.isFinite(timeoutMs) || timeoutMs < 0) throw new Error('Invalid session drain timeout');
+      const work = Promise.allSettled([...entries].map(e => e.close()));
+      let timer, timedOut = false;
+      try {
+        // Even a zero deadline may observe already settled close promises.
+        await Promise.race([work, new Promise(resolve => {timer = setTimeout(() => {timedOut=true;resolve();}, timeoutMs);})]);
+      } finally { clearTimeout(timer); }
+      const state = snapshot();
+      return {...state, timedOut, ok:state.active === 0 && state.failed === 0,
+        reason:state.failed ? 'cleanup-failed' : state.active ? 'cleanup-pending' : null};
+    },
+    get stats() { return snapshot(); },
+  };
+}
+
+export function registerMcpResponseCleanup(res, transport, server, registry) {
   let cleanupPromise;
-  const onTerminated = () => { void cleanup(); };
+  const onTerminated = () => { void cleanup().catch(() => {}); };
   const detach = () => {
     res.off('close', onTerminated);
     res.off('finish', onTerminated);
     res.off('error', onTerminated);
   };
-  const cleanup = () => {
+  const perform = () => {
     if (!cleanupPromise) {
       detach();
       cleanupPromise = Promise.allSettled([
         Promise.resolve().then(() => transport.close()),
         Promise.resolve().then(() => server.close()),
-      ]);
+      ]).then(results => {
+        const failures = results.filter(r => r.status === 'rejected').map(r => r.reason);
+        if (failures.length) throw new AggregateError(failures, 'MCP response cleanup failed');
+      });
     }
     return cleanupPromise;
   };
+  const cleanup = registry ? registry.register(perform) : perform;
 
   res.once('close', onTerminated);
   res.once('finish', onTerminated);
@@ -285,7 +333,8 @@ export function createGatewayRuntime(options) {
   const unsubscribeHandoff=ledger?.subscribe?.(publishHandoff)??(()=>{});
   const finishHandoffWaiter=(waiter,value)=>{if(waiter.done)return;waiter.done=true;clearTimeout(waiter.timer);waiter.signal?.removeEventListener('abort',waiter.abort);const set=handoffWaiters.get(waiter.requestId);set?.delete(waiter);if(set?.size===0)handoffWaiters.delete(waiter.requestId);waiter.resolve(value);};
   const reviewAttempts = options.requestLedgerDir ? createReviewAttemptLedger(resolve(options.requestLedgerDir, 'review-attempts')) : null;
-  let phase = 'running', inFlight = 0, replacing, shutdownPromise;
+  let phase = 'running', inFlight = 0, replacing, shutdownPromise, mcpAdmissionClosed = false, mcpRecoveryReads = false;
+  const responseSessions = createResponseSessionRegistry();
   const idleWaiters = new Set();
   const pendingTasks = () => taskMonitor.list({ limit: taskMonitor.size }).filter(task => !['completed','failed','blocked','cancelled','awaiting-host-verification'].includes(task.state)).length;
   const unavailable = () => Object.assign(new Error(`Gateway is ${phase}`), { code:'GATEWAY_UNAVAILABLE' });
@@ -320,7 +369,7 @@ export function createGatewayRuntime(options) {
   const osSandbox = writeEnabled ? sandbox.backend : 'unavailable';
   const capabilities = () => ({
     ...publicCapabilities(),
-    lifecycle: { ...modules.snapshot(), phase, inFlight, pendingTasks:pendingTasks(), replacement:'trusted-host-idle-only', replaceableAdapters:['dispatch','lsp'] },
+    lifecycle: { ...modules.snapshot(), phase, inFlight, pendingTasks:pendingTasks(), responseSessions:responseSessions.stats, replacement:'trusted-host-idle-only', replaceableAdapters:['dispatch','lsp'] },
     editors: EDITOR_POLICY,
     projectMemory: PROJECT_MEMORY_POLICY,
     codeGraph: CODE_GRAPH_POLICY,
@@ -1296,6 +1345,10 @@ export function createGatewayRuntime(options) {
     const { graceMs = 10_000, abortWaitMs = 20_000 } = limits;
     if (![graceMs, abortWaitMs].every(value => Number.isFinite(value) && value >= 0)) return Promise.reject(new Error('Shutdown deadlines must be non-negative finite milliseconds'));
     phase = 'closing';
+    mcpAdmissionClosed = true;
+    mcpRecoveryReads = false;
+    const deadline = performance.now() + graceMs + abortWaitMs;
+    const remaining = () => Math.max(0, deadline - performance.now());
     shutdownPromise = (async () => {
       const errors = [];
       try { await replacing; }
@@ -1303,22 +1356,29 @@ export function createGatewayRuntime(options) {
       let execution;
       try { execution = await stopExecutor(executor, { graceMs, abortWaitMs }); }
       catch (error) { errors.push(error); }
-      await waitForOperations(abortWaitMs);
+      await waitForOperations(remaining());
       // A timed-out adapter can ignore cancellation. Keep its dependencies alive.
       if (inFlight || executor.state.active) {
         phase = 'draining';
         return { gatewayInstanceId, disposed:false, remainingOperations:inFlight, execution:{ ...execution, remainingActive:executor.state.active } };
       }
       // Let admitted monitor callbacks settle before final metadata cleanup.
-      const resultDurability=typeof taskMonitor.drain==='function'?await taskMonitor.drain({timeoutMs:2000}):
+      const resultDurability=typeof taskMonitor.drain==='function'?await taskMonitor.drain({timeoutMs:Math.min(2000,Math.floor(remaining()))}):
         {pendingWrites:null,protectedResults:null,lossRisk:true,timedOut:false,reason:'monitor-drain-unavailable'};
       if(resultDurability.lossRisk && typeof taskMonitor.drain==='function') {
         phase='draining';
+        mcpRecoveryReads = true;
         return {gatewayInstanceId,disposed:false,execution,resultDurability,code:'PI_RESULT_DRAIN_UNSAFE'};
       }
       workflowReceipts.clear();
       handoffClosed=true;unsubscribeHandoff();
       for(const waiters of [...handoffWaiters.values()])for(const waiter of [...waiters])finishHandoffWaiter(waiter,{ok:false,code:'GATEWAY_CLOSED',requestId:waiter.requestId});
+      const sessionCleanup = await responseSessions.drain(remaining());
+      if (!sessionCleanup.ok) {
+        phase = sessionCleanup.failed ? 'failed' : 'draining';
+        return {gatewayInstanceId, disposed:false, execution, resultDurability, sessionCleanup,
+          code:sessionCleanup.failed ? 'PI_SESSION_CLEANUP_FAILED' : 'PI_SESSION_DRAIN_INCOMPLETE'};
+      }
       let ledgerRetention, auditRetention;
       for (const [id, action] of [
         ['ledger', async () => { ledgerRetention = await ledger?.prune?.(); }],
@@ -1330,7 +1390,7 @@ export function createGatewayRuntime(options) {
       try { await modules.dispose(); } catch (error) { errors.push(error); }
       phase = errors.length ? 'failed' : 'disposed';
       if (errors.length) throw new AggregateError(errors, 'Gateway shutdown failed; all eligible cleanup was attempted');
-      return { gatewayInstanceId, disposed:true, execution:{ ...execution, remainingActive:executor.state.active }, auditRetention, ledgerRetention,resultDurability };
+      return { gatewayInstanceId, disposed:true, execution:{ ...execution, remainingActive:executor.state.active }, auditRetention, ledgerRetention,resultDurability,sessionCleanup };
     })();
     shutdownPromise.then(result => { if (!result.disposed) shutdownPromise = null; }, () => {});
     return shutdownPromise;
@@ -1340,7 +1400,16 @@ export function createGatewayRuntime(options) {
     phase = 'maintenance'; return true;
   }
   function resumeAfterUpgrade() { if (phase !== 'maintenance') return false; phase = 'running'; return true; }
-  return { makeServer, executor, capabilities, gatewayInstanceId, taskMonitor, shutdown, replaceAdapter, pauseForUpgrade, resumeAfterUpgrade };
+  const acceptsMcpRequests = body => {
+    if (!mcpAdmissionClosed) return true;
+    if (!mcpRecoveryReads || !body || Array.isArray(body)) return false;
+    // Retain the existing protected-result reader; executor/model admission
+    // stays closed. New clients may initialize solely to recover that result.
+    if (['initialize','notifications/initialized','tools/list'].includes(body.method)) return true;
+    return body.method === 'tools/call' && ['list_capabilities','get_subagent_result','get_subagent_status',
+      'list_subagents','list_host_verification_pending','get_task_handoff','cancel_subagent'].includes(body.params?.name);
+  };
+  return { makeServer, executor, capabilities, gatewayInstanceId, taskMonitor, responseSessions, acceptsMcpRequests, shutdown, replaceAdapter, pauseForUpgrade, resumeAfterUpgrade };
 }
 
 export function createGatewayApp(options) {
@@ -1390,9 +1459,14 @@ export function createGatewayApp(options) {
   });
   app.use('/mcp', express.json({ limit: maxRequestBytes, strict: true }));
   app.post('/mcp', async (req, res) => {
+    // No await between admission and resource registration: shutdown cannot
+    // interleave with an admitted request before its lease becomes visible.
+    if (!runtime.acceptsMcpRequests(req.body)) {
+      return res.status(503).json({error:'gateway closing or unavailable'});
+    }
     const server = runtime.makeServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    const cleanup = registerMcpResponseCleanup(res, transport, server);
+    const cleanup = registerMcpResponseCleanup(res, transport, server, runtime.responseSessions);
     try {
       if (res.destroyed || res.closed) {
         await cleanup();
@@ -1407,9 +1481,9 @@ export function createGatewayApp(options) {
     } catch (error) {
       console.error(JSON.stringify({ level: 'error', event: 'mcp_request_failed', error: error.message }));
       if (!res.headersSent && !res.destroyed) res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null });
-      await cleanup();
+      await cleanup().catch(() => {}); // registry records the failed close
     } finally {
-      if (res.destroyed || res.closed || res.writableEnded) await cleanup();
+      if (res.destroyed || res.closed || res.writableEnded) await cleanup().catch(() => {});
     }
   });
   app.get('/mcp', (_req, res) => res.status(405).json({ error: 'method not allowed' }));

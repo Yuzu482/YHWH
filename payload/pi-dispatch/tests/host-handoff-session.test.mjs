@@ -81,6 +81,26 @@ test('session caches only immutable matching preparation and never trusts return
   session.clear();assert.equal(session.stats.entries,0);assert.equal(session.stats.bytes,0);
 });
 
+test('session idle TTL refresh, exact boundary, release and terminal close preserve bounds',async()=>{
+  const {input,options}=await sessionFixture();let clock=0;
+  const session=createHostHandoffSession({idleTtlMs:100,now:()=>clock});
+  session.prepare(input,options);clock=99;assert.equal(session.prepare(input,options).cacheHit,true);
+  clock=198;assert.equal(session.stats.entries,1);clock=199;assert.equal(session.stats.entries,0);
+  assert.equal(session.stats.evictions.expired,1);assert.equal(session.stats.bytes,0);
+  session.prepare(input,options);assert.throws(()=>session.release(''),/Invalid/);assert.throws(()=>session.release('other'),/Unknown/);
+  assert.equal(session.stats.entries,1);assert.equal(session.release(input.request.requestId),1);assert.equal(session.stats.bytes,0);
+  session.prepare(input,options);session.clear();session.prepare(input,options);session.close();session.close();
+  assert.equal(session.stats.closed,true);assert.equal(session.stats.entries,0);assert.throws(()=>session.prepare(input,options),/closed/);
+});
+
+test('session rejects invalid or reversed clocks without evicting cached evidence',async()=>{
+  for(const idleTtlMs of [0,-1,Infinity,1.2])assert.throws(()=>createHostHandoffSession({idleTtlMs}),/TTL/);
+  const {input,options}=await sessionFixture();let clock=10;const session=createHostHandoffSession({now:()=>clock});
+  session.prepare(input,options);clock=9;assert.throws(()=>session.sweep(),/clock/);
+  clock=10;assert.equal(session.stats.entries,1);assert.equal(session.prepare(input,options).cacheHit,true);
+  clock=NaN;assert.throws(()=>session.stats,/clock/);clock=10;assert.equal(session.stats.entries,1);
+});
+
 test('session LRU count and byte budget are bounded without caching failures',async()=>{
   const {input,options}=await sessionFixture(),session=createHostHandoffSession({maxEntries:1,maxBytes:65536});
   session.prepare(input,options);session.prepare(input,{...options,requestId:'review-two'});assert.equal(session.stats.entries,1);

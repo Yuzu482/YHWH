@@ -104,20 +104,29 @@ export function timingBreakdown({events=[],intervals=[]}) {
   });
 }
 
-export function createHostHandoffSession({maxEntries=16,maxBytes=8*1024*1024}={}) {
+export function createHostHandoffSession({maxEntries=16,maxBytes=8*1024*1024,idleTtlMs=15*60*1000,now=()=>performance.now()}={}) {
   if(!Number.isInteger(maxEntries)||maxEntries<1||maxEntries>64||!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>32*1024*1024)fail('Invalid session cache bounds');
-  const cache=new Map();let bytes=0;
+  if(!Number.isSafeInteger(idleTtlMs)||idleTtlMs<1||typeof now!=='function')fail('Invalid session idle TTL or clock');
+  const cache=new Map();let bytes=0,closed=false,lastNow=-Infinity;
+  const evictions={expired:0,lru:0,released:0,cleared:0};
+  const remove=(key,reason)=>{const entry=cache.get(key);if(!entry)return;bytes-=entry.size;cache.delete(key);evictions[reason]=Math.min(Number.MAX_SAFE_INTEGER,evictions[reason]+1);};
+  const time=()=>{const value=now();if(!Number.isFinite(value)||value<lastNow)fail('Invalid or reversed session clock');lastNow=value;return value;};
+  const sweep=()=>{const at=time();for(const [key,entry]of cache)if(at-entry.lastAccess>=idleTtlMs)remove(key,'expired');return at;};
   return {
     prepare(input,options) {
-      const start=performance.now(),identity=binding(input),key=digest({identity,options});
-      if(cache.has(key)) {const entry=cache.get(key);cache.delete(key);cache.set(key,entry);return {...clone(entry.value),cacheHit:true,preparationMs:performance.now()-start};}
+      if(closed)fail('Session cache is closed');
+      const start=performance.now(),identity=binding(input),key=digest({identity,options}),at=sweep();
+      if(cache.has(key)) {const entry=cache.get(key);entry.lastAccess=at;cache.delete(key);cache.set(key,entry);return {...clone(entry.value),cacheHit:true,preparationMs:performance.now()-start};}
       const readiness=reviewReadiness(input,options);
       if(!readiness.ok)return {...readiness,cacheHit:false,preparationMs:performance.now()-start};
       const value={...readiness,summary:boundSummary(input,readiness.bundle,identity)},serialized=JSON.stringify(value),size=Buffer.byteLength(serialized);
-      if(size<=maxBytes){while(cache.size>=maxEntries||bytes+size>maxBytes){const first=cache.keys().next().value;bytes-=cache.get(first).size;cache.delete(first);}cache.set(key,{value:JSON.parse(serialized),size});bytes+=size;}
+      if(size<=maxBytes){while(cache.size>=maxEntries||bytes+size>maxBytes)remove(cache.keys().next().value,'lru');cache.set(key,{value:JSON.parse(serialized),size,lastAccess:at,requestId:identity.requestId});bytes+=size;}
       return {...clone(value),cacheHit:false,preparationMs:performance.now()-start};
     },
-    clear(){cache.clear();bytes=0;},
-    get stats(){return {entries:cache.size,bytes,maxEntries,maxBytes};},
+    sweep(){sweep();return cache.size;},
+    release(requestId){if(typeof requestId!=='string'||!requestId.trim())fail('Invalid session requestId');const keys=[...cache].filter(([,e])=>e.requestId===requestId).map(([key])=>key);if(!keys.length)fail('Unknown session requestId');for(const key of keys)remove(key,'released');return keys.length;},
+    clear(){for(const key of cache.keys())remove(key,'cleared');},
+    close(){for(const key of cache.keys())remove(key,'cleared');closed=true;},
+    get stats(){sweep();return {entries:cache.size,bytes,maxEntries,maxBytes,idleTtlMs,closed,evictions:{...evictions}};},
   };
 }
