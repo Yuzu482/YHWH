@@ -575,6 +575,48 @@ export function createRequestLedger(directory, options = {}) {
     return result;
   }
 
+  function getAcceptanceRecord(requestId) {
+    const source=getHostArtifact(requestId),effective=getEffectiveResult(requestId);
+    if(!source||effective?.state!=='completed')return {state:'not-verified'};
+    const {pending,contractTemplate:template}=source;
+    const anchor=template.runAnchorSha256??template.taskAnchorSha256;
+    const artifactSha256=effective.verifiedArtifactSha256,recordSha256=effective.verificationRecordSha256??effective.verifierProofSha256;
+    if(![anchor,artifactSha256,recordSha256].every(v=>/^[a-f0-9]{64}$/.test(v??'')))return {state:'unknown'};
+    const acceptanceId=`acceptance-${createHash('sha256').update(`${requestId}\n${template.mode==='linked'?template.runAnchorSha256:template.taskAnchorSha256}\ntask_accepted`,'utf8').digest('hex')}`;
+    const input={parentRunId:pending.parentRunId,workspaceSha256:createHash('sha256').update(pending.workspace).digest('hex'),anchor,artifactSha256,recordSha256,tier:template.tier};
+    const directory=join(root,entryKey(acceptanceId));
+    if(!existsSync(directory))return {state:'missing'};
+    try{
+      const started=readJson(join(directory,'started.json')),final=readJson(join(directory,'final.json')),digest=requestDigest('task_accepted',input);
+      if(started.requestId!==acceptanceId||started.operation!=='task_accepted'||started.requestDigest!==digest||final.requestId!==acceptanceId||final.operation!=='task_accepted'||final.requestDigest!==digest||final.ledgerVersion!==REQUEST_LEDGER_VERSION||final.state!=='completed'||final.result?.ok!==true)return {state:'unknown'};
+      return {state:'accepted',acceptedAt:final.result.acceptedAt};
+    }catch{return {state:'unknown'};}
+  }
+
+  // Bounded disk projection. Missing historical acceptance/timestamp data stays
+  // explicit; it is never replaced with fabricated milestone or zero time.
+  function listHostOpen({limit=100,cursor}={}) {
+    if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('limit must be between 1 and 100');
+    const entries=readdirSync(hostRoot,{withFileTypes:true}).filter(e=>e.isDirectory()&&/^[a-f0-9]{64}$/.test(e.name)).map(e=>e.name).sort();
+    if(cursor!==undefined&&(typeof cursor!=='string'||!/^[a-f0-9]{64}$/.test(cursor)))throw new Error('Invalid host artifact cursor');
+    const after=cursor===undefined?0:entries.findIndex(name=>name>cursor);
+    if(after===-1)return {items:[],cursor:null,damaged:0};
+    const items=[];let scanned=0,index=after,damaged=0;
+    for(;index<entries.length&&items.length<limit&&scanned<1024;index++,scanned++){
+      try{
+        const pending=readJson(join(hostRoot,entries[index],'pending.json'));
+        if(!verifyHostPending(pending))throw new Error('invalid pending');
+        const effective=getEffectiveResult(pending.requestId),acceptance=getAcceptanceRecord(pending.requestId);
+        if(!effective)throw new Error('invalid source');
+        if(acceptance.state==='accepted')continue;
+        let createdAt=null;try{const started=readJson(join(root,entryKey(pending.requestId),'started.json'));if(started.requestId===pending.requestId&&Number.isFinite(Date.parse(started.startedAt)))createdAt=started.startedAt;}catch{}
+        const elapsed=createdAt===null?null:Date.now()-Date.parse(createdAt);
+        items.push({requestId:pending.requestId,parentRunId:pending.parentRunId,workspace:pending.workspace,artifactSha256:pending.artifactSha256,status:effective.state==='completed'?'verified-without-acceptance-proof':effective.state,acceptanceState:acceptance.state,createdAt,stale:elapsed===null||elapsed<0?null:elapsed>=7200000});
+      }catch{damaged++;}
+    }
+    return {items,cursor:index<entries.length?entries[index-1]:null,damaged};
+  }
+
   function getOutcome(requestId) {
     const effective = getEffectiveResult(requestId);
     if (effective) return effective.state === 'awaiting-host-verification' ? {state:effective.state} : {state:effective.state, ...(effective.contract?{contract:effective.contract,handoffResult:effective.structuredResult}:{})};
@@ -608,6 +650,20 @@ export function createRequestLedger(directory, options = {}) {
     recordVerifierVerification,
     getEffectiveResult,
     listHostPending,
+    listHostOpen,
+    getAcceptanceRecord,
+    getExecutionRecordByDigest(requestId, digest) {
+      if(typeof requestId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(requestId)||!/^[a-f0-9]{64}$/.test(digest??''))return {state:'damaged'};
+      const directory=join(root,entryKey(requestId));
+      try{
+        const started=readJson(join(directory,'started.json'));
+        if(started.requestId!==requestId||started.operation!=='dispatch_subagent'||started.requestDigest!==digest)return {state:'damaged'};
+        if(!existsSync(join(directory,'final.json')))return {state:'in-doubt'};
+        const final=readJson(join(directory,'final.json'));
+        if(final.requestId!==requestId||final.operation!=='dispatch_subagent'||final.requestDigest!==digest||final.ledgerVersion!==REQUEST_LEDGER_VERSION||final.state!=='completed'||!Number.isFinite(Date.parse(final.completedAt))||!Object.hasOwn(final,'result'))return {state:'damaged'};
+        return {state:'completed',digest,result:sanitizeCapturedResult(final.result,{mode:'stored'})};
+      }catch{return existsSync(directory)?{state:'damaged'}:{state:'missing'};}
+    },
     subscribe,
     getExecutionRecord(requestId, operation, input) {
       const digest=requestDigest(operation,input), key=entryKey(requestId), dir=join(root,key);

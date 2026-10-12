@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {canonicalRole, resultDigest} from './role-contract.js';
 import {sanitizeResult} from './result-export.js';
+import {describeMilestone,validateMilestonePlan} from './milestone-ledger.js';
 
 export const STAGES = {compiled:'Yesod', clarified:'Binah', classified:'Hod', scouted:'Malkuth', planned:'Chochmah', 'pre-review':'Geburah', implementing:'Chesed', verifying:'Netzach', 'post-review':'Geburah'};
 const required = {compiled:[], clarified:['compiled'], classified:[], scouted:[], planned:['scouted'], 'pre-review':['planned'], implementing:['pre-review'], verifying:['implementing'], 'post-review':['verifying']};
@@ -85,8 +86,10 @@ export function completedContract(task,input,cwd,value) {
   const knownScope=canonicalRole(task.role)==='Geburah'&&stageFor(task)==='pre-review'?(task.context??[]).find(item=>typeof item==='string'&&/^KNOWN_SCOPE=\s*\S/u.test(item)):undefined;
   const primaryPlan=task.reviewPacket?.changes?.content;
   const knownScopeSha256=knownScope&&Array.isArray(primaryPlan)?createHash('sha256').update(JSON.stringify({knownScope,plan:primaryPlan})).digest('hex'):undefined;
+  const milestoneDefinitions=canonicalRole(task.role)==='Geburah'&&stageFor(task)==='pre-review'&&task.milestonePlan
+    ? validateMilestonePlan(task.milestonePlan).map(item=>{const d=describeMilestone({...item,workspace:cwd,parentRunId:input.parentRunId});return {id:item.milestone.id,definitionSha256:d.definitionSha256};}) : undefined;
   return {version:2,role:canonicalRole(task.role),stage:stageFor(task),mode:handoff?'linked':'standalone',parentRunId:input.parentRunId??null,
-    workspaceSha256:workspaceDigest(cwd),resultSha256:resultDigest(value),...(knownScopeSha256?{knownScopeSha256}:{}),...(handoff?.version===2?{handoffVersion:2,runAnchorSha256:runAnchor(handoff),phaseIndex:handoff.phaseIndex}:taskAnchorSha256?{taskAnchorSha256}:{}),...(canonicalRole(task.role)==='Geburah'?{reviewDecision:value.reviewDecision}:{})};
+    workspaceSha256:workspaceDigest(cwd),resultSha256:resultDigest(value),...(milestoneDefinitions?{milestoneDefinitions}:{}),...(knownScopeSha256?{knownScopeSha256}:{}),...(handoff?.version===2?{handoffVersion:2,runAnchorSha256:runAnchor(handoff),phaseIndex:handoff.phaseIndex}:taskAnchorSha256?{taskAnchorSha256}:{}),...(canonicalRole(task.role)==='Geburah'?{reviewDecision:value.reviewDecision}:{})};
 }
 
 export function collectHandoffResults(task, ledger) {
