@@ -27,10 +27,12 @@ test('structured result tool is explicit, WSL-only, and role-ceiling bounded', (
 test('structured result prompt requests schema payload only when opted in', () => {
   const task = { role: 'Chesed', objective: 'Do work', acceptance: ['Report result'] };
   const enabled = compileKetherTask(task, { structuredResultTool: true });
-  assert.match(enabled, /Call yhwh_submit_result exactly once/);
+  assert.match(enabled, /exactly one successful yhwh_submit_result submission/);
+  assert.match(enabled, /Only an explicit kether_result_rejection \/ RESULT_ROLE_SCHEMA_INVALID response/);
+  assert.match(enabled, /error, timeout, unknown outcome, or successful submission does not permit retry/);
   assert.match(enabled, /short final acknowledgement/);
   const legacy = compileKetherTask(task);
-  assert.doesNotMatch(legacy, /Call yhwh_submit_result/);
+  assert.doesNotMatch(legacy, /successful yhwh_submit_result submission/);
   assert.match(legacy, /Return exactly one line: KETHER_RESULT_JSON=/);
 });
 

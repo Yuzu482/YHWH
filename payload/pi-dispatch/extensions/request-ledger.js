@@ -5,6 +5,7 @@ import {
   chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
+import {writeFile as writeFileAsync,rename as renameAsync,unlink as unlinkAsync} from 'node:fs/promises';
 import { redactSensitiveText } from './audit-log.js';
 import { createHostPending, createHostAttestation, verifyHostPending, verifyHostAttestation, hostRecordDigest, hostSubmissionDigest } from './host-verification.js';
 
@@ -245,6 +246,17 @@ export function createRequestLedger(directory, options = {}) {
       const record={...body,digest:createHash('sha256').update(JSON.stringify(canonicalize(body)),'utf8').digest('hex')};
       atomicWriteJson(path,record); notify(requestId); return true;
     } catch { return false; }
+  }
+
+  async function saveMonitorResultAsync(requestId,{state,result}) {
+    if(closed||typeof requestId!=='string'||!requestId||!['completed','failed','cancelled','blocked','awaiting-host-verification'].includes(state))return false;
+    const safe=sanitizeCapturedResult(result,{mode:'capture'}),body={version:1,requestId,state,result:safe,completedAt:new Date().toISOString()};
+    const record={...body,digest:createHash('sha256').update(JSON.stringify(canonicalize(body)),'utf8').digest('hex')};
+    const serialized=JSON.stringify(record)+'\n';
+    if(Buffer.byteLength(serialized,'utf8')>REQUEST_LEDGER_MAX_RESULT_BYTES)throw Object.assign(new Error('PI_RESULT_OVERSIZED'),{code:'PI_RESULT_OVERSIZED'});
+    const target=cachePath(requestId),temp=`${target}.${process.pid}.${randomUUID()}.tmp`;
+    try {await writeFileAsync(temp,serialized,{encoding:'utf8',mode:0o600,flag:'wx'});await renameAsync(temp,target);notify(requestId);return true;}
+    catch {await unlinkAsync(temp).catch(()=>{});return false;}
   }
 
   function readMonitorResult(requestId) {
@@ -542,6 +554,7 @@ export function createRequestLedger(directory, options = {}) {
     execute,
     recordOutcome,
     saveMonitorResult,
+    saveMonitorResultAsync,
     readMonitorResult,
     getOutcome,
     registerHostPending,

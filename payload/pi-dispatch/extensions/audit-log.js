@@ -1,3 +1,18 @@
+const count = n => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : null;
+export function normalizeUsage(value) {
+  const u = value && typeof value === 'object' ? value : {};
+  const inputTokens = count(u.inputTokens ?? u.input ?? u.input_tokens);
+  const outputTokens = count(u.outputTokens ?? u.output ?? u.output_tokens);
+  const cacheReadTokens = count(u.cacheReadTokens ?? u.cacheRead ?? u.cache_read_input_tokens);
+  const cacheWriteTokens = count(u.cacheWriteTokens ?? u.cacheWrite ?? u.cache_creation_input_tokens);
+  const reasoningTokens = count(u.reasoningTokens ?? u.output_tokens_details?.thinking_tokens);
+  const components = [inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens];
+  const explicit = count(u.totalTokens ?? u.total_tokens);
+  const totalTokens = explicit ?? (components.every(n => n !== null) ? count(components.reduce((a,b)=>a+b,0)) : null);
+  return {inputTokens,outputTokens,cacheReadTokens,cacheWriteTokens,reasoningTokens,totalTokens};
+}
+
+
 import { createHash, randomUUID } from 'node:crypto';
 import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -108,10 +123,14 @@ function finiteNumber(value) {
 
 export function summarizeUsage(usage) {
   if (!usage || typeof usage !== 'object') return { available: false };
-  const inputTokens = finiteNumber(usage.inputTokens ?? usage.input);
-  const outputTokens = finiteNumber(usage.outputTokens ?? usage.output);
-  const cacheReadTokens = finiteNumber(usage.cacheReadTokens ?? usage.cacheRead);
-  const cacheWriteTokens = finiteNumber(usage.cacheWriteTokens ?? usage.cacheWrite);
+  if(usage.execution?.scope==='execution-assistant-message-end'){
+    const u=normalizeUsage(usage.execution),e=usage.execution;
+    return {available:u.totalTokens!==null,...u,scope:e.scope,complete:e.complete===true,expectedMessages:finiteNumber(e.expectedMessages),observedMessages:finiteNumber(e.observedMessages)};
+  }
+  const inputTokens = finiteNumber(usage.inputTokens ?? usage.input ?? usage.input_tokens);
+  const outputTokens = finiteNumber(usage.outputTokens ?? usage.output ?? usage.output_tokens);
+  const cacheReadTokens = finiteNumber(usage.cacheReadTokens ?? usage.cacheRead ?? usage.cache_read_input_tokens);
+  const cacheWriteTokens = finiteNumber(usage.cacheWriteTokens ?? usage.cacheWrite ?? usage.cache_creation_input_tokens);
   const totalTokens = finiteNumber(usage.totalTokens) ?? (
     inputTokens !== undefined || outputTokens !== undefined || cacheReadTokens !== undefined || cacheWriteTokens !== undefined
       ? (inputTokens || 0) + (outputTokens || 0) + (cacheReadTokens || 0) + (cacheWriteTokens || 0)
@@ -119,6 +138,18 @@ export function summarizeUsage(usage) {
   );
   if (totalTokens === undefined) return { available: false };
   return { available: true, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, totalTokens };
+}
+
+export function sanitizePhaseTimings(value) {
+  if(!value || typeof value!=='object')return undefined;
+  const number=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=Number.MAX_SAFE_INTEGER?n:null;
+  const select=(v,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(v??{},k)).map(k=>[k,number(v[k])]));
+  const out=select(value,['authenticationMs','startupMs','timeToFirstResponseMs','generationMs','processMs','processTailMs','cleanupMs']);
+  if(['stream-delta','completed-message'].includes(value.firstResponseSource))out.firstResponseSource=value.firstResponseSource;
+  if(value.stream){out.stream=select(value.stream,['thinkingDeltas','textDeltas','toolStarts','toolEnds','toolErrors','firstTextMs','lastEventMs']);if(typeof value.stream.lastEventType==='string'&&/^[A-Za-z_]{1,64}$/.test(value.stream.lastEventType))out.stream.lastEventType=value.stream.lastEventType;}
+  if(value.toolTiming){const t=value.toolTiming;out.toolTiming={...select(t,['observedStarts','observedEnds','retainedSpans','sumMs','wallMs','nonToolGenerationMs']),complete:t.complete===true,byName:{}};for(const [name,v]of Object.entries(t.byName??{}).slice(0,32))if(/^[A-Za-z0-9_.:-]{1,128}$/.test(name))Object.defineProperty(out.toolTiming.byName,name,{value:select(v,['count','sumMs']),enumerable:true});}
+  if(value.reviewer){out.reviewer=select(value.reviewer,['helpMs','authStatusMs','cliExecutionMs','parseMs','cleanupMs','totalMs','firstOutputMs']);if(value.reviewer.providerReported)out.reviewer.providerReported=select(value.reviewer.providerReported,['duration_ms','duration_api_ms','num_turns']);}
+  return out;
 }
 
 function summarizeTools(result) {
@@ -285,7 +316,7 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
       actualProvider: result?.provider,
       actualModel: result?.model,
     },
-    phaseTimings: result?.phaseTimings,
+    phaseTimings: sanitizePhaseTimings(result?.phaseTimings),
     ...(result?.sandboxEvidence?{sandboxEvidence:{evidenceKind:'sandboxEvidence',ok:result.sandboxEvidence.ok===true,receipts:(result.sandboxEvidence.receipts??[]).slice(0,8).map(r=>({commandId:r.commandId,argv:r.argv.map(v=>redactSensitiveText(v,{compact:false})),cwd:r.cwd,exitCode:r.exitCode,signal:r.signal,reason:r.reason,startedAt:r.startedAt,endedAt:r.endedAt,outputBytes:r.outputBytes,outputSha256:r.outputSha256,outputSummary:redactSensitiveText(r.outputSummary,{compact:false}),cleanupOk:r.cleanupOk,taskSha256:r.taskSha256,policySha256:r.policySha256,trustSha256:r.trustSha256,snapshotSha256:r.snapshotSha256})),terminal:result.sandboxEvidence.terminal??null,failure:result.sandboxEvidence.failure??null}}:{}),
     executionMode: result?.executionMode,
     // Internal adapter identity is separate from process isolation/transport runtime.

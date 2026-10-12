@@ -271,7 +271,7 @@ export function createGatewayRuntime(options) {
     definition('writeLocks', () => options.requestLedgerDir ? createWriteScopeLockManager(resolve(options.requestLedgerDir, 'write-scope-locks')) : null, ['ledger']),
     definition('taskMonitor', () => createTaskMonitor({ gatewayInstanceId, maxEntries: options.monitorMaxEntries ?? 512,
       maxResultBytes:options.monitorMaxResultBytes??134217728,terminalTtlMs:options.monitorTerminalTtlMs??3600000,maintenanceIntervalMs:options.monitorMaintenanceIntervalMs??60000,
-      persistResult:(id,value)=>ledger?.saveMonitorResult(id,value)===true,loadResult:id=>ledger?.readMonitorResult(id)??null }), ['ledger']),
+      persistResult:options.requestLedgerDir?(id,value)=>ledger.saveMonitorResultAsync(id,value):undefined,loadResult:id=>ledger?.readMonitorResult(id)??null }), ['ledger']),
     definition('memoryContext', () => createProjectMemoryContext({roots}), ['ledger']),
     definition('dispatch', () => dispatch),
     definition('lsp', () => runDirectLsp),
@@ -329,7 +329,8 @@ export function createGatewayRuntime(options) {
     },
     lsp: {piAdapter:{name:"yhwh-pi-lsp",version:"1.6.0",reuse:"task-local immutable snapshot",idleTimeoutMs:15000,pythonBackendSlots:2,clangdCleanup:"await-exit",csharpProfile:"isolated-single-file",javaProfile:"isolated-tier1",goProfile:"gopls-pull",rustProfile:"rustc-single-file",toolPrefix:"yhwh_lsp_",transport:"task-scoped IPC",scope:"single-file snapshot",legacyCompatibility:true}, semanticEngine:"multilspy", semanticEngineVersion:"0.0.15", structuralEngine:"pi-lsp-extension/tree-sitter", officialAdapters:{python:"JediServer: hover/definition/references/symbols/completions",typescript:"TypeScriptLanguageServer: all seven semantic operations",javascript:"TypeScriptLanguageServer: all seven semantic operations"}, controlledProfiles:["python diagnostics/code_actions: Pyright","java: JDT LS","c/cpp: clangd","csharp: csharp-ls","go: gopls","rust: rust-analyzer + rustc"], automaticFallback:false, executionMode:"direct", modelRequired:false, credentialsRequired:false, sandboxRequired:true, scope:"single-file snapshot", methods:Object.keys(LSP_METHODS), positions:"1-based", query:"exact symbol or structural pattern; no natural-language interpretation"},
     ...executor.state,
-    accepting: phase === 'running' && executor.state.accepting,
+    accepting: phase === 'running' && executor.state.accepting && taskMonitor.resultCache.accepting,
+    resultCache:taskMonitor.resultCache,
     roots,
     riskProfiles: riskProfiles.map(({cwd,riskProfile})=>({cwd,riskProfile})),
     bind: options.bind ?? `${options.host}:${options.port}`,
@@ -580,6 +581,7 @@ export function createGatewayRuntime(options) {
       let reviewTicket=null, reviewStarted=false, reviewStartedAt=null, reviewDispatchAt=null, reviewTimingKnown=false;
       const result = await executor.run(async (runSignal, remainingSeconds) => {
         runSignal.throwIfAborted();
+        taskMonitor.assertCanStart();
         executionStartedAt=new Date().toISOString();
         lifecycle?.onRunning?.({executionTimeoutSeconds:reviewTicket?.timeoutSeconds??invocation.request.timeoutSeconds});
         if (isReviewer(invocation.task.role)) {
@@ -642,7 +644,7 @@ export function createGatewayRuntime(options) {
         provider: input.provider,
         memoryBytes: invocation.request.resourceLimits.memoryBytes,
         cpu,
-        canRun: dependencyGate,
+        canRun:()=>{taskMonitor.assertCanStart();return dependencyGate();},
         acquire: lockRequest ? () => writeLocks?.tryAcquire(lockRequest) : undefined,
         release: lockRequest ? lock => writeLocks?.release(lock) : undefined,
       });
@@ -885,9 +887,23 @@ export function createGatewayRuntime(options) {
   async function executeSubagentBody(input, signal, lifecycle = null) {
     const invalidReview=newReviewInputFailure(input);
     if (invalidReview) return {response:invalidReview,isError:true};
+    if((input.access==='workspace-write'||input.task?.handoff||input.editorAuthorization)&&!input.requestId)
+      return {response:{ok:false,error:'workspace-write requires a caller-supplied stable requestId for idempotency',modelExecutionStarted:false,osSandbox,writeEnabled},isError:true};
+    input={...input,requestId:ensureRequestId(input.requestId)};
+    const protectedRequest=input.access==='workspace-write'||input.task?.handoff||input.editorAuthorization;
+    const existing=ledger?.enabled?ledger.getExecutionRecord(input.requestId,'dispatch_subagent',input):null;
+    const replayExisting=protectedRequest&&existing&&existing.state!=='missing';
+    let reservation,lastResponse;
+    const borrowed=lifecycle?.monitorOwned===true;
+    if(!replayExisting){
+      try {reservation=taskMonitor.reserve(input,{monitorEntry:true});}
+      catch(error){return {response:{ok:false,requestId:input.requestId,status:'blocked',code:error.code,error:error.message,modelExecutionStarted:false},isError:true};}
+    }
+    try {
     const invoke = async () => {
       try {
         const result = await runInvocation(input, signal, null, 'dispatch_subagent', false, lifecycle);
+        lastResponse=result;
         return { response: result, isError: result.ok === false && result.status !== 'awaiting-host-verification' };
       } catch (error) {
         return { response: { ok: false, preflight:error.preflight, requestId: error.requestId ?? input.requestId, error: error.message, code:error.code, timings:error.timings, phaseTimings:error.phaseTimings, waitReasons:error.waitReasons, used:error.used,base:error.base,extensionEligible:error.extensionEligible,remainingMs:error.remainingMs,stageCap:error.stageCap,totalCap:error.totalCap,remainingMs:error.remainingMs,modelExecutionStarted:error.modelExecutionStarted,stageUsed:error.stageUsed,remainingBase:error.remainingBase,sharedExtraRemaining:error.sharedExtraRemaining,remainingStage:error.remainingStage,remainingTotal:error.remainingTotal,extensionUsed:error.extensionUsed,extensionEligibilityReason:error.extensionEligibilityReason,nextAction:error.nextAction,
@@ -898,7 +914,7 @@ export function createGatewayRuntime(options) {
       if (!input.requestId) return { response: { ok: false, error: 'workspace-write requires a caller-supplied stable requestId for idempotency', osSandbox, writeEnabled }, isError: true };
       if (!ledger?.enabled) return { response: { ok: false, requestId: input.requestId, error: 'workspace-write is disabled because the persistent request ledger is unavailable', osSandbox, writeEnabled }, isError: true };
       try {
-        const outcome = await ledger.execute({ requestId: input.requestId, operation: 'dispatch_subagent', input }, invoke);
+        const outcome = await ledger.execute({ requestId: input.requestId, operation: 'dispatch_subagent', input }, async()=>{const value=await invoke();lastResponse=value.response;return value;});
         if (outcome.disposition === 'executed') ledger.recordOutcome(input.requestId, outcome.value.response);
         if (outcome.disposition === 'replayed') {
           audit?.record(buildAuditRecord({ requestId: input.requestId, operation: 'dispatch_subagent_replay', input, task: input.task, result: outcome.value.response, durationMs: 0 }));
@@ -908,7 +924,10 @@ export function createGatewayRuntime(options) {
           isError: outcome.value.isError,
         };
       } catch (error) {
-        if (!(error instanceof RequestLedgerError)) throw error;
+        if (!(error instanceof RequestLedgerError)) {
+          const blocked={...(lastResponse??{}),ok:false,status:'blocked',requestId:input.requestId,code:'PI_RESULT_STORAGE_UNAVAILABLE',error:'PI_RESULT_STORAGE_UNAVAILABLE',modelExecutionStarted:lastResponse?.modelExecutionStarted??null};
+          lastResponse=blocked;return {response:blocked,isError:true};
+        }
         audit?.record(buildAuditRecord({ requestId: input.requestId, operation: 'dispatch_subagent_idempotency', input, task: input.task, durationMs: 0, failure: error.code }));
         return {
           response: { ok: false, requestId: input.requestId, error: error.message, idempotency: { protected: true, status: error.code, requestDigest: error.digest }, osSandbox, writeEnabled },
@@ -916,9 +935,12 @@ export function createGatewayRuntime(options) {
         };
       }
     }
-    const outcome = await invoke();
+    const outcome = await invoke();lastResponse=outcome.response;
     ledger?.recordOutcome(outcome.response.requestId??input.requestId, outcome.response);
     return outcome;
+    } finally {
+      if(!borrowed&&reservation){try {if(lastResponse)taskMonitor.retainResult(input,lastResponse);}finally{taskMonitor.release(reservation);}}
+    }
   }
 
   function monitorPayload(parentRunId, limit = 50) {
@@ -927,7 +949,8 @@ export function createGatewayRuntime(options) {
       ok: true,
       gateway: {
         instanceId: gatewayInstanceId,
-        accepting: phase === 'running' && state.accepting,
+        accepting: phase === 'running' && state.accepting && taskMonitor.resultCache.accepting,
+        resultCache:taskMonitor.resultCache,
         active: state.active,
         queued: state.queued,
         maxConcurrency: state.maxConcurrency,
@@ -1020,10 +1043,15 @@ export function createGatewayRuntime(options) {
       try {
         const invalidReview=newReviewInputFailure(invocation);
         if (invalidReview) return structuredResult(invalidReview,true);
-        const submission = taskMonitor.submit(invocation, (signal, markRunning, markWaiting, markProgress) => executeSubagent(invocation, signal, { onRunning: markRunning, onWaiting:markWaiting,onProgress:markProgress }));
+        const known=ledger?.enabled?ledger.getExecutionRecord(invocation.requestId,'dispatch_subagent',invocation):null;
+        if(known&&known.state!=='missing'&&!taskMonitor.get(invocation.requestId)){
+          const outcome=await executeSubagent(invocation);
+          return structuredResult({...outcome.response,accepted:false,replayed:true,task:{requestId:invocation.requestId,state:outcome.response.status??(outcome.isError?'failed':'completed')}},outcome.isError);
+        }
+        const submission = taskMonitor.submit(invocation, (signal, markRunning, markWaiting, markProgress) => executeSubagent(invocation, signal, { monitorOwned:true,onRunning: markRunning, onWaiting:markWaiting,onProgress:markProgress }));
         return structuredResult({ ok: true, ...submission, preflight:runtimePreflight(input.task) });
       } catch (error) {
-        return structuredResult({ ok: false, requestId: input.requestId, error: redactSensitiveText(error.message) }, true);
+        return structuredResult({ ok: false, requestId: input.requestId, code:error.code,modelExecutionStarted:error.modelExecutionStarted,error: redactSensitiveText(error.message) }, true);
       }
     }));
     server.registerTool('get_subagent_result', {
@@ -1261,11 +1289,16 @@ export function createGatewayRuntime(options) {
         phase = 'draining';
         return { gatewayInstanceId, disposed:false, remainingOperations:inFlight, execution:{ ...execution, remainingActive:executor.state.active } };
       }
+      // Let admitted monitor callbacks settle before final metadata cleanup.
+      const resultDurability=typeof taskMonitor.drain==='function'?await taskMonitor.drain({timeoutMs:2000}):
+        {pendingWrites:null,protectedResults:null,lossRisk:true,timedOut:false,reason:'monitor-drain-unavailable'};
+      if(resultDurability.lossRisk && typeof taskMonitor.drain==='function') {
+        phase='draining';
+        return {gatewayInstanceId,disposed:false,execution,resultDurability,code:'PI_RESULT_DRAIN_UNSAFE'};
+      }
       workflowReceipts.clear();
       handoffClosed=true;unsubscribeHandoff();
       for(const waiters of [...handoffWaiters.values()])for(const waiter of [...waiters])finishHandoffWaiter(waiter,{ok:false,code:'GATEWAY_CLOSED',requestId:waiter.requestId});
-      // Let admitted monitor callbacks settle before final metadata cleanup.
-      await Promise.resolve();
       let ledgerRetention, auditRetention;
       for (const [id, action] of [
         ['ledger', async () => { ledgerRetention = await ledger?.prune?.(); }],
@@ -1277,7 +1310,7 @@ export function createGatewayRuntime(options) {
       try { await modules.dispose(); } catch (error) { errors.push(error); }
       phase = errors.length ? 'failed' : 'disposed';
       if (errors.length) throw new AggregateError(errors, 'Gateway shutdown failed; all eligible cleanup was attempted');
-      return { gatewayInstanceId, disposed:true, execution:{ ...execution, remainingActive:executor.state.active }, auditRetention, ledgerRetention };
+      return { gatewayInstanceId, disposed:true, execution:{ ...execution, remainingActive:executor.state.active }, auditRetention, ledgerRetention,resultDurability };
     })();
     shutdownPromise.then(result => { if (!result.disposed) shutdownPromise = null; }, () => {});
     return shutdownPromise;
@@ -1320,6 +1353,7 @@ export function createGatewayApp(options) {
       try {
         const result = await runtime.shutdown({ graceMs: 1000, abortWaitMs: 1000 });
         if (!result.disposed) return res.status(409).json({ ok: false });
+        if(result.resultDurability?.lossRisk)return res.status(409).json({ok:false,code:'PI_RESULT_STORAGE_UNAVAILABLE',resultDurability:result.resultDurability});
         res.once('finish', () => { void options.onMaintenanceStop(); });
         return res.json({ ok: true, disposed: true, pid: process.pid });
       } catch { return res.status(503).json({ ok: false, reason: 'runtime_cleanup_failed' }); }
@@ -1368,12 +1402,15 @@ export function createGatewayApp(options) {
 }
 
 export async function gracefulShutdownHttp(server, runtime, { graceMs = 10_000, abortWaitMs = 20_000, socketCloseMs = 5_000 } = {}) {
+  // Preserve the live reader and maintenance cycle while a RAM-only result is
+  // protected. Shutdown can be explicitly attempted again after recovery.
+  let durability,failure;
+  try{durability=await runtime.shutdown({graceMs,abortWaitMs});}catch(error){failure=error;}
+  if(durability?.code==='PI_RESULT_DRAIN_UNSAFE')throw Object.assign(new Error('Protected results are not durable; gateway remains alive'),{code:'PI_RESULT_DRAIN_UNSAFE',result:durability});
   let httpClosed = false;
   const closed = new Promise(resolveClose => server.close(() => { httpClosed = true; resolveClose(); }));
   server.closeIdleConnections?.();
-  let result, failure, socketTimer;
-  try { result = await runtime.shutdown({ graceMs, abortWaitMs }); }
-  catch (error) { failure = error; }
+  const result=durability;let socketTimer;
   try { await Promise.race([closed, new Promise(resolveTimeout => { socketTimer = setTimeout(resolveTimeout, socketCloseMs); })]); }
   finally { clearTimeout(socketTimer); }
   if (!httpClosed) {
@@ -1420,10 +1457,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       if (stopping) return;
       stopping = true;
       try { await gracefulShutdownHttp(server, runtime); process.exit(0); }
-      catch (error) { console.error(JSON.stringify({ ok: false, event: 'graceful_shutdown_failed', error: error.message })); process.exit(1); }
+      catch (error) { console.error(JSON.stringify({ ok:false,event:'graceful_shutdown_failed',code:error.code,error:error.message }));if(error.code==='PI_RESULT_DRAIN_UNSAFE'){stopping=false;return;}process.exit(1); }
     };
-    process.once('SIGINT', stop);
-    process.once('SIGTERM', stop);
+    process.on('SIGINT', stop);
+    process.on('SIGTERM', stop);
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: error.message }));
     process.exitCode = 1;

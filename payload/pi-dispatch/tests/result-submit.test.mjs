@@ -21,6 +21,34 @@ function setup(role) {
 
 const invoke = (tool, payload) => tool.execute('call-1', { payload });
 
+test('historical overlong host check rejects before success latch and is repairable in the same turn',async()=>{
+  const {tool}=setup('Chesed'),value=roleValue('Chesed');
+  const name='host regression: Host runs node --test payload/pi-dispatch/tests/source-window.test.mjs and independent exact-scope/content checks; exit 0 required.';
+  assert.equal(name.length,148);
+  value.deliverable.checks=[{name,outcome:'unverified',evidence:'Host test execution unavailable; host is assigned to run this check.'}];
+  const before=structuredClone(value),rejected=await invoke(tool,value);
+  assert.equal(rejected.details.type,'kether_result_rejection');
+  assert.equal(rejected.details.code,'RESULT_ROLE_SCHEMA_INVALID');
+  assert.equal(Object.hasOwn(rejected.details,'canonicalText'),false);
+  assert.match(rejected.content[0].text,/\$\.deliverable\.checks\[0\]\.name length 148 exceeds maxLength 128/);
+  assert.deepEqual(value,before,'Rejected names and outcomes must not be normalized or truncated');
+  value.deliverable.checks[0].name='host regression';
+  const accepted=await invoke(tool,value);
+  assert.equal(accepted.details.type,'kether_result_submission');
+  assert.deepEqual(JSON.parse(accepted.details.canonicalText.slice('KETHER_RESULT_JSON='.length)),value);
+  await assert.rejects(invoke(tool,value),/RESULT_ALREADY_SUBMITTED/);
+});
+
+test('invalid duplicate and NUL names leave the result latch open',async()=>{
+  const {tool}=setup('Chesed'),value=roleValue('Chesed');
+  for(const names of [['host\0regression'],['host regression','host regression']]){
+    value.deliverable.checks=names.map(name=>({name,outcome:'unverified',evidence:'Host check not run'}));
+    assert.equal((await invoke(tool,value)).details.type,'kether_result_rejection');
+  }
+  value.deliverable.checks=[{name:'host regression',outcome:'unverified',evidence:'Host check not run'}];
+  assert.equal((await invoke(tool,value)).details.type,'kether_result_submission');
+});
+
 test('submits canonical prefixed JSON and marks details for tool_execution_end', async () => {
   const { tool } = setup();
   const result = await invoke(tool, { status: 'completed', z: [1, true], a: { y: 'ok', b: null } });

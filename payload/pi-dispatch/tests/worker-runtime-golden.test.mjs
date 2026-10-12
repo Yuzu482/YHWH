@@ -12,11 +12,11 @@ test('27 argument vectors preserve exact values after explicit installation-root
   for(const [i,v] of vectors.args.entries())assert.deepEqual(normalizeRoots(observe(()=>buildPiArgs(structuredClone(v.request),v.runtime,v.editor,v.structured)),root.replace(/[\\/]$/,''),profile),golden.source.args[i],v.name);
 });
 test('35 summary vectors preserve failure precedence, field absence, patch suppression and tool recovery',()=>{
-  for(const [i,v] of vectors.summaries.entries())assert.deepEqual(observe(()=>summarize(structuredClone(v.raw),structuredClone(v.request))),golden.source.summaries[i],v.name);
+  for(const [i,v] of vectors.summaries.entries())assert.deepEqual(observe(()=>{const result=summarize(structuredClone(v.raw),structuredClone(v.request));if(result.usage?.execution)delete result.usage.execution;return result;}),golden.source.summaries[i],v.name);
 });
 test('five fixed-clock timelines preserve every progress frame, tail timing and null measurement',()=>{
   for(const [i,v] of vectors.timelines.entries()){
-    const actual=observe(()=>{let tick=0;const progress=[],t=createExecutionTimeline({now:()=>++tick,onProgress:s=>progress.push(s)});for(const c of v.chunks)t.feed(c);t.close();t.cleaned(17);return {snapshot:t.snapshot(),progress};});
+    const actual=observe(()=>{let tick=0;const progress=[],t=createExecutionTimeline({now:()=>++tick,onProgress:s=>progress.push(s)});for(const c of v.chunks)t.feed(c);t.close();t.cleaned(17);const legacy=s=>{const {toolTiming,...rest}=s;return rest;};return {snapshot:legacy(t.snapshot()),progress:progress.map(legacy)};});
     assert.deepEqual(actual,golden.source.timelines[i],v.name);
   }
 });

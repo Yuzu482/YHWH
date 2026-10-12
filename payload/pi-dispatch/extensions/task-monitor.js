@@ -79,8 +79,10 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
   let waiterCount = 0;
   let closed = false;
   let resultBytes = 0;
+  const reservations=new Map();
+  let retryCursor=0;
   const encodedSize = value => Buffer.byteLength(JSON.stringify(value) ?? 'null');
-  const setResult = (record, value) => { resultBytes -= record.resultBytes || 0; record.result=value; record.resultBytes=value==null?0:encodedSize(value); resultBytes += record.resultBytes; };
+  const setResult = (record, value) => {const size=value==null?0:encodedSize(value);resultBytes -= record.resultBytes || 0; record.result=value; record.resultBytes=size; resultBytes += size;};
   function wakeWaiters(record) {
     const snapshot = { ok: true, ready: true, requestId: record.requestId, state: record.state, gatewayInstanceId };
     const pending = waiters.get(record.requestId);
@@ -89,25 +91,111 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
     for (const waiter of pending) waiter.finish(snapshot);
   }
   function persistTerminal(record) {
-    if (typeof persistResult !== 'function' || record.persisted || record.result == null) return;
-    try { record.persisted = persistResult(record.requestId,{state:record.state,result:record.result}) === true; } catch { record.persisted=false; }
+    if (typeof persistResult !== 'function' || record.persisted || record.result == null || record.persistencePending) return null;
+    const revision=record.result;
+    const finish=value=>{
+      if(record.result!==revision)return;
+      record.persisted=value===true;
+      record.persistenceFailed=!record.persisted;
+      record.persistenceFailures=record.persisted?0:(record.persistenceFailures??0)+1;
+      record.retryAt=Date.now()+maintenanceIntervalMs*Math.min(10,2**Math.min(record.persistenceFailures,4));
+      // A reloadable durable copy no longer needs a second full body in RAM.
+      // Failed writes and callbacks without a reader retain their only copy.
+      if(record.persisted && typeof loadResult==='function')setResult(record,null);
+    };
+    try {
+      const value=persistResult(record.requestId,{state:record.state,result:revision});
+      if(value && typeof value.then==='function') {
+        const pending=Promise.resolve(value).then(finish,error=>{if(record.result===revision&&error?.code==='PI_RESULT_OVERSIZED')record.oversized=true;finish(false);}).finally(()=>{
+          record.persistencePending=null;
+          if(record.result!==revision && !closed)persistTerminal(record);
+          trim();
+        });
+        record.persistencePending=pending;
+        return pending;
+      }
+      finish(value);
+    } catch {finish(false);}
+    return null;
   }
-  function trim(now = Date.now()) {
+  function trim(now = Date.now(), retry=false) {
     const terminal = [...records.values()].filter(record => TERMINAL.has(record.state)).sort((a,b)=>Date.parse(a.finishedAt||0)-Date.parse(b.finishedAt||0));
+    // Closing intake must not stop the existing sole-copy recovery cycle.
+    // Final close() cancels the timer after durable disposal.
+    if(retry && terminal.length){
+      for(let i=0;i<terminal.length;i++){
+        const record=terminal[(retryCursor+i)%terminal.length];
+        if(!record.persisted&&record.result!=null&&!record.persistencePending&&(record.retryAt??0)<=now){retryCursor=(retryCursor+i+1)%terminal.length;persistTerminal(record);break;}
+      }
+    }
     for (const record of terminal) {
       const expired = now - Date.parse(record.finishedAt || now) >= terminalTtlMs;
       const overCount = records.size > maxEntries;
       if (!expired && !(resultBytes > maxResultBytes && record.result != null) && !(overCount && records.has(record.requestId))) continue;
-      if (!record.persisted && typeof persistResult === 'function') {
-        try { record.persisted = persistResult(record.requestId,{state:record.state,result:record.result}) === true; } catch { record.persisted=false; }
-      }
       if (typeof persistResult === 'function' && !record.persisted && record.result != null) continue;
       if (record.result != null) setResult(record,null);
       if (expired || overCount) records.delete(record.requestId);
     }
   }
-  const maintenanceTimer = maintenanceIntervalMs ? setInterval(()=>trim(),maintenanceIntervalMs) : null;
+  const maintenanceTimer = maintenanceIntervalMs ? setInterval(()=>{try{trim(Date.now(),true);}catch{}},maintenanceIntervalMs) : null;
   maintenanceTimer?.unref?.();
+
+  function cacheState() {
+    const protectedRecords=[...records.values()].filter(r=>TERMINAL.has(r.state)&&r.result!=null&&!r.persisted&&typeof persistResult==='function');
+    const oversized=protectedRecords.filter(r=>r.resultBytes>32*1024*1024||r.oversized);
+    const reason=closed?'closed':oversized.length?'oversized_result':protectedRecords.some(r=>r.persistenceFailed)?'storage_unavailable':resultBytes>maxResultBytes?'cache_pressure':null;
+    return {retainedBytes:resultBytes,protectedResults:protectedRecords.length,pendingWrites:protectedRecords.filter(r=>r.persistencePending).length,
+      oversizedBytes:oversized.reduce((sum,r)=>sum+r.resultBytes,0),reservations:reservations.size,entries:records.size,maxEntries,maxResultBytes,
+      normalInFlightAllowanceBytes:reservations.size*32*1024*1024,degradedReason:reason,accepting:reason===null};
+  }
+  function assertCanStart() {
+    const state=cacheState();
+    if(state.accepting)return;
+    const code=closed?'PI_GATEWAY_CLOSED':state.degradedReason==='cache_pressure'?'PI_RESULT_CACHE_PRESSURE':'PI_RESULT_STORAGE_UNAVAILABLE';
+    throw Object.assign(new Error(code),{code,modelExecutionStarted:false});
+  }
+  function reserve(input,{monitorEntry=false}={}) {
+    assertCanStart();
+    const inputDigest=digest(input),existing=reservations.get(input.requestId);
+    if(existing){if(existing.digest!==inputDigest)throw new Error('requestId is already reserved for different input');return existing;}
+    trim();
+    const unrecorded=()=>[...reservations.keys()].filter(id=>!records.has(id)).length;
+    if(monitorEntry&&records.size+unrecorded()>=maxEntries){
+      const oldest=[...records.values()].filter(r=>TERMINAL.has(r.state)&&(r.persisted||typeof persistResult!=='function')).sort((a,b)=>Date.parse(a.finishedAt)-Date.parse(b.finishedAt))[0];
+      if(oldest){setResult(oldest,null);records.delete(oldest.requestId);}
+    }
+    if(reservations.size>=maxEntries||monitorEntry&&records.size+unrecorded()>=maxEntries)throw Object.assign(new Error('PI_RESULT_CACHE_PRESSURE'),{code:'PI_RESULT_CACHE_PRESSURE',modelExecutionStarted:false});
+    const token={requestId:input.requestId,digest:inputDigest};reservations.set(input.requestId,token);return token;
+  }
+  function release(token) {if(token && reservations.get(token.requestId)===token)reservations.delete(token.requestId);}
+
+  function retainResult(input,result) {
+    let record=records.get(input.requestId);
+    if(!record){const now=new Date().toISOString();record={requestId:input.requestId,inputDigest:digest(input),parentRunId:input.parentRunId,gatewayInstanceId,
+      role:input.task?.role??'unknown',provider:input.provider,model:input.model,access:input.access,resourceProfile:input.resourceProfile,
+      priority:input.priority,dependsOnRequestIds:[],waitReasons:[],createdAt:now,startedAt:now,finishedAt:now,heartbeat:createHeartbeat(),resultBytes:0,persisted:false};records.set(input.requestId,record);}
+    record.state=result?.status==='awaiting-host-verification'?'awaiting-host-verification':result?.ok?'completed':result?.status==='blocked'?'blocked':'failed';
+    record.finishedAt=new Date().toISOString();record.persisted=false;record.persistenceFailed=false;
+    setResult(record,result);
+    record.resultSummary={provider:result?.provider,model:result?.model,ok:result?.ok,status:result?.status,timings:result?.timings,phaseTimings:result?.phaseTimings,
+      hostVerification:result?.hostVerification,formatValidation:result?.formatValidation,reviewValidation:result?.reviewValidation,
+      reviewDecision:result?.reviewDecision,missingMaterials:result?.missingMaterials,toolSummary:toolSummary(result),tokens:summarizeUsage(result?.usage),patchSummary:summarizePatch(result?.patch)};
+    persistTerminal(record);trim();
+  }
+
+  async function drain({timeoutMs=2000}={}) {
+    if(!Number.isInteger(timeoutMs)||timeoutMs<0||timeoutMs>2000)throw new Error('Invalid persistence drain timeout');
+    // Stop intake first. Let all monitor settlement handlers reach retention.
+    closed=true;
+    const settlements=[...records.values()].map(r=>r.promise).filter(Boolean);
+    let timer,timedOut=false;
+    const work=(async()=>{await Promise.allSettled(settlements);
+      const retry=[...records.values()].find(r=>TERMINAL.has(r.state)&&r.result!=null&&!r.persisted&&!r.persistencePending);
+      if(retry)persistTerminal(retry);
+      await Promise.allSettled([...records.values()].map(r=>r.persistencePending).filter(Boolean));})();
+    await Promise.race([work,new Promise(resolve=>{timer=setTimeout(()=>{timedOut=true;resolve();},timeoutMs);})]);clearTimeout(timer);
+    const state=cacheState();return {pendingWrites:state.pendingWrites,protectedResults:state.protectedResults,lossRisk:state.protectedResults>0,timedOut};
+  }
 
   function submit(input, runner) {
     const requestId = input.requestId;
@@ -118,6 +206,8 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
       if (existing.inputDigest !== inputDigest) throw new Error('requestId is already assigned to a different monitored task');
       return { accepted: false, replayed: true, task: publicRecord(existing) };
     }
+
+    const reservation=reserve(input,{monitorEntry:true});
 
     const controller = new AbortController();
     const heartbeat = createHeartbeat();
@@ -164,6 +254,7 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
     };
     record.promise = Promise.resolve().then(() => {
       if (controller.signal.aborted) throw new Error('cancelled before execution');
+      assertCanStart();
       return runner(controller.signal, markRunning, value=>{
         if(record.state==='queued') {record.waitReasons=[...value.waitReasons];record.queueDeadlineAt=value.queueDeadlineAt;record.timeoutSeconds=value.executionTimeoutMs/1000;}
       },value=>{record.heartbeat.progress();record.phaseTimings=value;});
@@ -196,11 +287,11 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
       record.heartbeat.stop();
       record.state = record.state === 'cancelling' || controller.signal.aborted ? 'cancelled' : 'failed';
       record.failureReason = redactSensitiveText(record.state === 'cancelled' ? 'cancelled by Tifereth' : error?.message ?? 'execution failed');
-      const result={ok:false,requestId,error:record.failureReason,...(error?.code==='EXECUTION_TIMEOUT'?{failureCode:'EXECUTION_TIMEOUT'}:{}),phaseTimings:record.phaseTimings};
+      const result={ok:false,requestId,error:record.failureReason,...(error?.code?{code:error.code,modelExecutionStarted:error.modelExecutionStarted}:{}),...(error?.code==='EXECUTION_TIMEOUT'?{failureCode:'EXECUTION_TIMEOUT'}:{}),phaseTimings:record.phaseTimings};
       record.resultSummary={ok:false,error:record.failureReason,...(error?.code==='EXECUTION_TIMEOUT'?{failureCode:'EXECUTION_TIMEOUT'}:{}),phaseTimings:record.phaseTimings}; setResult(record,result); persistTerminal(record); wakeWaiters(record); trim();
       record.promise=null; record.controller=null;
       return undefined;
-    });
+    }).finally(()=>release(reservation));
 
     return { accepted: true, replayed: false, task: publicRecord(record) };
   }
@@ -302,15 +393,14 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
   }
 
   function close() {
-    if (closed) return;
     closed=true;
     for (const [requestId, pending] of waiters) for (const waiter of [...pending]) waiter.finish({ok:false,ready:false,requestId,code:'MONITOR_CLOSED'});
     if(maintenanceTimer) clearInterval(maintenanceTimer);
     for (const record of records.values()) {
       if (!TERMINAL.has(record.state) || record.result==null) continue;
-      persistTerminal(record);
       if (record.persisted) setResult(record,null);
     }
   }
-  return { submit, get, getResult, wait, resolveHostVerification, list, cancel, close, get size() { return records.size; } };
+  return { submit, get, getResult, wait, resolveHostVerification, list, cancel, close,drain,reserve,release,assertCanStart,retainResult,
+    get resultCache(){return cacheState();},get size() { return records.size; } };
 }

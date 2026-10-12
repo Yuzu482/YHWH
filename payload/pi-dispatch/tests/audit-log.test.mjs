@@ -246,3 +246,9 @@ test('audit logger rotates and protects failed or write records longer', () => {
     assert.match(critical, /failed/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+
+test('new timing fields cannot carry arbitrary tool names, arguments or thinking into audit',()=>{
+ const result={phaseTimings:{toolTiming:{complete:true,sumMs:1,wallMs:1,args:'HOSTILE_SECRET',byName:{'HOSTILE_SECRET / path':{count:1,sumMs:1},read:{count:1,sumMs:1,args:'HOSTILE_SECRET'}}},reviewer:{helpMs:1,authStatusMs:2,cliExecutionMs:3,totalMs:6,thinking:'HOSTILE_SECRET',providerReported:{duration_api_ms:3,private:'HOSTILE_SECRET'}},arbitrary:'HOSTILE_SECRET'}};
+ const record=buildAuditRecord({operation:'dispatch_subagent',result});assert.equal(JSON.stringify(record).includes('HOSTILE_SECRET'),false);assert.equal(record.phaseTimings.reviewer.authStatusMs,2);assert.equal(record.phaseTimings.toolTiming.byName.read.count,1);
+});

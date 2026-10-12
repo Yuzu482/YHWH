@@ -39,12 +39,13 @@ test('memory-only maintenance expires completed results while retaining active w
   } finally {release?.();monitor.close();}
 });
 
-test('configured persistence failure keeps the only copy despite count, TTL and byte pressure', async()=>{
+test('configured persistence failure keeps the only copy and blocks further admission', async()=>{
   for(const persistResult of [()=>false,()=>{throw Error('storage offline');}]) {
     const monitor=createTaskMonitor({gatewayInstanceId:'failed-storage',maxEntries:16,terminalTtlMs:0,maxResultBytes:1,maintenanceIntervalMs:0,persistResult});
     try {
-      for(let i=0;i<19;i++) {const id=`failed-${i}`;monitor.submit({...base,requestId:id},async()=>({ok:true,patch:'only-copy'}));await monitor.wait(id);}
-      assert.equal(monitor.size,19);
+      monitor.submit({...base,requestId:'failed-0'},async()=>({ok:true,patch:'only-copy'}));await monitor.wait('failed-0');
+      for(let i=1;i<19;i++)assert.throws(()=>monitor.submit({...base,requestId:`failed-${i}`},()=>{}),{code:'PI_RESULT_STORAGE_UNAVAILABLE'});
+      assert.equal(monitor.size,1);
       assert.equal(monitor.getResult('failed-0').result.patch,'only-copy');
     } finally {monitor.close();}
   }
@@ -93,6 +94,7 @@ test('count retention trims oldest persisted terminal records and public list/ge
   for(let i=0;i<19;i++) {
     const input={...base,requestId:`count-${i}`};
     monitor.submit(input,async(_signal,running)=>{running();return {response:{ok:true,status:'completed',provider:'provider-x',model:'model-y',timings:{executionMs:4},usage:{input_tokens:3},patch:'tiny',toolsUsed:[]},isError:false};});
+    await monitor.wait(input.requestId);
   }
   for(let i=0;i<50&&monitor.size>16;i++) await new Promise(resolvePromise=>setImmediate(resolvePromise));
   assert.equal(monitor.size,16);

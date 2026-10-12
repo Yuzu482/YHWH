@@ -13,6 +13,7 @@ export const claudeCliRuntime=Object.freeze({
       target: request.target, requestedProvider: request.provider, requestedModel: request.model,
       provider: request.provider, model: request.model, ok: result.status === 'completed',
       ...(result.text !== undefined ? { text: result.text } : {}), usage: result.usage ?? null, modelExecutionStarted: result.modelExecutionStarted === true,
+      ...(result.phaseTimings ? {phaseTimings:result.phaseTimings} : {}),
       toolsUsed: [], toolErrors: 0, runtime: 'host-cli', osSandbox: 'none',
       ...(result.status !== 'completed' ? { failureCode: failureCode ?? result.reason, failure: failureCode ?? result.reason ?? 'Claude Code CLI failed' } : {}),
       ...(result.resetTime ? { resetTime: result.resetTime } : {}),
