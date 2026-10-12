@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {fetchHostCandidate,prepareHostReview,summarizeCandidate,sha256} from './host-handoff.mjs';
 import {waitForHostCandidate,prepareReviewBundle,collectAcceptanceInspection} from './host-handoff-flow.mjs';
 import {createHostHandoffSession,stageSummary,resumeStage,inspectDispatchReadiness} from './host-handoff-session.mjs';
+import {inspectReviewMaterialBudget} from './review-materials.mjs';
 
 function readJson(file) {
   const stat=lstatSync(file);
@@ -49,10 +50,13 @@ function loadClosureInput(input) {
 
 export async function main(args, env=process.env) {
   const [command,inputFile,outputFile] = args;
-  if (args.length !== 3 || !['candidate','prepare-review','wait-candidate','prepare-review-plan','close-acceptance','summarize-stage','resume-stage','inspect-readiness'].includes(command) || resolve(inputFile) === resolve(outputFile)) throw new Error('Usage: host-handoff-client.mjs candidate|wait-candidate|prepare-review|prepare-review-plan|close-acceptance|summarize-stage|resume-stage|inspect-readiness <input.json> <new-output.json>');
+  if (args.length !== 3 || !['candidate','prepare-review','wait-candidate','prepare-review-plan','close-acceptance','summarize-stage','resume-stage','inspect-readiness','review-budget'].includes(command) || resolve(inputFile) === resolve(outputFile)) throw new Error('Usage: host-handoff-client.mjs candidate|wait-candidate|prepare-review|prepare-review-plan|close-acceptance|summarize-stage|resume-stage|inspect-readiness|review-budget <input.json> <new-output.json>');
   const input = readJson(inputFile);
   let value,summary;
-  if(command==='inspect-readiness'){
+  if(command==='review-budget'){
+    value=inspectReviewMaterialBudget(input);summary={ready:false,budgetFits:value.ok,admissionReady:false,
+      requiresTrustedDiffBinding:value.requiresTrustedDiffBinding??false,budget:value.budget,violations:value.violations,modelCalls:0,readOnly:true};
+  }else if(command==='inspect-readiness'){
     value=inspectDispatchReadiness(input);summary={ready:value.ok,modelCalls:0,readOnly:true};
   }else if(command==='summarize-stage'||command==='resume-stage'){
     const material=input.material??input,loaded=material.requestFile?loadReviewInput(material):material;
