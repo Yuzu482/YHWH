@@ -1,4 +1,5 @@
 import {exportResult} from './result-export.js';
+import {DATA_CAPACITY} from './data-capacity.js';
 import { resolveRolePreset } from '../scripts/role-presets.mjs';
 import { createTaskHeartbeat } from './task-heartbeat.js';
 import { createHash } from 'node:crypto';
@@ -115,7 +116,7 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
         return pending;
       }
       finish(value);
-    } catch {finish(false);}
+    } catch(error) {if(record.result===revision&&error?.code==='PI_RESULT_OVERSIZED')record.oversized=true;finish(false);}
     return null;
   }
   function trim(now = Date.now(), retry=false) {
@@ -142,11 +143,11 @@ export function createTaskMonitor({ gatewayInstanceId, maxEntries = 512, createH
 
   function cacheState() {
     const protectedRecords=[...records.values()].filter(r=>TERMINAL.has(r.state)&&r.result!=null&&!r.persisted&&typeof persistResult==='function');
-    const oversized=protectedRecords.filter(r=>r.resultBytes>32*1024*1024||r.oversized);
+    const oversized=protectedRecords.filter(r=>r.resultBytes>DATA_CAPACITY.persistentRecordMaxUtf8Bytes||r.oversized);
     const reason=closed?'closed':oversized.length?'oversized_result':protectedRecords.some(r=>r.persistenceFailed)?'storage_unavailable':resultBytes>maxResultBytes?'cache_pressure':null;
     return {retainedBytes:resultBytes,protectedResults:protectedRecords.length,pendingWrites:protectedRecords.filter(r=>r.persistencePending).length,
       oversizedBytes:oversized.reduce((sum,r)=>sum+r.resultBytes,0),reservations:reservations.size,entries:records.size,maxEntries,maxResultBytes,
-      normalInFlightAllowanceBytes:reservations.size*32*1024*1024,degradedReason:reason,accepting:reason===null};
+      normalInFlightAllowanceBytes:reservations.size*DATA_CAPACITY.persistentRecordMaxUtf8Bytes,degradedReason:reason,accepting:reason===null};
   }
   function assertCanStart() {
     const state=cacheState();

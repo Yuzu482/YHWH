@@ -256,6 +256,7 @@ if ($installWsl) {
     (Join-Path $payload 'pi-dispatch\extensions\result-submit.js')='/tmp/pi-kether-install/result-submit.js'
     (Join-Path $payload 'pi-dispatch\extensions\role-contract.js')='/tmp/pi-kether-install/role-contract.js'
     (Join-Path $payload 'pi-dispatch\extensions\result-export.js')='/tmp/pi-kether-install/result-export.js'
+    (Join-Path $payload 'pi-dispatch\extensions\data-capacity.js')='/tmp/pi-kether-install/data-capacity.js'
     (Join-Path $pluginTarget 'scripts\snapshot-scope.py')='/tmp/pi-kether-install/snapshot-scope.py'
     (Join-Path $pluginTarget 'scripts\lsp-result.mjs')='/tmp/pi-kether-install/lsp-result.mjs'
     (Join-Path $pluginTarget 'scripts\prepare-credentials.mjs')='/tmp/pi-kether-install/prepare-credentials.mjs'

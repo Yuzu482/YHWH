@@ -4,6 +4,7 @@ import {performance} from 'node:perf_hooks';
 import {sanitizeResult} from '../extensions/result-export.js';
 import {buildReviewPacket} from './review-materials.mjs';
 import {measureReviewPacket} from '../extensions/review-contract.js';
+import {DATA_CAPACITY} from '../extensions/data-capacity.js';
 
 export const sha256 = value => createHash('sha256').update(value).digest('hex');
 const receipts=new WeakMap();
@@ -57,14 +58,17 @@ export async function fetchCompleteResult(callTool, requestId, {clock=receiptClo
   identity(requestId, '0'.repeat(64));
   let json = '', offset = 0, digest, totalLength, pages = 0;
   do {
-    if (++pages > 128) fail('Result page budget exceeded');
-    const page = unwrap(await callTool('get_subagent_result', {requestId, offset, limit:65536}));
+    if (++pages > DATA_CAPACITY.pageCountMax) fail('Result page budget exceeded');
+    const page = unwrap(await callTool('get_subagent_result', {requestId, offset, limit:DATA_CAPACITY.pageMaxUtf16Units}));
+    if (Number.isSafeInteger(page.totalLength) && page.totalLength > DATA_CAPACITY.fullResultMaxUtf16Units)
+      throw Object.assign(new Error('Complete result exceeds the host reader capacity'), {code:'PI_RESULT_CAPACITY_EXCEEDED',
+        location:'exportedResult',unit:'utf16-units',actual:page.totalLength,limit:DATA_CAPACITY.fullResultMaxUtf16Units});
     if (page.ready !== true || page.requestId !== requestId || page.encoding !== 'json-utf16-offsets' || page.offset !== offset || !hash(page.sha256) ||
-        !Number.isSafeInteger(page.totalLength) || page.totalLength < 1 || page.totalLength > 4 * 1024 * 1024 ||
+        !Number.isSafeInteger(page.totalLength) || page.totalLength < 1 || page.totalLength > DATA_CAPACITY.fullResultMaxUtf16Units ||
         (digest && (page.sha256 !== digest || page.totalLength !== totalLength))) fail('Invalid or changing result page');
     digest = page.sha256; totalLength = page.totalLength;
     const chunk = page.result !== undefined ? JSON.stringify(page.result) : page.resultJsonChunk;
-    if (typeof chunk !== 'string' || !chunk.length || chunk.length > 65536 || json.length + chunk.length > totalLength) fail('Invalid result chunk');
+    if (typeof chunk !== 'string' || !chunk.length || chunk.length > DATA_CAPACITY.pageMaxUtf16Units || json.length + chunk.length > totalLength) fail('Invalid result chunk');
     json += chunk;
     if (page.nextOffset !== null && (!Number.isSafeInteger(page.nextOffset) || page.nextOffset !== json.length || page.nextOffset <= offset)) fail('Invalid result offset');
     offset = page.nextOffset;

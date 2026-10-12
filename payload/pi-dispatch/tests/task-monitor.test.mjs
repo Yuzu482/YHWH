@@ -175,3 +175,19 @@ test('task monitor cancels active work and redacts a failed reason', async () =>
   assert.equal(task.state, 'cancelled');
   assert.doesNotMatch(JSON.stringify(task), /secret-token|hunter2/);
 });
+test('sync and async wrapper overflow protect the result and report identical degradation',async()=>{
+  for(const asynchronous of [false,true]) {
+    const overflow=()=>{throw Object.assign(new Error('wrapper overflow'),{code:'PI_RESULT_OVERSIZED'});};
+    const monitor=createTaskMonitor({gatewayInstanceId:'wrapper-overflow',maintenanceIntervalMs:0,
+      persistResult:asynchronous?async()=>overflow():overflow});
+    try {
+      const requestId=asynchronous?'async-wrapper':'sync-wrapper';
+      monitor.submit({...base,requestId},async(_signal,running)=>{running();return {response:{ok:true,patch:'only copy'}};});
+      await monitor.wait(requestId,{timeoutMs:1000});
+      await new Promise(resolve=>setImmediate(resolve));
+      assert.equal(monitor.resultCache.degradedReason,'oversized_result');
+      assert.equal(monitor.resultCache.accepting,false);
+      assert.equal(monitor.getResult(requestId).result.patch,'only copy');
+    }finally{monitor.close();}
+  }
+});

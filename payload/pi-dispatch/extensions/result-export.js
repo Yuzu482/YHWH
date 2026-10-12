@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {DATA_CAPACITY, assertCapacity} from './data-capacity.js';
 import {redactSensitiveText} from './audit-log.js';
 const sensitive=/^(?:api[_-]?key|authorization|access[_-]?token|refresh[_-]?token|password|passwd|secret|credentials?)$/i;
 export function sanitizeResult(value){
@@ -33,10 +34,18 @@ export function sanitizeCapturedResult(value,{mode='projection'}={}){
   return value&&typeof value==='object'&&!Array.isArray(value)?sanitizeCapturedRecord(value,true,mode):sanitizeResult(value);
 }
 export function exportResult(result,{offset=0,limit=32768}={}){
-  if(!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>65536)throw new Error('Invalid result page');
+  if(!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>DATA_CAPACITY.pageMaxUtf16Units)throw new Error('Invalid result page');
   const sanitized=sanitizeCapturedResult(result,{mode:'export'}),json=JSON.stringify(sanitized);
   if(offset>json.length)throw new Error('Result offset exceeds length');
   const end=Math.min(offset+limit,json.length);
   return {encoding:'json-utf16-offsets',offset,nextOffset:end<json.length?end:null,totalLength:json.length,sha256:createHash('sha256').update(json).digest('hex'),redacted:true,
     ...(offset===0&&end===json.length?{result:sanitized}:{resultJsonChunk:json.slice(offset,end)})};
+}
+
+// Generic paging remains available for recovery of oversized failed results.
+// Only host workflow admission uses this stricter complete-reader contract.
+export function assertReadableResult(result, location = 'exportedResult') {
+  const json = JSON.stringify(sanitizeCapturedResult(result, {mode:'export'}));
+  return assertCapacity(json, {code:'PI_RESULT_CAPACITY_EXCEEDED', location,
+    unit:'utf16-units', limit:DATA_CAPACITY.fullResultMaxUtf16Units});
 }

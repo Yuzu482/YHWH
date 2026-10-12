@@ -101,6 +101,7 @@ test('production root functions block issued forms and emit verified bytes under
   const auditSource = readFileSync(fileURLToPath(new URL('../extensions/audit-log.js', import.meta.url)), 'utf8');
   const artifactSource = readFileSync(fileURLToPath(new URL('../scripts/artifact-apply.mjs', import.meta.url)), 'utf8');
   const guardSource = readFileSync(fileURLToPath(new URL('../extensions/write-scope-guard.js', import.meta.url)), 'utf8');
+  const capacitySource = readFileSync(fileURLToPath(new URL('../extensions/data-capacity.js', import.meta.url)), 'utf8');
   const names = ['select_native_issued_token', 'select_api_issued_token', 'emit_checked_patch'];
   const functions = names.map(name => {
     const match = rootSource.match(new RegExp(`^${name}\\(\\) \\{[\\s\\S]*?^\\}`, 'm'));
@@ -116,7 +117,7 @@ test('production root functions block issued forms and emit verified bytes under
     command = [process.execPath, ['--input-type=module']];
   }
   const token = 'synthetic/' + '0123456789abcdef';
-  const input = Buffer.from(JSON.stringify({ functions, helperSource, auditSource, artifactSource, guardSource, token })).toString('base64');
+  const input = Buffer.from(JSON.stringify({ functions, helperSource, auditSource, artifactSource, guardSource, capacitySource, token })).toString('base64');
   const child = String.raw`
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -130,6 +131,7 @@ try {
   const helper=path.join(dir,'scripts','patch-policy.mjs');
   fs.writeFileSync(helper,data.helperSource);fs.writeFileSync(path.join(dir,'extensions','audit-log.js'),data.auditSource);
   fs.writeFileSync(path.join(dir,'scripts','artifact-apply.mjs'),data.artifactSource);fs.writeFileSync(path.join(dir,'extensions','write-scope-guard.js'),data.guardSource);
+  fs.writeFileSync(path.join(dir,'extensions','data-capacity.js'),data.capacitySource);
   const baseline=path.join(dir,'baseline'),workspace=path.join(dir,'workspace');
   fs.mkdirSync(baseline);fs.mkdirSync(workspace);
   fs.writeFileSync(path.join(baseline,'x'),'old\r\n');fs.writeFileSync(path.join(workspace,'x'),'safe café\r\n');

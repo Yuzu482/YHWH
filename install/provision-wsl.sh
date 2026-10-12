@@ -60,6 +60,7 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/role-presets.js /opt/pi-k
 install -o root -g root -m 0644 /tmp/pi-kether-install/result-submit.js /opt/pi-kether/extensions/result-submit.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/role-contract.js /opt/pi-kether/extensions/role-contract.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/result-export.js /opt/pi-kether/extensions/result-export.js
+install -o root -g root -m 0644 /tmp/pi-kether-install/data-capacity.js /opt/pi-kether/extensions/data-capacity.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/snapshot-scope.py /opt/pi-kether/scripts/snapshot-scope.py
 install -o root -g root -m 0644 /tmp/pi-kether-install/lsp-result.mjs /opt/pi-kether/scripts/lsp-result.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/prepare-credentials.mjs /opt/pi-kether/scripts/prepare-credentials.mjs
