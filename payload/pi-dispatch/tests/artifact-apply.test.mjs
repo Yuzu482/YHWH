@@ -277,6 +277,8 @@ test('authenticated MCP applies a real pending create/delete artifact with only 
   await withArtifactGateway(t,{cwd,dispatchFn},async(client,port)=>{
     const unauth=await fetch(`http://127.0.0.1:${port}/mcp`,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});assert.equal(unauth.status,401);
     const args={cwd,requestId:'mcp-apply-1',parentRunId:'artifact-test',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',tier:'T0',tierDeclaration:{publicApiOrProtocol:false,dependencyOrLockfile:false,securityAuthOrCredentials:false,migration:false,irreversibleOrNoRollback:false},task:{role:'Chesed',objective:'Fixture pending patch',readScope:['docs/**'],writeScope:['docs/**'],acceptance:['contents']}};
+    args.task.milestone={id:'contents',objective:'Create and delete isolated fixture files',acceptanceCommandIds:['contents']};
+    args.task.verify={commands:[{id:'contents',argv:['node','--test'],cwd:'.'}]};
     const pending=parse(await client.callTool({name:'dispatch_subagent',arguments:args}));assert.equal(pending.state ?? pending.status,'awaiting-host-verification',JSON.stringify(pending));
     const missing=parse(await client.callTool({name:'apply_artifact',arguments:{requestId:'unknown'}}));assert.equal(missing.code,'artifact_not_pending');
     const extra=await client.callTool({name:'apply_artifact',arguments:{requestId:args.requestId,cwd}});assert.equal(extra.isError,true);

@@ -23,6 +23,7 @@ const parentRunId='tier-flow-parent';
 const flags={publicApiOrProtocol:true,dependencyOrLockfile:false,securityAuthOrCredentials:false,migration:false,irreversibleOrNoRollback:false};
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const parsed=result=>JSON.parse(result.content[0].text);
+const fixtureMilestone=(id='implementation')=>({milestone:{id,objective:`Isolated ${id} acceptance fixture`,acceptanceCommandIds:['test']},verify:{commands:[{id:'test',argv:['node','--test','tests/tier-acceptance-flow.test.mjs'],cwd:'.'}]}});
 
 test('durable T1 host verification completes source contract before one default-medium post-review and acceptance',async()=>{
   const directory=mkdtempSync(join(tmpdir(),'tier-t1-review-flow-'));
@@ -53,7 +54,7 @@ test('durable T1 host verification completes source contract before one default-
   try{
     await client.connect(transport);
     const receipt=parsed(await client.callTool({name:'get_workflow',arguments:{topic:'task-tiers'}})).receipt;
-    const source=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,parentRunId:'tier-t1-review-parent',requestId:'tier-t1-source',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',workflowReceipt:receipt,tier:'T1',tierDeclaration:{...flags,publicApiOrProtocol:false},task:{contractVersion:2,role:'Chesed',objective:goal,acceptance:runAcceptance,readScope:['package.json'],writeScope:['package.json']}}}));
+    const source=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,parentRunId:'tier-t1-review-parent',requestId:'tier-t1-source',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',workflowReceipt:receipt,tier:'T1',tierDeclaration:{...flags,publicApiOrProtocol:false},task:{...fixtureMilestone(),contractVersion:2,role:'Chesed',objective:goal,acceptance:runAcceptance,readScope:['package.json'],writeScope:['package.json']}}}));
     assert.equal(source.status,'awaiting-host-verification',JSON.stringify(source));
     assert.equal(source.ok,false);
     assert.deepEqual(source.hostVerification.requiredCheckNames,[checkName]);
@@ -138,8 +139,9 @@ test('known-scope T2 pre-review proceeds directly through host verification to o
   try{
     await client.connect(transport);
     const receipt=parsed(await client.callTool({name:'get_workflow',arguments:{topic:'task-tiers'}})).receipt;
-    const task=(role,stage,inputs,extra={})=>({contractVersion:2,role,objective:goal,acceptance,readScope:role==='Geburah'?[]:['package.json'],writeScope:role==='Chesed'?['package.json']:[],handoff:{version:2,stage,inputs,runGoal:goal,runAcceptance:acceptance,phaseIndex:1},...extra});
+    const task=(role,stage,inputs,extra={})=>({... (role==='Chesed'?fixtureMilestone():{}),contractVersion:2,role,objective:goal,acceptance,readScope:role==='Geburah'?[]:['package.json'],writeScope:role==='Chesed'?['package.json']:[],handoff:{version:2,stage,inputs,runGoal:goal,runAcceptance:acceptance,phaseIndex:1},...extra});
     const preTask=task('Geburah','pre-review',[],{context:['KNOWN_SCOPE= package.json only; primary supplied bounded plan.'],reviewPacket:{version:1,stage:'pre-change',requirements:{status:'provided',content:['Plan requirement']},changes:{status:'provided',content:['primary plan: change package.json fixture']},context:{status:'provided',content:['KNOWN_SCOPE= package.json only']},verification:{status:'provided',content:['Verify package fixture']}}});
+    preTask.milestonePlan=['implementation','failure-fixture'].map(id=>({...fixtureMilestone(id),writeScope:['package.json']}));
     const pre=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,parentRunId,requestId:'direct-t2-pre',provider:'claude-code-cli',model:'claude-sonnet-5',access:'none',workflowReceipt:receipt,tier:'T2',tierDeclaration:flags,task:preTask}}));
     assert.equal(pre.ok,true,JSON.stringify(pre));
     const preOutcome=ledger.getOutcome('direct-t2-pre');
@@ -161,7 +163,7 @@ test('known-scope T2 pre-review proceeds directly through host verification to o
     assert.equal(aliasBeforeHost.ok,false);
     assert.equal(aliasBeforeHost.code,'PI_T2_REVIEW_REFERENCE_REQUIRED');
     assert.equal(calls.filter(item=>item.task.role==='Geburah'&&item.task.reviewPacket?.stage==='post-change').length,0);
-    const failedImpl=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...implArgs,requestId:'direct-t2-failed-impl'}}));
+    const failedImpl=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...implArgs,requestId:'direct-t2-failed-impl',task:{...implArgs.task,...fixtureMilestone('failure-fixture')}}}));
     assert.equal(failedImpl.status,'awaiting-host-verification',JSON.stringify(failedImpl));
     const failedHost=parsed(await client.callTool({name:'record_host_verification',arguments:{requestId:'direct-t2-failed-impl',artifactSha256:failedImpl.hostVerification.artifactSha256,workflowReceipt:receipt,commands:[{checkName,command:'synthetic failing fixture; not executed',exitCode:1,outputSummary:'Synthetic rejection fixture; no host command was executed.'}]}}));
     assert.equal(failedHost.state,'failed');
@@ -200,7 +202,7 @@ test('known-scope T2 pre-review proceeds directly through host verification to o
   }
 });
 
-test('completed T2 source falls back to ledger outcome through Netzach and one final review',async()=>{
+test('legacy completed T2 source falls back to ledger outcome through Netzach and one final review',async()=>{
   const directory=mkdtempSync(join(tmpdir(),'tier-flow-'));
   const ledger=createRequestLedger(directory);
   const preTask={role:'Geburah',objective:'Synthetic predecessor',acceptance:['Fixture'],reviewPacket:{version:1,stage:'pre-change',requirements:{status:'provided',content:['Fixture']},changes:{status:'provided',content:['Fixture']},context:{status:'provided',content:['Fixture']},verification:{status:'provided',content:['Fixture']}},handoff:{version:2,stage:'pre-review',inputs:[{requestId:'planned',role:'Chochmah',stage:'planned',resultSha256:'a'.repeat(64)}],runGoal:goal,runAcceptance:acceptance,phaseIndex:1}};
@@ -229,9 +231,16 @@ test('completed T2 source falls back to ledger outcome through Netzach and one f
   try{
     await client.connect(transport);
     const receipt=parsed(await client.callTool({name:'get_workflow',arguments:{topic:'task-tiers'}})).receipt;
-    const task=(role,stage,inputs,extra={})=>({contractVersion:2,role,objective:goal,acceptance,readScope:role==='Geburah'?[]:['package.json'],writeScope:role==='Chesed'?['package.json']:[],handoff:{version:2,stage,inputs,runGoal:goal,runAcceptance:acceptance,phaseIndex:1},...extra});
+    const task=(role,stage,inputs,extra={})=>({... (role==='Chesed'?fixtureMilestone():{}),contractVersion:2,role,objective:goal,acceptance,readScope:role==='Geburah'?[]:['package.json'],writeScope:role==='Chesed'?['package.json']:[],handoff:{version:2,stage,inputs,runGoal:goal,runAcceptance:acceptance,phaseIndex:1},...extra});
     const writeArgs={cwd:root,parentRunId,requestId:'flow-write',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',workflowReceipt:receipt,dependsOnRequestIds:['pre-flow'],tier:'T2',tierDeclaration:flags,task:task('Chesed','implementing',[preRef])};
-    const write=parsed(await client.callTool({name:'dispatch_subagent',arguments:writeArgs}));
+    // Existing completed records remain readable under their original gates.
+    // NEW writes now require host verification, exercised by the direct-host
+    // case above; this legacy fixture must not bypass that admission path.
+    const legacyTask={...writeArgs.task};delete legacyTask.milestone;delete legacyTask.verify;
+    const legacyValue=roleValue('Chesed',goal);legacyValue.changedFiles=['package.json'];
+    const legacyContract={...completedContract(legacyTask,{parentRunId},root,legacyValue),tierPolicyVersion:1,tier:'T2',artifactSha256:hash(patch),files:1,addedLines:1,deletedLines:0,estimatedLines:1,semanticRisks:flags};
+    const write={ok:true,contract:legacyContract,structuredResult:legacyValue};
+    ledger.recordOutcome('flow-write',write);
     assert.equal(write.ok,true,JSON.stringify(write));
     assert.equal(write.contract.artifactSha256,hash(patch));
     const completed=ledger.getOutcome('flow-write');
