@@ -25,6 +25,37 @@ const STAGES = new Set(['pre-review', 'post-review']);
 const FINDING_SEVERITIES = new Set(['info', 'low', 'medium', 'high', 'critical']);
 const UNKNOWN_EXECUTION_MS = 900000;
 const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+const GRANT_KEYS = ['id', 'authorizationReference', 'workspaceSha256', 'runAnchorSha256', 'parentRunId', 'tier', 'phaseIndex', 'totalCap', 'stageCap'];
+export function validateReviewQuotaExceptions(value = []) {
+  if (!Array.isArray(value) || value.length > 16) throw new TypeError('Invalid reviewQuotaExceptions');
+  const grants = value.map(grant => {
+    if (!exact(grant, GRANT_KEYS) || typeof grant.id !== 'string' || !ID.test(grant.id) ||
+        typeof grant.authorizationReference !== 'string' || !grant.authorizationReference.trim() || grant.authorizationReference.length > 256 ||
+        !HEX.test(grant.workspaceSha256) || !HEX.test(grant.runAnchorSha256) || !ID.test(grant.parentRunId) ||
+        grant.tier !== 'T2' || grant.phaseIndex !== 2 ||
+        !((grant.totalCap === 6 && grant.stageCap === 3) || (grant.totalCap === 8 && grant.stageCap === 5) || (grant.totalCap === 11 && grant.stageCap === 8) || (grant.totalCap === 13 && grant.stageCap === 9) || (grant.totalCap === 14 && grant.stageCap === 10)) ||
+        (grant.totalCap > 6 && (grant.id !== 'infalsus-card-lab-phase2-20261012' ||
+          grant.workspaceSha256 !== '3149a065938db19874bfdbcce8d6de2ca9c27645fa38f353cbd5c8245691d149' ||
+          grant.runAnchorSha256 !== 'b991be558d49d9847f0eb12560d2cd2f1873b1f69146678a9e13b06d1286b062' ||
+          grant.parentRunId !== 'infalsus-card-lab-20261012' ||
+          (grant.totalCap === 14 && grant.authorizationReference !== 'user-approval:quota14:4ae04ff18684e8ceab91d19b96296c43dc6e6bb64338ab2fc0ee7551249495d1')))) throw new TypeError('Invalid reviewQuotaExceptions entry');
+    return Object.freeze({ ...grant });
+  });
+  for (let i = 0; i < grants.length; i++) for (let j = i + 1; j < grants.length; j++) {
+    if (grants[i].id === grants[j].id || (grants[i].workspaceSha256 === grants[j].workspaceSha256 && grants[i].runAnchorSha256 === grants[j].runAnchorSha256 && grants[i].parentRunId === grants[j].parentRunId && grants[i].phaseIndex === grants[j].phaseIndex)) throw new TypeError('Duplicate review quota exception');
+  }
+  return Object.freeze(grants);
+}
+export function effectiveReviewQuota(grants, identity, candidate) {
+  const grant = grants.find(item => item.workspaceSha256 === identity.workspaceSha256 && item.runAnchorSha256 === identity.runAnchorSha256 &&
+    item.parentRunId === candidate.parentRunId && item.phaseIndex === candidate.phaseIndex && item.tier === identity.tier && identity.tier === 'T2');
+  if (!grant) return LIMITS[identity.tier];
+  if (grant.totalCap > 6 && !STAGES.has(candidate.stage)) throw new TypeError('Review quota stage is required for extended grants');
+  return Object.freeze({ ...LIMITS.T2, total: grant.totalCap,
+    stage: [13, 14].includes(grant.totalCap) && candidate.stage === 'pre-review' ? 4 : grant.totalCap > 6 && candidate.stage === 'post-review' ? grant.stageCap : 3,
+    sharedExtensions: grant.totalCap - 4, grantId: grant.id, authorizationReference: grant.authorizationReference,
+    parentRunId: grant.parentRunId, totalCap: grant.totalCap, stageCap: grant.stageCap });
+}
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) &&
   JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -216,7 +247,7 @@ function migrateCurrentState(data, key, identity) {
   return changed;
 }
 
-function validateState(data, key, identity) {
+function validateState(data, key, identity, grants = []) {
   if (!exact(data, ['version', 'key', 'identity', 'attempts', 'requests', 'decisions', 'timeUsedMs', 'extensionUsed']) ||
       data.version !== 2 || data.key !== key || !exact(data.identity, ['workspaceSha256', 'runAnchorSha256', 'tier']) || !same(data.identity, identity) ||
       !Array.isArray(data.attempts) || !data.requests || Array.isArray(data.requests) || typeof data.requests !== 'object' ||
@@ -227,6 +258,9 @@ function validateState(data, key, identity) {
   let time = 0;
   let extensions = 0;
   const stageCounts = { 'pre-review': 0, 'post-review': 0 };
+  const extensionAttempts = [];
+  const phaseStageExtensions = new Set();
+  let wholeGoalCount = 0;
   for (const attempt of data.attempts) {
     if (!exact(attempt, ['attemptId', 'requestId', 'stage', 'phaseIndex', 'parentRunId', 'materialDigest', 'artifactDigest', 'hostRecordDigest',
       'status', 'started', 'outcome', 'reservedMs', 'elapsedMs', 'extension', 'timeKnown', 'materialSections', 'progressVerified', 'legacyImportDigest']) ||
@@ -248,9 +282,22 @@ function validateState(data, key, identity) {
     attemptIds.add(attempt.attemptId);
     requests[attempt.requestId] = attempt.attemptId;
     if (attempt.status !== 'released') {
+      const priorStageCount = stageCounts[attempt.stage];
       stageCounts[attempt.stage]++;
+      wholeGoalCount++;
       const base = LIMITS[data.identity.tier].base;
-      if ((stageCounts[attempt.stage] > base) !== attempt.extension || stageCounts[attempt.stage] > base + 1) invalid('Review extension flags disagree with stage attempt counts');
+      const rule = effectiveReviewQuota(grants, data.identity, attempt);
+      if ((stageCounts[attempt.stage] > base) !== attempt.extension || stageCounts[attempt.stage] > rule.stage) invalid('Review extension flags disagree with stage attempt counts');
+      if (attempt.extension) {
+        const authorized = rule.grantId !== undefined && attempt.phaseIndex === 2 && attempt.parentRunId === rule.parentRunId &&
+          (attempt.stage === 'pre-review' ? priorStageCount === 2 || ([13, 14].includes(rule.totalCap) && priorStageCount === 3) : priorStageCount >= 2 && priorStageCount < rule.stage);
+        extensionAttempts.push({ authorized, totalCap: rule.total, grantId: rule.grantId });
+        if (authorized) {
+          const slot = `${attempt.stage}:${attempt.phaseIndex}:${wholeGoalCount}`;
+          if (phaseStageExtensions.has(slot)) invalid('Duplicate authorized review extension slot');
+          phaseStageExtensions.add(slot);
+        }
+      }
     }
     if (attempt.status === 'reserved' || attempt.status === 'started') {
       time += attempt.reservedMs;
@@ -264,9 +311,16 @@ function validateState(data, key, identity) {
     }
     if (attempt.extension && attempt.status !== 'released') extensions++;
   }
-  if (!same(requests, data.requests) || time !== data.timeUsedMs || extensions > 1 || (extensions > 0) !== data.extensionUsed ||
-      (data.identity.tier === 'T1' && stageCounts['pre-review'] !== 0) || stageCounts['pre-review'] > LIMITS[data.identity.tier].stage || stageCounts['post-review'] > LIMITS[data.identity.tier].stage ||
-      stageCounts['pre-review'] + stageCounts['post-review'] > LIMITS[data.identity.tier].total) invalid('Review state derived indexes or counters disagree');
+  const hasAuthorizedExtension = extensionAttempts.some(item => item.authorized);
+  const mixedUnauthorized = extensionAttempts.some(item => !item.authorized);
+  const authorizedTotalCap = Math.max(LIMITS[data.identity.tier].total, ...extensionAttempts.filter(item => item.authorized).map(item => item.totalCap));
+  const authorizedExtensionCap = authorizedTotalCap - 4;
+  const extendedGrant = grants.find(grant => grant.totalCap > 6 && grant.workspaceSha256 === identity.workspaceSha256 && grant.runAnchorSha256 === identity.runAnchorSha256);
+  const postStageCap = extendedGrant?.stageCap ?? LIMITS[data.identity.tier].stage;
+  if (!same(requests, data.requests) || time !== data.timeUsedMs || extensions > (hasAuthorizedExtension && !mixedUnauthorized ? authorizedExtensionCap : 1) ||
+      (extensions > 1 && (!hasAuthorizedExtension || mixedUnauthorized)) || (extensions > 0) !== data.extensionUsed ||
+      (data.identity.tier === 'T1' && stageCounts['pre-review'] !== 0) || stageCounts['pre-review'] > ([13, 14].includes(extendedGrant?.totalCap) ? 4 : LIMITS[data.identity.tier].stage) || stageCounts['post-review'] > postStageCap ||
+      stageCounts['pre-review'] + stageCounts['post-review'] > (hasAuthorizedExtension && !mixedUnauthorized ? authorizedTotalCap : LIMITS[data.identity.tier].total)) invalid('Review state derived indexes or counters disagree');
   if (Object.keys(data.decisions).some(request => !ID.test(request) || !own(data.requests, request))) invalid('Invalid persisted decision index');
   for (const [request, value] of Object.entries(data.decisions)) {
     const attempt = data.attempts.find(item => item.requestId === request);
@@ -338,7 +392,7 @@ function migrateLegacy(data, directory, identity) {
   return changed;
 }
 
-function loadState(directory, key, identity) {
+function loadState(directory, key, identity, grants = []) {
   const path = join(directory, `${key}.json`);
   let data;
   let changed = false;
@@ -348,9 +402,53 @@ function loadState(directory, key, identity) {
     changed = migrateCurrentState(data, key, identity);
   } else data = initial(key, identity);
   changed = migrateLegacy(data, directory, identity) || changed;
-  validateState(data, key, identity);
+  validateState(data, key, identity, grants);
   if (changed) sync(path, `${JSON.stringify(data)}\n`);
   return { data, path };
+}
+
+const EVIDENCE_RECONSIDERATION = Object.freeze({
+  requestId:'card-lab-final-range-3-evidence-reconsideration-20261013',
+  previousReviewRequestId:'card-lab-final-range-3-20261013',
+  blockerKey:'72e17cb44d20fc848f4ab8e5d07ad9b29bc432feab9ab06a113e51c00e8d9fd4',
+  path:'tests/native-planner.test.mjs',
+  materialDigest:'5b746af029241d283f06e0f867bdfbdc3f935de17bcd27f6ab48d55c1bc64ac1',
+  previousMaterialDigest:'5c420fd5b0707e63808164e0ca404554fc8ebe79ee2bfcab414b179df5f9f34f',
+  artifactDigest:'cdd8518a02743d344645709600c8c6bce7564e2258d9a596b7b1f69c450e2184',
+  hostRecordDigest:'873748be9c0e59041e1cba540cadb464bc43591b8ca1dbf510f9284eac00d706',
+  reportSha256:'31c4f85c6f4af9a83f4c3a464009511fa867eb83b78cef581f6179d08eef18ac',
+  authorizationSha256:'user-approval:quota14:4ae04ff18684e8ceab91d19b96296c43dc6e6bb64338ab2fc0ee7551249495d1',
+  parentRunId:'infalsus-card-lab-20261012',
+});
+
+function evidenceReconsiderationEligible(data, input, limits) {
+  if (input.requestId !== EVIDENCE_RECONSIDERATION.requestId || input.stage !== 'post-review' || input.phaseIndex !== 2 ||
+      input.parentRunId !== EVIDENCE_RECONSIDERATION.parentRunId || limits.totalCap !== 14 ||
+      limits.authorizationReference !== EVIDENCE_RECONSIDERATION.authorizationSha256 ||
+      input.materialDigest !== EVIDENCE_RECONSIDERATION.materialDigest ||
+      input.artifactDigest !== EVIDENCE_RECONSIDERATION.artifactDigest || input.hostRecordDigest !== EVIDENCE_RECONSIDERATION.hostRecordDigest ||
+      !input.progress || input.progress.previousReviewRequestId !== EVIDENCE_RECONSIDERATION.previousReviewRequestId) return false;
+  const history = data.attempts.filter(attempt => attempt.stage === 'post-review' && attempt.phaseIndex === 2 &&
+    attempt.parentRunId === EVIDENCE_RECONSIDERATION.parentRunId && attempt.status !== 'released');
+  const previousAttempt = history.at(-1);
+  const prior = data.decisions[EVIDENCE_RECONSIDERATION.previousReviewRequestId];
+  if (!previousAttempt || previousAttempt.requestId !== EVIDENCE_RECONSIDERATION.previousReviewRequestId || previousAttempt.status !== 'finished' ||
+      previousAttempt.materialDigest !== EVIDENCE_RECONSIDERATION.previousMaterialDigest ||
+      previousAttempt.artifactDigest !== EVIDENCE_RECONSIDERATION.artifactDigest || previousAttempt.hostRecordDigest !== EVIDENCE_RECONSIDERATION.hostRecordDigest ||
+      !prior || prior.stage !== 'post-review' || prior.phaseIndex !== 2 || prior.materialDigest !== EVIDENCE_RECONSIDERATION.previousMaterialDigest ||
+      prior.artifactDigest !== EVIDENCE_RECONSIDERATION.artifactDigest || prior.hostRecordDigest !== EVIDENCE_RECONSIDERATION.hostRecordDigest ||
+      prior.decision.reviewDecision !== 'request-changes') return false;
+  const blockers = reviewBlockers(prior.decision);
+  if (blockers.length !== 1 || blockers[0].key !== EVIDENCE_RECONSIDERATION.blockerKey ||
+      blockers[0].paths.length !== 1 || blockers[0].paths[0] !== EVIDENCE_RECONSIDERATION.path) return false;
+  const sections = input.materialSections;
+  if (!sections || !sections.requirements || !sections.changes ||
+      sections.requirements === previousAttempt.materialSections.requirements) return false;
+  const progress = input.progress;
+  if (progress.closures.length !== 1) return false;
+  const closure = progress.closures[0];
+  return closure.key === EVIDENCE_RECONSIDERATION.blockerKey && closure.paths.length === 1 &&
+    closure.paths[0] === EVIDENCE_RECONSIDERATION.path && closure.evidence.includes(EVIDENCE_RECONSIDERATION.reportSha256);
 }
 
 function progressEligible(data, input) {
@@ -392,6 +490,26 @@ function progressEligible(data, input) {
   });
 }
 
+function actionableFailure(decision) {
+  if (!decision || !['request-changes', 'insufficient-materials'].includes(decision.reviewDecision)) return false;
+  const blockers = reviewBlockers(decision);
+  return blockers.length > 0 && blockers.every(blocker => blocker.paths.length > 0);
+}
+
+function recoverablePostHistory(data, history, currentVerified) {
+  for (let index = 0; index < history.length; index++) {
+    const attempt = history[index];
+    const decision = data.decisions[attempt.requestId]?.decision;
+    if (['approve', 'conditional-approve'].includes(decision?.reviewDecision)) continue;
+    if (!actionableFailure(decision)) return false;
+    const next = history[index + 1];
+    if (!next) return index === history.length - 1 && currentVerified;
+    if (!next.progressVerified || !['approve', 'conditional-approve'].includes(data.decisions[next.requestId]?.decision?.reviewDecision)) return false;
+    index++;
+  }
+  return true;
+}
+
 function stalled(data, input) {
   const phase = input.phaseIndex || 1;
   const history = data.attempts.filter(attempt => attempt.stage === input.stage && attempt.phaseIndex === phase && attempt.status !== 'released');
@@ -409,10 +527,11 @@ function stalled(data, input) {
 
 function makeTicket(attempt, data, replayed, timeoutSeconds) {
   return Object.freeze({ attemptId: attempt.attemptId, requestId: attempt.requestId, key: data.key, ...data.identity,
-    parentRunId: attempt.parentRunId, stage: attempt.stage, tier: data.identity.tier, replayed, timeoutSeconds });
+    parentRunId: attempt.parentRunId, stage: attempt.stage, phaseIndex: attempt.phaseIndex, tier: data.identity.tier, replayed, timeoutSeconds });
 }
 
-export function createReviewAttemptLedger(directory) {
+export function createReviewAttemptLedger(directory, options = {}) {
+  const grants = validateReviewQuotaExceptions(options.reviewQuotaExceptions ?? []);
   const dir = resolve(directory);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   return Object.freeze({
@@ -422,7 +541,7 @@ export function createReviewAttemptLedger(directory) {
       const key = hash(JSON.stringify({ workspaceSha256: input.workspaceSha256, runAnchorSha256: input.runAnchorSha256 }));
       return lock(dir, () => {
         bindParent(dir, input);
-        const { data, path } = loadState(dir, key, identity);
+        const { data, path } = loadState(dir, key, identity, grants);
         const priorId = data.requests[input.requestId];
         if (priorId) {
           const old = data.attempts.find(attempt => attempt.attemptId === priorId);
@@ -435,10 +554,11 @@ export function createReviewAttemptLedger(directory) {
         const pending = data.attempts.find(attempt => attempt.status === 'reserved' || attempt.status === 'started');
         if (pending) invalid(`Pending review attempt ${pending.attemptId} requires operator reconciliation`);
 
-        const limits = LIMITS[input.tier];
-        const consumed = data.attempts.filter(attempt => attempt.status !== 'released');
-        const stageUsed = consumed.filter(attempt => attempt.stage === input.stage).length;
         const phase = input.phaseIndex || 1;
+        const stageUsed = data.attempts.filter(attempt => attempt.status !== 'released' && attempt.stage === input.stage).length;
+        const candidate = { stage: input.stage, phaseIndex: phase, parentRunId: input.parentRunId ?? null };
+        const limits = effectiveReviewQuota(grants, identity, candidate);
+        const consumed = data.attempts.filter(attempt => attempt.status !== 'released');
         const approved = Object.values(data.decisions).some(decision => decision.stage === input.stage && decision.phaseIndex === phase &&
           ['approve', 'conditional-approve'].includes(decision.decision.reviewDecision));
         const sameApprovedContent = approved && data.attempts.some(attempt => attempt.stage === input.stage && attempt.phaseIndex === phase &&
@@ -448,11 +568,40 @@ export function createReviewAttemptLedger(directory) {
         if (sameApprovedContent) throw new ReviewAttemptError(LIMIT, 'Review already approved for unchanged material/artifact');
         if (stalled(data, input)) throw new ReviewAttemptError(LIMIT, 'Review retries stopped after consecutive non-progress blocker sets');
 
-        const verified = progressEligible(data, input);
-        const extension = !approved && stageUsed >= limits.base && verified;
-        if (consumed.length >= limits.total || stageUsed >= limits.stage || (stageUsed >= limits.base && (!extension || data.extensionUsed))) {
+        const evidenceOnlyReconsideration = input.stage === 'post-review' && evidenceReconsiderationEligible(data, input, limits);
+        const verified = progressEligible(data, input) || evidenceOnlyReconsideration;
+        const extendedGrant = limits.grantId !== undefined && limits.totalCap > 6;
+        const phasePostHistory = consumed.filter(attempt => attempt.stage === 'post-review' && attempt.phaseIndex === phase && attempt.parentRunId === candidate.parentRunId);
+        const postHistoryApproved = phasePostHistory.every(attempt => ['approve', 'conditional-approve'].includes(data.decisions[attempt.requestId]?.decision.reviewDecision));
+        const postRecoveryAllowed = [13, 14].includes(limits.totalCap) && recoverablePostHistory(data, phasePostHistory, verified);
+        const postDigestsDistinct = evidenceOnlyReconsideration || ['materialDigest', 'artifactDigest', 'hostRecordDigest'].every(key => input[key] &&
+          phasePostHistory.every(attempt => attempt[key] !== input[key]));
+        const authorizedPost = extendedGrant && input.stage === 'post-review' && phase === 2 && candidate.parentRunId === limits.parentRunId;
+        if (authorizedPost && (!input.materialDigest || !input.artifactDigest || !input.hostRecordDigest || !(postHistoryApproved || postRecoveryAllowed) || !postDigestsDistinct)) {
+          throw new ReviewAttemptError(LIMIT, 'Authorized post-review requires approved prior reviews and distinct complete host evidence');
+        }
+        const priorAuthorizedExtension = data.attempts.some(attempt => attempt.status !== 'released' && attempt.extension &&
+          attempt.stage === input.stage && attempt.phaseIndex === phase && attempt.parentRunId === candidate.parentRunId);
+        const latestPhasePost = [...phasePostHistory].at(-1);
+        const latestPostDecision = latestPhasePost && data.decisions[latestPhasePost.requestId]?.decision;
+        const latestPhasePre = [...consumed].reverse().find(attempt => attempt.stage === 'pre-review' && attempt.phaseIndex === phase);
+        const sectionsChanged = latestPhasePre && input.materialSections && Object.keys(input.materialSections).some(name =>
+          latestPhasePre.materialSections[name] !== input.materialSections[name]);
+        const recoverablePre = [13, 14].includes(limits.totalCap) && input.stage === 'pre-review' && phase === 2 && stageUsed === 3 &&
+          latestPhasePost?.status === 'finished' && actionableFailure(latestPostDecision) && input.materialDigest &&
+          input.materialDigest !== latestPhasePre?.materialDigest && sectionsChanged;
+        const authorizedPreSlot = limits.grantId !== undefined && input.stage === 'pre-review' && phase === 2 &&
+          (([13, 14].includes(limits.totalCap) && stageUsed === 3 && recoverablePre) || (!approved && stageUsed === 2 && !priorAuthorizedExtension));
+        const authorizedGenericSlot = limits.grantId !== undefined && !extendedGrant && !approved && stageUsed === 2 && !priorAuthorizedExtension;
+        const authorizedPostSlot = authorizedPost && stageUsed >= 2 && stageUsed < limits.stage && (postHistoryApproved || postRecoveryAllowed) && postDigestsDistinct;
+        const authorizedSlot = authorizedPreSlot || authorizedGenericSlot || authorizedPostSlot;
+        const ordinaryExtension = !approved && stageUsed >= limits.base && verified && !data.extensionUsed;
+        const extension = authorizedSlot || ordinaryExtension;
+        const hasNonTupleExtension = data.attempts.some(attempt => attempt.status !== 'released' && attempt.extension && !effectiveReviewQuota(grants, identity, attempt).grantId);
+        const mixedWouldExceed = (consumed.length + 1 > LIMITS[input.tier].total || (extension && data.extensionUsed)) && (!authorizedSlot || hasNonTupleExtension);
+        if (mixedWouldExceed || consumed.length >= limits.total || stageUsed >= limits.stage || (stageUsed >= limits.base && !extension)) {
           throw new ReviewAttemptError(LIMIT, `Review quota exhausted (${input.tier} ${input.stage}: base ${limits.base}, extension ${data.extensionUsed ? 'used' : 'unavailable'}, stage ${limits.stage}, total ${limits.total})`,
-            { tier: input.tier, stage: input.stage, used: consumed.length, stageUsed, base: limits.base, remainingBase: Math.max(0, limits.base - stageUsed), sharedExtraRemaining: Math.max(0, (limits.sharedExtensions ?? 1) - (data.extensionUsed ? 1 : 0)), stageCap: limits.stage, remainingStage: Math.max(0, limits.stage - stageUsed), totalCap: limits.total, remainingTotal: Math.max(0, limits.total - consumed.length), extensionUsed: data.extensionUsed, extensionEligible: extension, extensionEligibilityReason: data.extensionUsed ? 'shared extension consumed' : 'trusted relevant progress and matching host proof required', nextAction: 'review trusted blocker progress and policy gates before retrying' });
+            { tier: input.tier, stage: input.stage, used: consumed.length, stageUsed, base: limits.base, remainingBase: Math.max(0, limits.base - stageUsed), sharedExtraRemaining: Math.max(0, (limits.sharedExtensions ?? 1) - consumed.filter(attempt => attempt.extension).length), stageCap: limits.stage, remainingStage: Math.max(0, limits.stage - stageUsed), totalCap: limits.total, remainingTotal: Math.max(0, limits.total - consumed.length), extensionUsed: data.extensionUsed, extensionEligible: extension, extensionEligibilityReason: authorizedSlot ? 'authorized phase continuation' : data.extensionUsed ? 'shared extension consumed' : 'trusted relevant progress and matching host proof required', nextAction: 'review trusted blocker progress and policy gates before retrying' });
         }
         const remaining = Math.max(0, limits.time - data.timeUsedMs);
         const timeoutSeconds = Math.min(input.timeoutSeconds ?? 900, 900, Math.floor(remaining / 1000));
@@ -468,7 +617,7 @@ export function createReviewAttemptLedger(directory) {
         data.requests[input.requestId] = attempt.attemptId;
         data.timeUsedMs += attempt.reservedMs;
         if (extension) data.extensionUsed = true;
-        validateState(data, key, identity);
+        validateState(data, key, identity, grants);
         sync(path, `${JSON.stringify(data)}\n`);
         return makeTicket(attempt, data, false, timeoutSeconds);
       });
@@ -498,7 +647,7 @@ export function createReviewAttemptLedger(directory) {
         attempt.elapsedMs = charged;
         attempt.timeKnown = started && executionKnown;
         data.timeUsedMs += charged - attempt.reservedMs;
-        if (!started && attempt.extension) data.extensionUsed = false;
+        if (!started && attempt.extension) data.extensionUsed = data.attempts.some(item => item.attemptId !== attempt.attemptId && item.extension && item.status !== 'released');
       });
     },
     recordDecision(ticket, decision) {
@@ -515,7 +664,7 @@ export function createReviewAttemptLedger(directory) {
       validate(input);
       const key = hash(JSON.stringify({ workspaceSha256: input.workspaceSha256, runAnchorSha256: input.runAnchorSha256 }));
       return lock(dir, () => {
-        const { data } = loadState(dir, key, { workspaceSha256: input.workspaceSha256, runAnchorSha256: input.runAnchorSha256, tier: input.tier });
+        const { data } = loadState(dir, key, { workspaceSha256: input.workspaceSha256, runAnchorSha256: input.runAnchorSha256, tier: input.tier }, grants);
         return JSON.parse(JSON.stringify(data));
       });
     },
@@ -523,11 +672,11 @@ export function createReviewAttemptLedger(directory) {
       if (!ticket || ticket.replayed || !HEX.test(ticket.key || '') || !ID.test(ticket.requestId || '') || !ID.test(ticket.attemptId || '')) invalid('Invalid review ticket');
       return lock(dir, () => {
         const identity = { workspaceSha256: ticket.workspaceSha256, runAnchorSha256: ticket.runAnchorSha256, tier: ticket.tier };
-        const { data, path } = loadState(dir, ticket.key, identity);
+        const { data, path } = loadState(dir, ticket.key, identity, grants);
         const attempt = data.attempts.find(item => item.attemptId === ticket.attemptId && item.requestId === ticket.requestId);
         if (!attempt) invalid('Unknown review ticket');
         callback(attempt, data);
-        validateState(data, ticket.key, identity);
+        validateState(data, ticket.key, identity, grants);
         sync(path, `${JSON.stringify(data)}\n`);
         return { attemptId: attempt.attemptId, status: attempt.status, started: attempt.started, outcome: attempt.outcome };
       });

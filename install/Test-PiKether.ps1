@@ -98,6 +98,12 @@ if ($Installed) {
     Write-Host "[DRIFT] $kind $Key" -ForegroundColor Yellow
   }
   $plugin = Join-Path $TargetHome 'plugins\pi-dispatch'
+  $integrityNode = (Get-Command node -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+  $integrityOutput = & $integrityNode (Join-Path $payloadPlugin 'scripts/install-integrity.mjs') --plugin-root $plugin --require-installed
+  $integrityExit = $LASTEXITCODE
+  $integrityResult = try { $integrityOutput | ConvertFrom-Json } catch { $null }
+  Check ($integrityExit -eq 0 -and $integrityResult.state -eq 'verified') 'all installation-managed file hashes match recorded installation'
+  if ($integrityResult.code -eq 'PI_INSTALL_DRIFT') { Write-Warning ('[PI_INSTALL_DRIFT] ' + ($integrityResult | ConvertTo-Json -Depth 6 -Compress)) }
   Check (Test-Path -LiteralPath (Join-Path $plugin 'node_modules\@modelcontextprotocol\sdk')) 'plugin dependencies installed'
   $piEntry = Join-Path $TargetHome '.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js'
   Check (Test-Path -LiteralPath $piEntry -PathType Leaf) 'host Pi entry installed'
