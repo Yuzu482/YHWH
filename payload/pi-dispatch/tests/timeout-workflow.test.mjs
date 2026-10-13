@@ -41,7 +41,9 @@ test('wait transport and host allowlists expose only the bounded wait contract',
  assert.match(client,/command === 'wait' && args.length === 1/);
  assert.match(client,/timeout:60000,maxTotalTimeout:60000/);
  assert.match(client,/timeoutMs>55000/);
- const installer=readFileSync(resolve(root,'../../install/Install-PiKether.ps1'),'utf8');
+ const caller=readFileSync(resolve(root,'../../install/Install-PiKether.ps1'),'utf8');
+ assert.match(caller,/Get-SharedGatewayConnection\.ps1/);
+ const installer=readFileSync(resolve(root,'../../install/Get-SharedGatewayConnection.ps1'),'utf8');
  assert.match(installer,/wait_subagent/);
 });
 

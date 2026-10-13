@@ -180,6 +180,10 @@ if ($Installed) {
     $mcp = Get-Content -LiteralPath (Join-Path $plugin '.mcp.json') -Raw | ConvertFrom-Json
     Check ([bool]$mcp.mcpServers.'pi-kether-gateway'.env.PI_GATEWAY_ROOTS) 'MCP workspace scope configured'
     Check ($mcp.mcpServers.'pi-kether-gateway'.env.PI_DISPATCH_PI_ENTRY -eq $piEntry) 'MCP resolves the installed host Pi entry'
+    $connection=$mcp.mcpServers.'pi-kether-gateway'
+    $expectedConnection=& (Join-Path $PSScriptRoot 'Get-SharedGatewayConnection.ps1') -NodePath $connection.command -PluginTarget $plugin -StateRoot (Join-Path $TargetHome '.local\state\pi-kether') -Roots @($connection.env.PI_GATEWAY_ROOTS | ConvertFrom-Json) -PiEntry $piEntry -WslDistro $WslDistro
+    Check ($connection.env.PI_GATEWAY_CONFIG -ceq $expectedConnection.env.PI_GATEWAY_CONFIG) 'MCP uses the shared local gateway independently of Tunnel'
+    Check (@(Compare-Object @($expectedConnection.enabled_tools | Sort-Object) @($connection.enabled_tools | Sort-Object) -CaseSensitive).Count -eq 0) 'MCP exposes the exact current governed tool list'
   } catch { Check $false 'MCP workspace scope configured' }
   if (-not $SkipWsl) {
     & wsl.exe -d $WslDistro -u root --exec test -f /opt/pi-kether/extensions/role-presets.js
