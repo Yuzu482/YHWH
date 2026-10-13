@@ -5,6 +5,23 @@ $fixture = Join-Path $repo ('.test/plugin-version-' + [guid]::NewGuid().ToString
 $full = [IO.Path]::GetFullPath($fixture)
 $allowed = [IO.Path]::GetFullPath((Join-Path $repo '.test')).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 if (-not $full.StartsWith($allowed, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture escaped repository .test.' }
+$installerPath=Join-Path $repo 'install/Install-PiKether.ps1'
+$installerText=[IO.File]::ReadAllText($installerPath)
+$installerAst=[Management.Automation.Language.Parser]::ParseFile($installerPath,[ref]$null,[ref]$null)
+$recordCommands=@($installerAst.FindAll({param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.Extent.Text -match 'plugin-upgrade\.mjs.*\brecord\s+\$installationSource\s+\$pluginTarget'},$true))
+$selfTestCommands=@($installerAst.FindAll({param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.Extent.Text -match 'Test-PiKether\.ps1.*-Installed'},$true))
+if($recordCommands.Count -ne 1 -or $selfTestCommands.Count -ne 1 -or $recordCommands[0].Extent.StartOffset -ge $selfTestCommands[0].Extent.StartOffset){throw 'Installation baseline must be recorded before the installed selftest.'}
+$statements=@($installerAst.EndBlock.Statements)
+$recordIndex=-1
+for($i=0;$i -lt $statements.Count;$i++){if($statements[$i].Extent.StartOffset -eq $recordCommands[0].Extent.StartOffset){$recordIndex=$i;break}}
+if($recordIndex -lt 0 -or $statements[$recordIndex+2].Extent.StartOffset -ne $selfTestCommands[0].Extent.StartOffset){throw 'Record and selftest must be consecutive guarded completion steps.'}
+$recordGuard=$statements[$recordIndex+1];$selfTestGuard=$statements[$recordIndex+3]
+foreach($guard in @($recordGuard,$selfTestGuard)){
+  if($guard -isnot [Management.Automation.Language.IfStatementAst] -or $guard.Extent.Text -notmatch '\$LASTEXITCODE\s+-ne\s+0' -or -not @($guard.FindAll({param($n) $n -is [Management.Automation.Language.ThrowStatementAst]},$true)).Count){throw 'Completion command failure must throw before continuing.'}
+}
+$completionSequence=[scriptblock]::Create($installerText.Substring($recordCommands[0].Extent.StartOffset,$selfTestGuard.Extent.EndOffset-$recordCommands[0].Extent.StartOffset))
+$selfTestAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'install/Test-PiKether.ps1'),[ref]$null,[ref]$null)
+if(@($selfTestAst.FindAll({param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.Extent.Text -match 'install-integrity\.mjs.*--require-installed'},$true)).Count -ne 1){throw 'The actual installed selftest must require the managed manifest.'}
 function Invoke-FixtureGit([string]$directory, [string[]]$GitArguments) {
   $gitExecutable = (Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
   & $gitExecutable -C $directory @GitArguments
@@ -19,6 +36,8 @@ try {
   $portableText = '{"version":"0.14.0","components":{"piDispatch":"2.3.4"}}'
   [IO.File]::WriteAllText((Join-Path $source $pluginRel), $pluginText)
   [IO.File]::WriteAllText((Join-Path $source 'portable.manifest.json'), $portableText)
+  New-Item -ItemType Directory -Path (Join-Path $source 'payload/pi-dispatch/scripts') -Force | Out-Null
+  Copy-Item -LiteralPath (Join-Path $repo 'payload/pi-dispatch/scripts/plugin-upgrade.mjs') -Destination (Join-Path $source 'payload/pi-dispatch/scripts/plugin-upgrade.mjs')
   Invoke-FixtureGit $source @('init','-q')
   Invoke-FixtureGit $source @('config','user.email','test@example.invalid')
   Invoke-FixtureGit $source @('config','user.name','Plugin Version Test')
@@ -50,17 +69,42 @@ try {
     $before=[IO.File]::ReadAllText((Join-Path $source $pluginRel))
     $actual=& (Join-Path $PSScriptRoot 'Stage-InstalledPlugin.ps1') -PackageRoot $source -Destination $copy
     Copy-Item -LiteralPath $actual -Destination $target -Recurse
-    & node (Join-Path $repo 'payload/pi-dispatch/scripts/plugin-upgrade.mjs') record $actual $target
-    if($LASTEXITCODE -ne 0){throw 'Stamped source installation baseline failed.'}
+    $nodePath=(Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+    $checker=Join-Path $repo 'payload/pi-dispatch/scripts/install-integrity.mjs'
+    $missing=& $nodePath $checker --plugin-root $target --require-installed | ConvertFrom-Json
+    if($LASTEXITCODE -ne 1 -or $missing.code -ne 'PI_INSTALL_DRIFT' -or $missing.drift[0].reason -ne 'missing-manifest'){throw 'Missing installation manifest was not rejected.'}
+    $packageRoot=Join-Path $full ('completion-package-'+[guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path (Join-Path $packageRoot 'install') -Force | Out-Null
+    $selfTestSentinel=Join-Path $full ('selftest-sentinel-'+[guid]::NewGuid().ToString('N'))
+    # Exercise the actual production completion sequence. Only the broader host
+    # selftest is adapted; this adapter runs its real integrity checker/flag.
+    [IO.File]::WriteAllText((Join-Path $packageRoot 'install/Test-PiKether.ps1'),@'
+param([switch]$Installed,[string]$TargetHome,[string]$WslDistro,[string[]]$Hosts,[switch]$SkipWsl)
+$result=& $nodePath $checker --plugin-root $pluginTarget --require-installed | ConvertFrom-Json
+if($LASTEXITCODE -ne 0 -or $result.state -ne 'verified'){throw 'Fixture installed integrity selftest failed.'}
+[IO.File]::AppendAllText($selfTestSentinel,"selftest`n")
+'@)
+    $pluginTarget=$target;$installationSource=$actual;$TargetHome=$full;$WslDistro='synthetic';$Hosts=@('generic');$installWsl=$false
+    & $completionSequence
+    if(-not (Test-Path -LiteralPath $selfTestSentinel)){throw 'Ordered completion never reached the verified selftest.'}
+    $verified=& $nodePath $checker --plugin-root $target --require-installed | ConvertFrom-Json
+    if($LASTEXITCODE -ne 0 -or $verified.state -ne 'verified'){throw 'Recorded installation did not verify.'}
     $marker=Get-Content -LiteralPath (Join-Path $target '.yhwh-managed-files.json') -Raw | ConvertFrom-Json
     if($marker.files.'build-provenance.json' -cne (Get-FileHash -LiteralPath (Join-Path $target 'build-provenance.json')).Hash.ToLowerInvariant()){throw 'Installed provenance was not included in baseline.'}
     $proof=Get-Content -LiteralPath (Join-Path $target 'build-provenance.json') -Raw | ConvertFrom-Json
     if($proof.dirty -ne $expectDirty -or [IO.File]::ReadAllText((Join-Path $source $pluginRel)) -cne $before){throw 'Installation staging changed source identity.'}
     $collision='';try{& (Join-Path $PSScriptRoot 'Stage-InstalledPlugin.ps1') -PackageRoot $source -Destination $copy | Out-Null}catch{$collision=$_.Exception.Message}
     if($collision -cne 'Installation staging destination already exists.'){throw 'Staging overwrote an existing directory.'}
+    $markerBefore=[Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $target '.yhwh-managed-files.json')))
+    $sentinelBefore=[IO.File]::ReadAllText($selfTestSentinel)
     [IO.File]::AppendAllText((Join-Path $target '.codex-plugin/plugin.json'),' ')
-    & node (Join-Path $repo 'payload/pi-dispatch/scripts/plugin-upgrade.mjs') record $actual $target
-    if($LASTEXITCODE -eq 0){throw 'Modified installed bytes were accepted.'}
+    $drift=& $nodePath $checker --plugin-root $target --require-installed | ConvertFrom-Json
+    if($LASTEXITCODE -ne 1 -or $drift.code -ne 'PI_INSTALL_DRIFT'){throw 'Altered installed bytes did not report drift.'}
+    $failed='';try{& $completionSequence}catch{$failed=$_.Exception.Message}
+    if($failed -cne 'Managed installation baseline could not be recorded.'){throw 'Modified installed bytes were not rejected before the selftest.'}
+    if([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $target '.yhwh-managed-files.json'))) -cne $markerBefore -or [IO.File]::ReadAllText($selfTestSentinel) -cne $sentinelBefore){throw 'Failed record changed the manifest or reached the selftest.'}
+    if([IO.File]::ReadAllText((Join-Path $source $pluginRel)) -cne $before){throw 'Completion fixture changed source bytes.'}
+    Write-Host '[PASS] Actual installer completion: missing manifest -> record -> verified selftest; drift rejects re-record before selftest'
   }
   Assert-InstallationStage $false
   [IO.File]::WriteAllText((Join-Path $source 'untracked.fixture'), 'ignored')
