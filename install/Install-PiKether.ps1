@@ -306,10 +306,10 @@ if ($installCodex -and (Test-Path -LiteralPath (Join-Path $TargetHome '.agents/s
   if (-not $?) { throw 'Hindsight wrapper update failed.' }
 }
 & (Join-Path $PSScriptRoot 'Protect-PiState.ps1') -TargetHome $TargetHome
-& (Join-Path $packageRoot 'install\Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $WslDistro -Hosts $Hosts -SkipWsl:$(-not $installWsl)
-if ($LASTEXITCODE -ne 0) { throw 'Post-install self-test failed.' }
 & $nodePath (Join-Path $pluginTarget 'scripts/plugin-upgrade.mjs') record $installationSource $pluginTarget
 if($LASTEXITCODE -ne 0){throw 'Managed installation baseline could not be recorded.'}
+& (Join-Path $packageRoot 'install\Test-PiKether.ps1') -Installed -TargetHome $TargetHome -WslDistro $WslDistro -Hosts $Hosts -SkipWsl:$(-not $installWsl)
+if ($LASTEXITCODE -ne 0) { throw 'Post-install self-test failed.' }
 Say "Installation complete. Backup: $backupRoot"
 Say 'Sign in with Pi on this Windows account if ~/.pi/agent/auth.json is not already present.'
 Say "Import your selected host's connection and PRIMARY-AGENT.md from: $hostExports"
