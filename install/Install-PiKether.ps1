@@ -105,6 +105,11 @@ if ($installTunnel) {
 }
 if ($PlanOnly) { Say 'Plan validated; no changes made.'; exit 0 }
 
+# Validate before changing the target; local sharing does not depend on Tunnel.
+$stateRoot = Join-Path $TargetHome '.local\state\pi-kether'
+$pluginTarget = Join-Path $TargetHome 'plugins\pi-dispatch'
+$sharedConnection = & (Join-Path $PSScriptRoot 'Get-SharedGatewayConnection.ps1') -NodePath $nodePath -PluginTarget $pluginTarget -StateRoot $stateRoot -Roots @($roots) -PiEntry (Join-Path $TargetHome '.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js') -WslDistro $WslDistro -ConfigurationWillBeCreated:$installTunnel
+
 if($installCodex){
   $configToml = Join-Path $TargetHome '.codex\config.toml'
   $tomlText = if (Test-Path -LiteralPath $configToml) { Get-Content -LiteralPath $configToml -Raw } else { '' }
@@ -138,29 +143,8 @@ $auditFile = Join-Path $stateRoot 'audit.jsonl'
 $circuitFile = Join-Path $stateRoot 'provider-circuit.jsonl'
 $ledgerDir = Join-Path $stateRoot 'request-ledger'
 New-Item -ItemType Directory -Force -Path $ledgerDir | Out-Null
-$mcp = [ordered]@{ mcpServers = [ordered]@{ 'pi-kether-gateway' = [ordered]@{
-  command = $nodePath
-  args = @((Join-Path $pluginTarget 'scripts\stdio-server.mjs'))
-  env = [ordered]@{
-    PATH = ((Split-Path -Parent $nodePath) + ';' + $env:PATH)
-    PI_DISPATCH_PI_ENTRY = (Join-Path $TargetHome '.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js')
-    PI_GATEWAY_ROOTS = (ConvertTo-Json -InputObject @($roots) -Compress)
-    PI_GATEWAY_AUDIT_FILE = $auditFile
-    PI_GATEWAY_PROVIDER_CIRCUIT_FILE = $circuitFile
-    PI_GATEWAY_REQUEST_LEDGER_DIR = $ledgerDir
-    PI_DISPATCH_SANDBOX = 'wsl2-bwrap'
-    PI_SANDBOX_DISTRO = $WslDistro
-  }
-  enabled = $true
-  enabled_tools = @('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','wait_subagent','get_task_handoff','wait_task_handoff','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth')
-  startup_timeout_sec = 30
-}}}
+$mcp = [ordered]@{ mcpServers = [ordered]@{ 'pi-kether-gateway' = $sharedConnection }}
 $mcp | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $pluginTarget '.mcp.json') -Encoding utf8NoBOM
-if ($installTunnel) {
-  # Native Codex UI and Tunnel must observe the same monitor and scheduler.
-  $mcp.mcpServers.'pi-kether-gateway'.env.PI_GATEWAY_CONFIG = Join-Path $stateRoot 'gateway-silent.json'
-  $mcp | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $pluginTarget '.mcp.json') -Encoding utf8NoBOM
-}
 
 $hostPiRoot = Join-Path $TargetHome '.pi\agent\npm'
 New-Item -ItemType Directory -Force -Path $hostPiRoot | Out-Null

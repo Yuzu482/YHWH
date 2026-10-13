@@ -28,7 +28,8 @@ test('T0 is accepted only with candidate-bound durable acceptance receipt; missi
 
 test('source manifest, installer and gateway consistently allowlist read-only handoff tools',()=>{
   const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');const manifest=JSON.parse(readFileSync(join(root,'.mcp.json'),'utf8'));const enabled=manifest.mcpServers['pi-kether-gateway'].enabled_tools;
-  const installer=readFileSync(resolve(root,'../../install/Install-PiKether.ps1'),'utf8');const gateway=readFileSync(join(root,'scripts/gateway.mjs'),'utf8');
+  const caller=readFileSync(resolve(root,'../../install/Install-PiKether.ps1'),'utf8');assert.match(caller,/Get-SharedGatewayConnection\.ps1/);
+  const installer=readFileSync(resolve(root,'../../install/Get-SharedGatewayConnection.ps1'),'utf8');const gateway=readFileSync(join(root,'scripts/gateway.mjs'),'utf8');
   for(const name of ['wait_subagent','get_task_handoff','wait_task_handoff']){assert.ok(enabled.includes(name),name);assert.ok(installer.includes(`'${name}'`),name);assert.ok(gateway.includes(`server.registerTool('${name}'`),name);}
 });
 
