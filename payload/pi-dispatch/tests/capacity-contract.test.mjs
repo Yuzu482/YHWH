@@ -199,9 +199,9 @@ test('gateway capacity failure preserves executed delivery, no host pending or d
   const http=await listenHttpFixture(app),client=new Client({name:'capacity-test',version:'1'});
   try {
     await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${http.address().port}/mcp`),{requestInit:{headers:{Authorization:'Bearer '+token}}}));
-    const request={cwd:root,requestId,provider:'openai-codex',model:'gpt-6-luna',thinking:'medium',access:'workspace-write',tier:'T1',
+    const request={cwd:root,requestId,parentRunId:'capacity-fixture',provider:'openai-codex',model:'gpt-6-luna',thinking:'medium',access:'workspace-write',tier:'T1',
       tierDeclaration:{publicApiOrProtocol:false,dependencyOrLockfile:false,securityAuthOrCredentials:false,migration:false,irreversibleOrNoRollback:false},
-      task:{role:'Chesed',objective:'Synthetic capacity fixture',acceptance:['Host validates fixture check'],writeScope:['x.js']}};
+      task:{role:'Chesed',objective:'Synthetic capacity fixture',acceptance:['Host validates fixture check'],writeScope:['x.js'],milestone:{id:'capacity',objective:'Capacity failure preserves original delivery',acceptanceCommandIds:['check']},verify:{commands:[{id:'check',argv:['node','--test','tests/capacity-contract.test.mjs'],cwd:'.'}]}}};
     const parse=r=>JSON.parse(r.content[0].text);
     const first=parse(await client.callTool({name:'dispatch_subagent',arguments:request}));
     assert.equal(first.failureCode,'PI_RESULT_CAPACITY_EXCEEDED',JSON.stringify({code:first.code,failure:first.failure,format:first.formatValidation,role:first.roleValidation}));assert.equal(first.status,'failed');assert.equal(first.patch,patch);

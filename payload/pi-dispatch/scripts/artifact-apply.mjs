@@ -169,11 +169,14 @@ export function runArtifactGit({cwd,args,patch,spawnFn=spawn,timeoutMs=15000,out
   });
 }
 
-export async function applyArtifact({requestId,ledger,roots=[],writeLocks,spawnFn=spawn}) {
+export async function applyArtifact({requestId,ledger,roots=[],writeLocks,spawnFn=spawn,milestones}) {
   const fail = (code,error=code) => ({ok:false,requestId,code,error});
   if (typeof requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(requestId)) return fail('invalid_request');
   const artifact = typeof ledger?.getHostApplyArtifact === 'function' ? ledger.getHostApplyArtifact(requestId) : ledger?.getHostArtifact(requestId), pending = artifact?.pending;
   if (!pending || ledger?.getEffectiveResult(requestId)?.state !== 'awaiting-host-verification') return fail('artifact_not_pending');
+  if(milestones?.getLegacyClosure(requestId))return fail('PI_MILESTONE_CLOSED');
+  const tracked=milestones?.get(requestId);
+  if(tracked){try{milestones.assertOpen(requestId,pending.artifactSha256);}catch(error){return fail(error.code,error.message);}}
   const response = artifact.originalResult?.response ?? artifact.originalResult, patch = response?.patch, proof = response?.patchValidation;
   if (typeof patch !== 'string' || !HEX.test(pending.artifactSha256 ?? '') || pending.artifactSha256 !== response.patchSha256 || pending.artifactSha256 !== proof?.patchSha256 || !proof.ok || proof.requestId !== requestId || digest(patch) !== pending.artifactSha256 || response.patchBytes !== Buffer.byteLength(patch)) return fail('artifact_hash_mismatch');
   if (response.secretLikeContent === true) return fail('secret_content_confirmation_required');
@@ -195,11 +198,13 @@ export async function applyArtifact({requestId,ledger,roots=[],writeLocks,spawnF
   try {lock = writeLocks?.tryAcquire({requestId,cwd,writeScope:response.trustedWriteScope,timeoutSeconds:30});} catch (error) {return fail('write_lock_error',error.message);}
   if (!lock) return fail('write_scope_busy');
   try {
-    try {validate();} catch (error) {return fail('artifact_path_unsafe',error.message);}
+    if(tracked){try{milestones.beginApply(requestId,pending.artifactSha256);}catch(error){return fail(error.code,error.message);}}
+    try {validate();} catch (error) {if(tracked)milestones.cancelApply(requestId,pending.artifactSha256);return fail('artifact_path_unsafe',error.message);}
     const check = await runArtifactGit({cwd,args:['apply','--check'],patch,spawnFn});
-    if (!check.ok) return {requestId,...check};
+    if (!check.ok) {if(tracked)milestones.cancelApply(requestId,pending.artifactSha256);return {requestId,...check};}
     const applied = await runArtifactGit({cwd,args:['apply'],patch,spawnFn});
-    if (!applied.ok) return {requestId,...applied};
+    if (!applied.ok) return {requestId,...applied,...(tracked?{reconciliationRequired:true}:{})};
+    if(tracked)milestones.completeApply(requestId,pending.artifactSha256);
     return {ok:true,requestId,artifactSha256:pending.artifactSha256,changedFiles:changed};
   } finally {writeLocks.release(lock);}
 }

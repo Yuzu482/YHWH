@@ -2,6 +2,15 @@
 
 T2 uses links; compact T0/T1 use host checks/T1 review references, no handoff. AGENTS.md/profile select stages; scout/planner conditional.
 
+## Milestones for new writes
+Every new workspace-write packet declares a stable parentRunId and milestone:{id,objective,acceptanceCommandIds}, with verify.commands resolving those IDs to exact argv/cwd. IDs are lowercase hyphenated identifiers, at most 64 characters; objective at most 2000; 1..8 distinct acceptance IDs. Keep one independently verifiable goal, normally at most five dispatches and three file groups. Never change parent/milestone to evade failure history; changed definition under the same identity is rejected.
+
+T2 pre-review supplies milestonePlan:[{milestone,verify,writeScope}], at most 32 explicit definitions. Approved contracts bind normalized scope and selected commands. A previous phase approval without this binding cannot authorize a new write; existing results remain readable and keep their original gates. Never infer milestones for historical tasks.
+
+Register project checks in the host-owned check policy before its first write dispatch. Workers cannot extend the whitelist. Missing or unsupported sandbox checks warn PI_HOST_CHECK_NOT_RUNNABLE; they never imply host execution is unavailable. Chesed must run declared yhwh_run_check commands before delivery; skipped or failed checks require unverified status and actual failure/limitation. Preserve the patch for host inspection. Sandbox receipts remain sandboxEvidence; fresh host verification and required review still control acceptance.
+
+After any genuine failed attempt, the repair carries previousFailure:{requestId,checkName,outputSha256,excerpt}, exactly matching the last stored bounded redacted excerpt. Two consecutive model-executed dispatch/host failures block another ID with PI_REPEATED_FAILURE_DIAGNOSIS_REQUIRED. Use diagnose_milestone_failure with the exact latest two request IDs, ordinals, check names and output hashes, rootCause, and action reduce-scope/split-milestone/host-exception/escalate. Diagnosis is single-use; it grants no coding exception or other authority. Proven zero-start failures do not strike. Unknown execution stays in_doubt; never change ID to restart it. Only a current valid host pass clears the active streak; preserve prior failures.
+
 Result contractVersion2(default); reject v1/reduced returnFields. Omit returnFields to use capabilities.governance.resultContract.schemas:status,result,evidence,changedFiles,assumptions,uncertainty,errors,nextAction,deliverable. Arrays stay arrays. Completed needs result/evidence/no errors; failed/blocked/unverified cannot satisfy dependencies. Geburah adds reviewDecision/missingMaterials; Netzach needs passed verdict/check evidence. Schema validity is not truth.
 
 Stage completion: Chochmah plans/Malkuth diagnoses separate source-backed work from future unrun checks/executors/uncertainty. Missing current evidence blocks; later success cannot relabel saved failed/unverified results. Keep Chesed host/Netzach execution gates.

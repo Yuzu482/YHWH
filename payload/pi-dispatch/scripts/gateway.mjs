@@ -31,6 +31,9 @@ import { evaluateHostVerificationCandidate, publicFormatValidation, recoverPrefa
 import {hostRecordDigest} from '../extensions/host-verification.js';
 import {exportResult} from '../extensions/result-export.js';
 import { createRequestLedger, RequestLedgerError } from '../extensions/request-ledger.js';
+import {createMilestoneLedger,describeMilestone} from '../extensions/milestone-ledger.js';
+import {inspectMilestoneRecovery,finalizeMilestoneRecovery} from './milestone-recovery.mjs';
+import {assertMilestoneAcceptance} from '../extensions/milestone-acceptance.js';
 import { createReviewAttemptLedger, REVIEW_QUOTA_POLICY, reviewBlockers } from './tier-review-policy.mjs';
 import { calculateExecutionBudget } from '../extensions/execution-budget.js';
 import { ResourceAwareExecutor, SCHEDULER_POLICY } from '../extensions/admission-scheduler.js';
@@ -246,8 +249,13 @@ const reviewPacketSchema=z.object({version:z.literal(1),stage:z.enum(['pre-chang
 const handoffV1Schema=z.object({version:z.literal(1),stage:z.string().max(32),inputs:z.array(z.object({requestId:z.string().max(128),role:z.string().max(64),stage:z.string().max(32),resultSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()).max(16)}).strict();
 const handoffV2Schema=z.object({version:z.literal(2),stage:z.string().max(32),inputs:z.array(z.object({requestId:z.string().max(128),role:z.string().max(64),stage:z.string().max(32),resultSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()).max(16),runGoal:z.string().trim().min(1).max(20000),runAcceptance:z.array(z.string().trim().min(1).max(4000)).min(1).max(64),phaseIndex:z.number().int().positive().safe()}).strict();
 const handoffSchema=z.discriminatedUnion('version',[handoffV1Schema,handoffV2Schema]);
+const milestoneSchema=z.object({id:z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),objective:z.string().min(1).max(2000),acceptanceCommandIds:z.array(z.string().regex(/^[a-z][a-z0-9-]{0,63}$/)).min(1).max(8)}).strict();
+const verifyCommandsSchema=z.object({commands:z.array(z.object({id:z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),argv:z.array(z.string().min(1).max(2048)).min(1).max(32),cwd:z.string().min(1).max(1024)}).strict()).min(1).max(16)}).strict();
 const taskSchema = z.object({
   contractVersion:z.literal(2).optional(), handoff:handoffSchema.optional(),
+  milestone:milestoneSchema.optional(),
+  milestonePlan:z.array(z.object({milestone:milestoneSchema,verify:verifyCommandsSchema,writeScope:z.array(z.string().min(1).max(4000)).min(1).max(64)}).strict()).min(1).max(32).optional(),
+  previousFailure:z.object({requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),checkName:z.string().min(1).max(128),outputSha256:z.string().regex(/^[a-f0-9]{64}$/),excerpt:z.string().max(4096)}).strict().optional(),
   role: z.string().min(1).max(64), objective: z.string().min(1).max(20000),
   context: stringList, readScope: stringList, writeScope: stringList, fixtureScope:stringList,
   verify:z.object({commands:z.array(z.object({id:z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),argv:z.array(z.string().min(1).max(2048)).min(1).max(32),cwd:z.string().min(1).max(1024)}).strict()).min(1).max(16)}).strict().optional(),
@@ -333,6 +341,7 @@ export function createGatewayRuntime(options) {
   const unsubscribeHandoff=ledger?.subscribe?.(publishHandoff)??(()=>{});
   const finishHandoffWaiter=(waiter,value)=>{if(waiter.done)return;waiter.done=true;clearTimeout(waiter.timer);waiter.signal?.removeEventListener('abort',waiter.abort);const set=handoffWaiters.get(waiter.requestId);set?.delete(waiter);if(set?.size===0)handoffWaiters.delete(waiter.requestId);waiter.resolve(value);};
   const reviewAttempts = options.requestLedgerDir ? createReviewAttemptLedger(resolve(options.requestLedgerDir, 'review-attempts')) : null;
+  const milestones=options.requestLedgerDir?createMilestoneLedger(resolve(options.requestLedgerDir,'milestones'),{instanceId:gatewayInstanceId}):null;
   let phase = 'running', inFlight = 0, replacing, shutdownPromise, mcpAdmissionClosed = false, mcpRecoveryReads = false;
   const responseSessions = createResponseSessionRegistry();
   const idleWaiters = new Set();
@@ -454,10 +463,10 @@ export function createGatewayRuntime(options) {
       timeouts: {independent:true,queueDefaultSeconds:120,queueMaximumSeconds:900,execution:'timeoutSeconds bounded by resourceProfile',completionWait:{tool:'wait_subagent',maxTimeoutMs:55000}}, 
       modelMismatchRejected: true, thinkingUnchanged: true, probeTargetExemptFromRoleBinding: true,
       acceptanceRequired: true, explicitReadScopeRequired: true, adaptiveThinking:TASK_PLANNING_POLICY,
-      workflowTiers:{version:2,reviewQuota:{version:REVIEW_QUOTA_POLICY.version,T1:{basePerStage:REVIEW_QUOTA_POLICY.T1.base,stageCap:REVIEW_QUOTA_POLICY.T1.stage,totalCap:REVIEW_QUOTA_POLICY.T1.total,timeMs:REVIEW_QUOTA_POLICY.T1.time},T2:{basePerStage:REVIEW_QUOTA_POLICY.T2.base,stageCap:REVIEW_QUOTA_POLICY.T2.stage,totalCap:REVIEW_QUOTA_POLICY.T2.total,timeMs:REVIEW_QUOTA_POLICY.T2.time,sharedExtensions:REVIEW_QUOTA_POLICY.T2.sharedExtensions}},levels:['T0','T1','T2'],semanticRisks:['publicApiOrProtocol','dependencyOrLockfile','securityAuthOrCredentials','migration','irreversibleOrNoRollback'],counts:'trusted unified patch files, added and deleted lines',t0:{files:3,lines:100,testsDocsFixturesExempt:true},t1:{postReviewAttempts:1,highThinking:false,reviewPacketMaxUtf8Bytes:T1_REVIEW_BUDGET.totalMaxUtf8Bytes,reviewMaterialBudget:T1_REVIEW_BUDGET},t2:{attemptsPerStage:2},riskProfiles:{canonicalCwd:true,longestAncestor:true,default:'standard'},hostExecutionAvailable,primaryDirectEnabled:false,enforcementBoundary:'actual patch classification before host-pending registration'},
+      workflowTiers:{version:2,reviewQuota:{version:REVIEW_QUOTA_POLICY.version,T1:{basePerStage:REVIEW_QUOTA_POLICY.T1.base,stageCap:REVIEW_QUOTA_POLICY.T1.stage,totalCap:REVIEW_QUOTA_POLICY.T1.total,timeMs:REVIEW_QUOTA_POLICY.T1.time},T2:{basePerStage:REVIEW_QUOTA_POLICY.T2.base,stageCap:REVIEW_QUOTA_POLICY.T2.stage,totalCap:REVIEW_QUOTA_POLICY.T2.total,timeMs:REVIEW_QUOTA_POLICY.T2.time,sharedExtensions:REVIEW_QUOTA_POLICY.T2.sharedExtensions}},levels:['T0','T1','T2'],semanticRisks:['publicApiOrProtocol','dependencyOrLockfile','securityAuthOrCredentials','migration','irreversibleOrNoRollback'],counts:'trusted unified patch files, added and deleted lines',t0:{files:3,lines:100,testsDocsFixturesExempt:true},t1:{postReviewAttempts:1,highThinking:false,reviewPacketMaxUtf8Bytes:T1_REVIEW_BUDGET.totalMaxUtf8Bytes,reviewMaterialBudget:T1_REVIEW_BUDGET},t2:{attemptsPerStage:2},riskProfiles:{canonicalCwd:true,longestAncestor:true,default:'standard'},hostExecutionAvailable,primaryDirectEnabled:false,milestones:{version:1,requiredFor:'new-workspace-write',failureThreshold:2,modelDispatchesPerMilestoneAdvisory:5,preReviewBinding:'explicit-definition-list',legacyMigration:'none'},enforcementBoundary:'actual patch classification before host-pending registration'},
       enforcementBoundary: 'Pi invocation validation; host-agent review stages are not attested',
       primaryHost: {protocol:'MCP',policyTool:'get_workflow',primaryModel:'host-selected',enforcement:'Pi invocation checks; host compliance is not attested',runtimePlatform:'Windows + WSL2'},
-      requiredConnectorTools: ['get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','wait_subagent','get_task_handoff','wait_task_handoff','probe_model','lsp_request','check_claude_auth'],
+      requiredConnectorTools: ['diagnose_milestone_failure','abandon_artifact','reconcile_milestone','get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','wait_subagent','get_task_handoff','wait_task_handoff','probe_model','lsp_request','check_claude_auth'],
       taskHandoff:TASK_HANDOFF_POLICY,
     },
   });
@@ -479,13 +488,23 @@ export function createGatewayRuntime(options) {
     if (!audit || template?.role!=='Chesed' || template?.stage!=='implementing' || !['host','netzach'].includes(source) || !/^([a-f0-9]{64})$/.test(artifactSha256??'') || !/^([a-f0-9]{64})$/.test(recordSha256??'') || !/^([a-f0-9]{64})$/.test(anchor??'') || !pending?.parentRunId || !pending?.workspace || template?.tierPolicyVersion!==1 || !['T0','T1','T2'].includes(template.tier) || (template.tier==='T2'&&!trustedT2Verifier)) return false;
     const task={role:'Chesed',objective:pending.goal,access:'workspace-write',parentRunId:pending.parentRunId,workspace:pending.workspace,runAnchorSha256:anchor,taskAnchorSha256:template.taskAnchorSha256};
     if (!ledger?.enabled) return false;
+    if(milestones?.getLegacyClosure(implementationRequestId))throw Object.assign(new Error('Legacy artifact was explicitly abandoned'),{code:'PI_MILESTONE_CLOSED'});
+    const trackedAcceptance=milestones?.get(implementationRequestId);
+    if(trackedAcceptance)task.milestone=trackedAcceptance.identity.milestone;
+    if(trackedAcceptance?.status==='accepted'&&trackedAcceptance.artifactSha256!==artifactSha256)throw Object.assign(new Error('Accepted artifact mismatch'),{code:'PI_MILESTONE_CONFLICT'});
+    if(trackedAcceptance&&trackedAcceptance.status!=='accepted')milestones.assertOpen(implementationRequestId,artifactSha256);
+    assertMilestoneAcceptance(trackedAcceptance,artifactSha256,{replaying:true,acceptanceState:trackedAcceptance?.status==='accepted'?ledger.getAcceptanceRecord(implementationRequestId).state:undefined});
     const acceptanceId=`acceptance-${createHash('sha256').update(`${implementationRequestId}\n${template.mode==='linked'?template.runAnchorSha256:template.taskAnchorSha256}\ntask_accepted`,'utf8').digest('hex')}`;
     const input={parentRunId:pending.parentRunId,workspaceSha256,anchor,artifactSha256,recordSha256,tier:template.tier};
     const execution=await ledger.execute({requestId:acceptanceId,operation:'task_accepted',input},async()=>{
+      assertMilestoneAcceptance(milestones?.get(implementationRequestId),artifactSha256);
       audit.record(buildAuditRecord({requestId:implementationRequestId,operation:'task_accepted',input:{access:'workspace-write'},task,result:{ok:true,status:'completed',hostVerification:source==='host'?{state:'completed',artifactSha256,recordSha256}:undefined},durationMs:0,telemetry:{taskAccepted:true,acceptedAt,parentRunId:pending.parentRunId,workspaceSha256,runAnchorSha256:anchor,tier:template.tier,counts:{files:template.files,addedLines:template.addedLines,deletedLines:template.deletedLines,estimatedLines:template.estimatedLines},baseTier:template.baseTier,riskProfile:template.riskProfile,semanticRisks:template.semanticRisks,implementationRequestIds,verification:{state:'completed',source,artifactSha256,recordSha256},hostVerification:source==='host'?{state:'completed',artifactSha256,recordSha256}:undefined}}));
       return {ok:true,acceptedAt};
     });
-    if(execution.value?.ok===true)publishHandoff(implementationRequestId);
+    if(execution.value?.ok===true){
+      if(milestones?.get(implementationRequestId))milestones.accepted(implementationRequestId,artifactSha256);
+      publishHandoff(implementationRequestId);
+    }
     return execution.value?.ok===true;
   }
 
@@ -506,6 +525,11 @@ export function createGatewayRuntime(options) {
     let executionStartedAt = null;
     let timings = {queueWaitMs:0,executionMs:0};
     let phaseTimings=null;
+    let milestoneAttempt=null;
+    let hostCheckAvailability=null;
+    const startMilestone=()=>{
+      if(milestoneAttempt&&milestoneAttempt.status==='reserved')milestoneAttempt=milestones.markStarted(requestId);
+    };
     try {
       if (operation !== 'probe_model') circuit.assertTaskAllowed(input.provider, input.model);
       const cliReviewerCandidate = input.provider === 'claude-code-cli' && input.access === 'none' && input.model === ROLE_MODELS.Geburah && ['Geburah','reviewer'].includes(task?.role);
@@ -603,6 +627,18 @@ export function createGatewayRuntime(options) {
       if (tierDecision && trustedRiskProfile === 'personal' && tierDecision.level === 'T2') { tierDecision.level='T1'; tierDecision.requiresPreReview=false; }
       if (tierDecision && trustedRiskProfile === 'critical' && tierDecision.level === 'T0') { tierDecision.level='T1'; tierDecision.requiresPostReview=true; }
       const typedHandoffGate=prepareHandoff(invocation.task,input,cwd,ledger);
+      if(invocation.task.milestonePlan)for(const item of invocation.task.milestonePlan)describeMilestone({...item,workspace:cwd,parentRunId:input.parentRunId});
+      let milestoneInput;
+      if(input.access==='workspace-write'){
+        if(!milestones||!ledger?.enabled)throw Object.assign(new Error('New writes require a durable milestone ledger'),{code:'PI_MILESTONE_STORAGE_FAILED'});
+        milestoneInput={requestId,workspace:cwd,parentRunId:input.parentRunId,milestone:invocation.task.milestone,verify:invocation.task.verify,writeScope:invocation.task.writeScope,previousFailure:invocation.task.previousFailure};
+        const definition=describeMilestone(milestoneInput);
+        if(tierDecision?.requiresPreReview){
+          const pre=invocation.task.handoff?.inputs?.find(ref=>ref.role==='Geburah'&&ref.stage==='pre-review');
+          const approved=pre&&ledger.getOutcome(pre.requestId);
+          if(approved?.contract?.reviewDecision!=='approve'||!approved.contract.milestoneDefinitions?.some(item=>item.id===invocation.task.milestone.id&&item.definitionSha256===definition.definitionSha256))throw Object.assign(new Error('Approved pre-review does not bind this exact milestone definition'),{code:'PI_MILESTONE_PRE_REVIEW_REQUIRED'});
+        }
+      }
       if (operation!=='probe_model' && invocation.task.role==='Netzach' && input.verificationOfRequestId===undefined) {
         const ref=invocation.task.handoff?.inputs?.find(item=>item.role==='Chesed'&&item.stage==='implementing');
         const source=ref&&(ledger?.getEffectiveResult(ref.requestId)??ledger?.getOutcome(ref.requestId)), pending=ref&&ledger?.getHostArtifact(ref.requestId)?.pending;
@@ -632,6 +668,7 @@ export function createGatewayRuntime(options) {
       const result = await executor.run(async (runSignal, remainingSeconds) => {
         runSignal.throwIfAborted();
         taskMonitor.assertCanStart();
+        if(milestoneInput)milestoneAttempt=milestones.reserve(milestoneInput);
         executionStartedAt=new Date().toISOString();
         lifecycle?.onRunning?.({executionTimeoutSeconds:reviewTicket?.timeoutSeconds??invocation.request.timeoutSeconds});
         if (isReviewer(invocation.task.role)) {
@@ -666,18 +703,29 @@ export function createGatewayRuntime(options) {
         try {
           const dispatchTask=operation==='probe_model'?invocation.task:await modules.get('memoryContext').inject({cwd,task:invocation.task,access:input.access,operation,signal:runSignal});
           runSignal.throwIfAborted();
-          const dispatchOptions = { editorBroker, upstreamResults:collectHandoffResults(dispatchTask,ledger), resultFormat: operation === 'probe_model' ? 'plain' : 'json', onProgress:value=>{phaseTimings=value;lifecycle?.onProgress?.(value);} };
+          const dispatchOptions = { editorBroker, upstreamResults:collectHandoffResults(dispatchTask,ledger), resultFormat: operation === 'probe_model' ? 'plain' : 'json', onProgress:value=>{
+            if(value.hostCheckAvailability){
+              hostCheckAvailability=value.hostCheckAvailability;
+              if(!hostCheckAvailability.available)audit?.record({auditVersion:1,timestamp:new Date().toISOString(),requestId,operation:'host-check-admission',parentRunId:input.parentRunId,milestone:invocation.task.milestone?.id,code:'PI_HOST_CHECK_NOT_RUNNABLE',reason:hostCheckAvailability.reason,commandIds:hostCheckAvailability.commandIds,modelExecution:false});
+            }else{
+              const stream=value.stream??{};
+              if(milestoneAttempt&&['thinkingDeltas','textDeltas','completedMessages','completedMessage'].some(key=>typeof stream[key]==='number'?stream[key]>0:stream[key]===true||Array.isArray(stream[key])&&stream[key].length>0)){modelExecutionState=true;startMilestone();}
+              phaseTimings=value;lifecycle?.onProgress?.(value);
+            }
+          } };
           if (reviewTicket) dispatchOptions.onModelStart=()=>{modelExecutionState=true;if(!reviewStarted){reviewAttempts.markStarted(reviewTicket);reviewStarted=true;reviewTimingKnown=true;reviewStartedAt=Date.now();}};
+          else if(milestoneAttempt)dispatchOptions.onModelStart=()=>{modelExecutionState=true;startMilestone();};
           if (operation === 'probe_model') Object.assign(dispatchOptions, { probe: true, probeToken: trustedProbeToken });
           let result;
           reviewDispatchAt=Date.now();
           dispatched=true;
           modelExecutionState=null;
           try { result=await modules.get('dispatch')({ ...request, gatewayInstanceId, gatewayWindowsPid: process.pid }, runSignal, dispatchTask, dispatchOptions); }
-          catch(error) { if(reviewTicket&&!reviewStarted&&error?.modelExecutionStarted!==false){reviewAttempts.markStarted(reviewTicket);reviewStarted=true;reviewStartedAt=reviewDispatchAt;} if(!modelExecutionState&&error?.modelExecutionStarted===false)modelExecutionState=false; else if(!modelExecutionState)modelExecutionState=null; throw error; }
+          catch(error) { if(reviewTicket&&!reviewStarted&&error?.modelExecutionStarted!==false){reviewAttempts.markStarted(reviewTicket);reviewStarted=true;reviewStartedAt=reviewDispatchAt;} if(error?.modelExecutionStarted===true){modelExecutionState=true;startMilestone();}else if(!modelExecutionState&&error?.modelExecutionStarted===false)modelExecutionState=false; else if(!modelExecutionState)modelExecutionState=null; throw error; }
           if(result?.modelExecutionStarted===true)modelExecutionState=true;
           else if(result?.modelExecutionStarted===false&&!modelExecutionState)modelExecutionState=false;
           else if(!modelExecutionState)modelExecutionState=null;
+          if(modelExecutionState===true)startMilestone();
           if(result?.modelExecutionStarted!==false&&reviewTicket&&!reviewStarted){reviewAttempts.markStarted(reviewTicket);reviewStarted=true;reviewStartedAt=reviewDispatchAt;}
           if(editorBroker){await editorBroker.close();result.editorExecution=editorBroker.report();if(!result.editorExecution.ok){result.ok=false;result.failure='EDITOR_OPERATION_FAILED_OR_UNCERTAIN';}}
           reviewOutputSuccessful=result?.ok===true&&result?.modelExecutionStarted!==false&&!result?.transportError&&!result?.cleanupError&&!result?.timedOut&&!result?.failureCode&&!result?.authFailure&&result?.cleanup?.ok!==false&&!(result?.unrecoveredErrors>0)&&(!Number.isInteger(result?.exitCode)||result.exitCode===0);
@@ -783,7 +831,7 @@ export function createGatewayRuntime(options) {
               raw:response,
               value:validation.value,
               patchProof:trustedPatch?{...response.patchValidation,trusted:true}:null,
-              forceHost:!!tierDecision && ['T0','T1'].includes(tierDecision.level),
+              forceHost:!!tierDecision && (milestoneAttempt!==null || ['T0','T1'].includes(tierDecision.level)),
             });
             if (candidate.eligible && !tierGateFailed) {
               if (!ledger?.enabled) throw Object.assign(new Error('Host verification is unavailable because the durable request ledger is disabled'),{code:'HOST_VERIFICATION_LEDGER_REQUIRED'});
@@ -810,6 +858,8 @@ export function createGatewayRuntime(options) {
                   capacity:{location:error.location,unit:error.unit,actual:error.actual,limit:error.limit}});
               }
               if(pending) {
+              startMilestone();
+              if(milestoneAttempt)milestoneAttempt=milestones.registerArtifact(requestId,{artifactSha256:pending.artifactSha256,applied:false});
               response.status='awaiting-host-verification';
               response.ok=false;
               response.failure='awaiting-host-verification';
@@ -880,6 +930,17 @@ export function createGatewayRuntime(options) {
         } catch(error) { response.ok=false; response.status='failed'; response.failure=error.code??'HOST_VERIFIER_PROOF_REJECTED'; response.code=response.failure; }
       }
       const durationMs = Date.now() - started;
+      if(hostCheckAvailability&&!hostCheckAvailability.available)response.warnings=[...(response.warnings??[]),{code:'PI_HOST_CHECK_NOT_RUNNABLE',reason:hostCheckAvailability.reason}];
+      if(milestoneAttempt?.ordinal>5)response.warnings=[...(response.warnings??[]),{code:'PI_MILESTONE_DISPATCH_SCOPE_BROAD',ordinal:milestoneAttempt.ordinal,message:'Reassess this independently verifiable milestone; do not reset failure history.'}];
+      if(milestoneAttempt&&milestoneAttempt.status==='reserved'&&response.modelExecutionStarted===true)startMilestone();
+      if(milestoneAttempt&&['reserved','started'].includes(milestoneAttempt.status)){
+        const stream={...(response.phaseTimings?.stream??{}),...(phaseTimings?.stream??{})};
+        const observed=['thinkingDeltas','textDeltas','completedMessages','completedMessage'].some(k=>typeof stream[k]==='number'?stream[k]>0:stream[k]===true||Array.isArray(stream[k])&&stream[k].length>0);
+        if(observed){modelExecutionState=true;startMilestone();}
+        if(modelExecutionState===true)milestoneAttempt=milestones.fail(requestId,{modelStarted:true,checkName:'dispatch',output:response.failureCode??response.failure??response.error??response.status??'execution failed'});
+        else if(modelExecutionState===false)milestoneAttempt=milestones.fail(requestId,{modelStarted:false,checkName:'dispatch',output:response.failureCode??response.failure??'model not started'});
+        else milestoneAttempt=milestones.markUncertain(requestId);
+      }
       if (deferRecords) return { response, durationMs, task: invocation.task };
       // Assess the execution outcome before gateway-only format validation changes it.
       const assessment = result.editorExecution?.ok===false ? {impact:false} : classifyProviderResult(result);
@@ -917,6 +978,11 @@ export function createGatewayRuntime(options) {
       }
       return response;
     } catch (error) {
+      if(milestoneAttempt&&['reserved','started'].includes(milestoneAttempt.status)){
+        if(modelExecutionState===true){startMilestone();milestoneAttempt=milestones.fail(requestId,{modelStarted:true,checkName:'dispatch',output:error.message});}
+        else if(modelExecutionState===false)milestoneAttempt=milestones.fail(requestId,{modelStarted:false,checkName:'dispatch',output:error.message});
+        else milestoneAttempt=milestones.markUncertain(requestId);
+      }
       const durationMs = Date.now() - started;
       if (dispatched) {
         const assessment = classifyProviderResult(null, error);
@@ -1036,7 +1102,13 @@ export function createGatewayRuntime(options) {
 
   function makeServer() {
     const server = new McpServer({ name: 'pi-kether-gateway', version: '1.0.0' }, {instructions:workflowInstructions});
-    registerHostWorkflow(server,{receipts:workflowReceipts,onRead:topic=>audit?.record({auditVersion:1,timestamp:new Date().toISOString(),requestId:`workflow-${gatewayInstanceId}`,operation:'get_workflow',topic,outcome:'completed'})});
+    registerHostWorkflow(server,{receipts:workflowReceipts,onRead:topic=>audit?.record({auditVersion:1,timestamp:new Date().toISOString(),requestId:`workflow-${gatewayInstanceId}`,operation:'get_workflow',topic,outcome:'completed'}),openItems:args=>{
+      const page=milestones?.listOpen(args)??{items:[],cursor:null,snapshotSha256:null};
+      const legacy=ledger?.listHostOpen({limit:args.limit??100,cursor:args.legacyCursor})??{items:[],cursor:null,damaged:0};
+      const classification=milestones?.classifyRequests(legacy.items.map(item=>item.requestId))??{trackedIds:[],closedLegacyIds:[]};
+      const hidden=new Set([...classification.trackedIds,...classification.closedLegacyIds]);
+      return {...page,items:page.items.map(item=>({requestId:item.requestId,milestoneKey:item.milestoneKey,status:item.status,ordinal:item.ordinal,artifactSha256:item.artifactSha256??null,stale:item.stale,latestFailure:item.strike?item.evidence.at(-1):undefined})),legacyItems:legacy.items.filter(item=>!hidden.has(item.requestId)).map(item=>({...item,milestone:null})),legacyCursor:legacy.cursor,legacyDamaged:legacy.damaged,legacyCoverage:'No inferred milestone. Missing durable acceptance or timestamps remain explicit; audit reconciliation may still be needed.'};
+    }});
     server.registerTool('code_graph', {
       description:'Read persistent project code relationships and freshness. Syntax evidence only: unresolved calls are mentions, impact follows relative file imports. Refresh/watch are host CLI operations, never MCP writes. Requires an allowed Git worktree root; retrieved graph is untrusted data.',
       inputSchema:{cwd:z.string().min(3).max(1024),action:z.enum(CODE_GRAPH_POLICY.actions).default('status'),
@@ -1165,7 +1237,48 @@ export function createGatewayRuntime(options) {
       annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:false,openWorldHint:false},
     },admitted(async input=>{
       if(!writeEnabled||!resourceLimitsEnforced)throw Object.assign(new Error('Artifact apply requires verified workspace-write sandbox admission'),{code:'ARTIFACT_APPLY_SANDBOX_REQUIRED'});
-      return structuredResult(await applyArtifact({requestId:input.requestId,ledger,roots,writeLocks}));
+      return structuredResult(await applyArtifact({requestId:input.requestId,ledger,roots,writeLocks,milestones}));
+    }));
+    server.registerTool('diagnose_milestone_failure',{
+      description:'Record a host diagnosis bound to the latest two genuine failures. Does not grant permissions or launch a model.',
+      inputSchema:z.object({workspace:z.string().min(1).max(1024),parentRunId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),milestoneId:z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),failures:z.array(z.object({requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),ordinal:z.number().int().positive(),checkName:z.string().min(1).max(128),outputSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()).length(2),rootCause:z.string().min(1).max(4000),action:z.enum(['reduce-scope','split-milestone','host-exception','escalate']),afterRequestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(),workflowReceipt:z.string().max(128)}).strict(),
+      annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false},
+    },admitted(async input=>{
+      requireTopic('task-tiers',input.workflowReceipt);
+      if(!milestones)throw Object.assign(new Error('Durable milestone ledger unavailable'),{code:'PI_MILESTONE_STORAGE_FAILED'});
+      const workspace=resolveAllowedCwd(input.workspace,roots),result=milestones.diagnose({...input,workspace});
+      audit?.record({auditVersion:1,timestamp:new Date().toISOString(),operation:'diagnose_milestone_failure',parentRunId:input.parentRunId,milestone:input.milestoneId,failureRequestIds:result.failureIds,action:result.action,rootCauseSha256:createHash('sha256').update(input.rootCause).digest('hex')});
+      return structuredResult({ok:true,diagnosis:result});
+    }));
+    server.registerTool('reconcile_milestone',{
+      description:'Inspect or finalize an original milestone failure using exact immutable terminal execution evidence. Unknown execution and interrupted apply stay blocked; no model or subprocess runs.',
+      inputSchema:z.object({mode:z.enum(['inspect','finalize']).default('inspect'),requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),requestDigest:z.string().regex(/^[a-f0-9]{64}$/),definitionSha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),resultSha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),workflowReceipt:z.string().max(128)}).strict(),
+      annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false},
+    },admitted(async input=>{
+      requireTopic('task-tiers',input.workflowReceipt);
+      const attempt=milestones?.get(input.requestId);
+      if(!attempt)throw Object.assign(new Error('Original milestone is unavailable'),{code:'PI_MILESTONE_NOT_FOUND'});
+      resolveAllowedCwd(attempt.identity.workspace,roots);
+      const parameters={...input,ledger,milestones};
+      if(input.mode==='inspect')return structuredResult({ok:true,...inspectMilestoneRecovery(parameters)});
+      const result=finalizeMilestoneRecovery(parameters);
+      audit?.record({auditVersion:1,timestamp:new Date().toISOString(),operation:'reconcile_milestone',requestId:input.requestId,parentRunId:attempt.identity.parentRunId,milestone:attempt.identity.milestone.id,resultSha256:input.resultSha256,status:result.status,modelExecution:false});
+      return structuredResult({ok:true,requestId:input.requestId,status:result.status,modelStarted:result.startedAt!==undefined});
+    }));
+    server.registerTool('abandon_artifact',{
+      description:'Close a milestone artifact with its exact fingerprint and an explicit reason. Never accepts a task or removes original evidence.',
+      inputSchema:z.object({requestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),artifactSha256:z.string().regex(/^[a-f0-9]{64}$/),reason:z.string().min(1).max(1000),workflowReceipt:z.string().max(128)}).strict(),
+      annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:true,openWorldHint:false},
+    },admitted(async input=>{
+      requireTopic('task-tiers',input.workflowReceipt);
+      const source=ledger?.getHostArtifact(input.requestId);
+      if(!source||source.pending.artifactSha256!==input.artifactSha256||!milestones)throw Object.assign(new Error('Exact durable artifact required'),{code:'PI_MILESTONE_NOT_FOUND'});
+      resolveAllowedCwd(source.pending.workspace,roots);
+      const acceptance=ledger.getAcceptanceRecord(input.requestId);
+      if(['accepted','unknown'].includes(acceptance.state))throw Object.assign(new Error('Accepted or uncertain legacy acceptance cannot be abandoned'),{code:'PI_MILESTONE_CLOSED'});
+      const result=milestones.get(input.requestId)?milestones.abandon(input.requestId,input):milestones.abandonLegacy(input);
+      audit?.record({auditVersion:1,timestamp:new Date().toISOString(),operation:'abandon_artifact',requestId:input.requestId,artifactSha256:input.artifactSha256,reason:redactSensitiveText(input.reason,{compact:false})});
+      return structuredResult({ok:true,requestId:input.requestId,status:result.status});
     }));
     server.registerTool('record_host_verification',{
       description:'Record bounded command and exit-code evidence from checks already run by the host. This tool never executes commands; use only actual host results for the bound pending artifact.',
@@ -1174,6 +1287,7 @@ export function createGatewayRuntime(options) {
     },admitted(async(input,extra)=>{
       if(!ledger?.enabled)throw Object.assign(new Error('Durable host verification ledger is unavailable'),{code:'HOST_VERIFICATION_LEDGER_REQUIRED'});
       const source=ledger.getHostArtifact(input.requestId);
+      if(milestones?.getLegacyClosure(input.requestId))throw Object.assign(new Error('Artifact explicitly abandoned'),{code:'PI_MILESTONE_CLOSED'});
       if (!source || !['T0','T1'].includes(source.contractTemplate?.tier)) requireTopic('task-tiers',input.workflowReceipt);
       const started=Date.now();
       const submission={requestId:input.requestId,artifactSha256:input.artifactSha256,commands:input.commands.map(item=>({
@@ -1183,16 +1297,22 @@ export function createGatewayRuntime(options) {
         outputSummary:redactSensitiveText(item.outputSummary),
       }))};
       const before=ledger.getEffectiveResult(input.requestId);
+      const tracked=milestones?.get(input.requestId);
+      if(tracked&&tracked.status!=='accepted')milestones.assertVerifiable(input.requestId,input.artifactSha256);
       const record=ledger.recordHostVerification(submission);
       const effective=ledger.getEffectiveResult(input.requestId);
       if(!effective||!['completed','failed'].includes(effective.state))throw Object.assign(new Error('Durable host verification could not be projected'),{code:'HOST_VERIFICATION_PROJECTION_FAILED'});
+      if(tracked&&tracked.status!=='accepted'){
+        const failed=record.commands.find(item=>item.exitCode!==0)??record.commands[0];
+        milestones.verify(input.requestId,{passed:effective.state==='completed',artifactSha256:input.artifactSha256,checkName:failed.checkName,output:failed.outputSummary});
+      }
       taskMonitor.resolveHostVerification(input.requestId,effective);
       if (!before || before.state!=='completed') {
         const artifact=ledger.getHostArtifact(input.requestId);
         if (effective.state==='completed' && artifact?.contractTemplate?.tier==='T0') await emitFinalAcceptance({implementationRequestId:input.requestId,source:'host',artifactSha256:effective.verifiedArtifactSha256,recordSha256:effective.verificationRecordSha256,template:artifact.contractTemplate,pending:artifact.pending});
       }
       const result={ok:true,requestId:record.requestId,artifactSha256:record.artifactSha256,recordSha256:record.recordSha256,outcome:record.outcome,state:effective.state,checks:record.commands.map(item=>({checkName:item.checkName,exitCode:item.exitCode}))};
-      audit?.record(buildAuditRecord({requestId:input.requestId,operation:'record_host_verification',input:{access:'none'},task:null,result,durationMs:Date.now()-started}));
+      audit?.record(buildAuditRecord({requestId:input.requestId,operation:'record_host_verification',input:{access:'none',parentRunId:source?.pending.parentRunId},task:tracked?{milestone:tracked.identity.milestone}:null,result,durationMs:Date.now()-started}));
       return structuredResult(result);
     }));
     server.registerTool('wait_subagent', {

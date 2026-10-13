@@ -93,6 +93,13 @@ test('MCP response cleanup covers response errors', async () => {
 
 function formattedTaskResult(task) { return 'KETHER_RESULT_JSON='+JSON.stringify(roleValue(task.role,task.objective)); }
 
+// Port legacy behavior fixtures to the mandatory NEW-write protocol. Missing or
+// invalid milestones and cross-request retry identity are tested independently
+// in milestone-gateway.test.mjs, without this fixture adapter.
+function fixtureMilestone(requestId,task){
+  return {milestone:{id:`fixture-${createHash('sha256').update(requestId).digest('hex').slice(0,16)}`,objective:task.objective,acceptanceCommandIds:['fixture-check']},verify:{commands:[{id:'fixture-check',argv:['node','--test','tests/gateway.test.mjs'],cwd:'.'}]}};
+}
+
 test('durable host attestation anchors linked v2 evidence to the recorded Chesed contract', async () => {
   const ledgerDir=mkdtempSync(join(tmpdir(),'pi-linked-anchor-ledger-'));
   const parentRunId='runtime-quality-20261001';
@@ -101,6 +108,7 @@ test('durable host attestation anchors linked v2 evidence to the recorded Chesed
   const preId='runtime-quality-20261001-scope-review-2';
   const preTask={role:'Geburah',objective:'Seed synthetic pre-review predecessor',acceptance:['Synthetic fixture only'],readScope:['tests/gateway.test.mjs'],writeScope:[],reviewPacket:{version:1,stage:'pre-change',requirements:{status:'provided',content:['Synthetic fixture']},changes:{status:'provided',content:['Synthetic fixture']},context:{status:'provided',content:['Synthetic fixture']},verification:{status:'provided',content:['Synthetic fixture']}},handoff:{version:2,stage:'pre-review',inputs:[{requestId:'planned-fixture',role:'Chochmah',stage:'planned',resultSha256:'a'.repeat(64)}],runGoal:goal,runAcceptance:acceptance,phaseIndex:1}};
   const preValue=roleValue('Geburah');
+  preTask.milestonePlan=[{...fixtureMilestone('linked-chesed',{objective:goal}),writeScope:['tests/gateway.test.mjs']}];
   const ledger=createRequestLedger(ledgerDir);
   ledger.recordOutcome(preId,{ok:true,contract:{...completedContract(preTask,{parentRunId},root,preValue),tierPolicyVersion:1},structuredResult:preValue});
   const preRecord=ledger.getOutcome(preId);
@@ -237,6 +245,7 @@ test('topic gate blocks omitted and mismatched receipts before write dispatch or
   const preId='topic-tier-fixture-pre-review';
   const preTask={role:'Geburah',objective:'Seed synthetic pre-review predecessor',acceptance:['Synthetic fixture only'],readScope:['tests/gateway.test.mjs'],writeScope:[],reviewPacket:{version:1,stage:'pre-change',requirements:{status:'provided',content:['Synthetic fixture']},changes:{status:'provided',content:['Synthetic fixture']},context:{status:'provided',content:['Synthetic fixture']},verification:{status:'provided',content:['Synthetic fixture']}},handoff:{version:2,stage:'pre-review',inputs:[{requestId:'topic-tier-planned',role:'Chochmah',stage:'planned',resultSha256:'a'.repeat(64)}],runGoal,runAcceptance,phaseIndex:1}};
   const preValue=roleValue('Geburah');
+  preTask.milestonePlan=[{...fixtureMilestone('workflow-write',{objective:runGoal}),writeScope:['package.json']}];
   const ledger=createRequestLedger(ledgerDir);
   ledger.recordOutcome(preId,{ok:true,contract:{...completedContract(preTask,{parentRunId},root,preValue),tierPolicyVersion:1},structuredResult:preValue});
   const preRecord=ledger.getOutcome(preId);
@@ -256,7 +265,7 @@ test('topic gate blocks omitted and mismatched receipts before write dispatch or
       assert.equal(calls,0);
       const correct=await receiptFor(client,'task-tiers');
       const accepted=parsed(await client.callTool({name:'dispatch_subagent',arguments:{...base,workflowReceipt:correct}}));
-      assert.equal(accepted.ok,true);assert.equal(calls,1);
+      assert.equal(accepted.status,'awaiting-host-verification');assert.equal(calls,1);
       assert.ok(records.some(record=>record.operation==='workflow_topic_required'&&record.topic==='task-tiers'));
       assert.ok(records.some(record=>record.operation==='get_workflow'&&record.topic==='task-tiers'));
       assert.ok(records.some(record=>record.operation==='workflow_topic_admitted'&&record.topic==='task-tiers'));
@@ -340,7 +349,7 @@ test('gateway CLI dispatches explicit T1 without a compulsory receipt and exits 
       const config=join(directory,'gateway.json'),tokenFile=join(directory,'token'),requestFile=join(directory,'request.json');
       writeFileSync(tokenFile,token);
       writeFileSync(config,JSON.stringify({host:'127.0.0.1',port,tokenFile}));
-      writeFileSync(requestFile,JSON.stringify({cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'cli-write-receipt',...declaredT1(),task:{role:'worker',objective:'Prepare scoped fixture change',acceptance:['Return result'],readScope:['package.json'],writeScope:['package.json']}}));
+      writeFileSync(requestFile,JSON.stringify({cwd:root,parentRunId:'fixture-parent',provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',requestId:'cli-write-receipt',...declaredT1(),task:{...fixtureMilestone('cli-write-receipt',{objective:'Prepare scoped fixture change'}),role:'worker',objective:'Prepare scoped fixture change',acceptance:['Return result'],readScope:['package.json'],writeScope:['package.json']}}));
       const {stdout}=await execFileAsync(process.execPath,[resolve(root,'scripts/gateway-client.mjs'),'dispatch',requestFile],{env:{...process.env,PI_GATEWAY_CONFIG:config},timeout:15000,windowsHide:true});
       const submitted=JSON.parse(stdout);
       assert.equal(submitted.status,'awaiting-host-verification');
@@ -660,6 +669,17 @@ async function withGateway(run, options = {}) {
   });
   try {
     await client.connect(transport);
+    const originalCall=client.callTool.bind(client);
+    client.callTool=(request,...rest)=>{
+      let args=request.arguments;
+      if(['dispatch_subagent','submit_subagent'].includes(request.name)&&args?.access==='workspace-write'&&args.requestId){
+        args={...args,parentRunId:args.parentRunId??'fixture-parent',task:{...fixtureMilestone(args.requestId,args.task),...args.task}};
+      }else if(args?.reviewOfRequestId&&args.parentRunId===undefined){
+        const source=createRequestLedger(options.requestLedgerDir??ledgerDir).getHostArtifact(args.reviewOfRequestId);
+        if(source?.pending.parentRunId)args={...args,parentRunId:source.pending.parentRunId};
+      }
+      return originalCall({...request,arguments:args},...rest);
+    };
     gatewayLedgerDirs.set(client, options.requestLedgerDir ?? ledgerDir);
     await run({ client, port, ledgerDir: options.requestLedgerDir ?? ledgerDir });
   } finally {
@@ -826,8 +846,8 @@ test('gateway requires bearer auth and exposes only governed MCP tools', async (
     assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/readyz`)).json(), { ok: true, service: 'pi-kether-gateway' });
     const tools = await client.listTools();
     assert.deepEqual(tools.tools.map(tool => tool.name).sort(), [
-      'apply_artifact', 'cancel_subagent', 'check_claude_auth', 'code_graph', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'get_task_handoff', 'get_workflow', 'list_capabilities',
-      'list_host_verification_pending', 'list_subagents', 'lsp_request', 'probe_model', 'project_memory', 'record_host_verification', 'render_subagent_monitor', 'submit_subagent', 'wait_subagent', 'wait_task_handoff',
+      'abandon_artifact', 'apply_artifact', 'cancel_subagent', 'check_claude_auth', 'code_graph', 'diagnose_milestone_failure', 'dispatch_subagent', 'get_subagent_result', 'get_subagent_status', 'get_task_handoff', 'get_workflow', 'list_capabilities',
+      'list_host_verification_pending', 'list_subagents', 'lsp_request', 'probe_model', 'project_memory', 'reconcile_milestone', 'record_host_verification', 'render_subagent_monitor', 'submit_subagent', 'wait_subagent', 'wait_task_handoff',
     ]);
     const caps = parsed(await client.callTool({ name: 'list_capabilities', arguments: {} }));
     assert.equal(caps.writeEnabled, true);

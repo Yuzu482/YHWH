@@ -69,6 +69,7 @@ export function summarizeTaskEnvelope(task) {
     sha256: sha256(serialized),
     bytes: Buffer.byteLength(serialized),
     role: /^[A-Za-z][A-Za-z0-9._ -]{0,63}$/.test(task.role || '') ? task.role : 'unknown',
+    ...(task.milestone&&/^[a-z][a-z0-9-]{0,63}$/.test(task.milestone.id??'')?{milestone:task.milestone.id}:{}),
     objectiveBytes: Buffer.byteLength(String(task.objective || '')),
     listCounts,
     ...(task.reviewPacket?{reviewPacket:{sha256:sha256(stableJson(task.reviewPacket)),bytes:Buffer.byteLength(stableJson(task.reviewPacket)),stage:task.reviewPacket.stage}}:{}),
@@ -301,6 +302,7 @@ export function buildAuditRecord({ timestamp = new Date().toISOString(), request
   return {
     auditVersion: AUDIT_VERSION,
     ...(parentRunId ? { parentRunId } : {}),
+    ...(task?.milestone&&/^[a-z][a-z0-9-]{0,63}$/.test(task.milestone.id??'')?{milestone:task.milestone.id}:{}),
     ...Object.fromEntries(Object.entries(hostTelemetry).filter(([key]) => key !== 'parentRunId' && key !== 'taskAccepted' && key !== 'acceptedAt' && key !== 'implementationRequestIds' && key !== 'verification')),
     ...(hostTelemetry.counts ? { counts: hostTelemetry.counts, files: hostTelemetry.counts.files, addedLines: hostTelemetry.counts.addedLines, deletedLines: hostTelemetry.counts.deletedLines, estimatedLines: hostTelemetry.counts.estimatedLines } : {}),
     ...(acceptedEvent ? { acceptedAt: hostTelemetry.acceptedAt, implementationRequestIds: hostTelemetry.implementationRequestIds, ...(acceptedVerification ? { verification: acceptedVerification } : {}) } : {}),

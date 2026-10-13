@@ -2,9 +2,11 @@ import {roleResultSchema,requireRoleFields} from './role-contract.js';
 import {validateVerify} from '../scripts/check-policy.mjs';
 import {validateHandoff} from './stage-handoff.js';
 import {validateReviewPacket,isReviewer,REVIEW_FIELDS} from './review-contract.js';
+import {validateMilestone,validateMilestonePlan,validatePreviousFailure} from './milestone-ledger.js';
 const TASK_KEYS = new Set([
   'role', 'objective', 'context', 'readScope', 'writeScope', 'fixtureScope', 'forbidden',
   'dependencies', 'acceptance', 'returnFields', 'assumptions', 'reviewPacket', 'contractVersion', 'handoff', 'verify',
+  'milestone','milestonePlan','previousFailure',
 ]);
 
 const DEFAULT_RETURN_FIELDS = [
@@ -67,6 +69,9 @@ export function validateKetherTask(value) {
     contractVersion:2,
     ...(value.handoff!==undefined?{handoff:validateHandoff(value.handoff,value)}:{}),
     ...(value.verify!==undefined?{verify:validateVerify(value.verify)}:{}),
+    ...(value.milestone!==undefined?{milestone:validateMilestone(value.milestone)}:{}),
+    ...(value.milestonePlan!==undefined?{milestonePlan:validateMilestonePlan(value.milestonePlan)}:{}),
+    ...(value.previousFailure!==undefined?{previousFailure:validatePreviousFailure(value.previousFailure)}:{}),
     role,
     objective: boundedText(value.objective, 'objective'),
     context: boundedList(value.context, 'context'),

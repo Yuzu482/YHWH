@@ -113,6 +113,15 @@ async function main(args) {
       if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(args[0])) throw new Error('Invalid requestId');
       return await client.callTool({name:'apply_artifact',arguments:{requestId:args[0]}},undefined,{timeout:30000,maxTotalTimeout:30000});
     }
+    if (command === 'open-items' && args.length <= 1) {
+      const options=args.length?JSON.parse(readFileSync(resolve(args[0]),'utf8').replace(/^\uFEFF/,'')):{};
+      return await client.callTool({name:'get_workflow',arguments:{topic:'task-tiers',...options,includeOpenItems:true}},undefined,{timeout:30000,maxTotalTimeout:30000});
+    }
+    if (['diagnose-milestone-failure','abandon-artifact','reconcile-milestone'].includes(command)&&args.length===1) {
+      const submission=JSON.parse(readFileSync(resolve(args[0]),'utf8').replace(/^\uFEFF/,''));
+      const [prepared]=await withWriteReceipt(client,[{access:'workspace-write',tier:'T2'}]);
+      return await client.callTool({name:command.replaceAll('-','_'),arguments:{...submission,workflowReceipt:prepared.workflowReceipt}},undefined,{timeout:30000,maxTotalTimeout:30000});
+    }
     if (command === 'host-pending' && args.length === 0) {
       return await client.callTool({name:'list_host_verification_pending',arguments:{}},undefined,{timeout:30000,maxTotalTimeout:30000});
     }
