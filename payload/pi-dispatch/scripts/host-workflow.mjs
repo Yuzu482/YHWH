@@ -15,13 +15,14 @@ export function workflowTopic(topic='primary'){
   const content=catalog.topics[topic];
   return {version:catalog.version,topic,sha256:createHash('sha256').update(content).digest('hex'),content,availableTopics:Object.keys(catalog.topics),enforcement:'Pi invocation checks only; host compliance is not attested',primaryPolicy};
 }
-export function registerHostWorkflow(server,{receipts,onRead,openItems}={}){
+export function registerHostWorkflow(server,{receipts,onRead,openItems,installationIntegrity}={}){
   server.registerTool('get_workflow',{
     description:'Read a YHWH policy topic on its trigger. A gateway may return a short-lived workflowReceipt for topic-gated tools. No model call or file-path access.',
     inputSchema:{topic:z.enum(Object.keys(catalog.topics)).default('primary'),includeOpenItems:z.boolean().optional(),limit:z.number().int().min(1).max(100).optional(),cursor:z.object({snapshotSha256:z.string().regex(/^[a-f0-9]{64}$/),lastKey:z.string().max(160)}).strict().optional(),legacyCursor:z.string().regex(/^[a-f0-9]{64}$/).optional()},
     annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
   },async({topic,includeOpenItems,limit,cursor,legacyCursor})=>{
     const result=workflowTopic(topic);
+    if(installationIntegrity) { result.installationIntegrity=installationIntegrity; if(installationIntegrity.code) result.code=installationIntegrity.code; }
     if(receipts) Object.assign(result,receipts.issue(topic,result.sha256));
     if(includeOpenItems&&openItems)result.openItems=await openItems({limit,cursor,legacyCursor});
     onRead?.(topic,result.sha256);

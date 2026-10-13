@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {registerHostWorkflow,workflowInstructions,workflowTopic} from './host-workflow.mjs';
+import {inspectInstallIntegrity} from './install-integrity.mjs';
 import {createWorkflowReceipts} from './workflow-receipts.mjs';
 import {projectMemory,PROJECT_MEMORY_POLICY} from './project-memory.mjs';
 import {createProjectMemoryContext} from './project-memory-context.mjs';
@@ -34,7 +35,7 @@ import { createRequestLedger, RequestLedgerError } from '../extensions/request-l
 import {createMilestoneLedger,describeMilestone} from '../extensions/milestone-ledger.js';
 import {inspectMilestoneRecovery,finalizeMilestoneRecovery} from './milestone-recovery.mjs';
 import {assertMilestoneAcceptance} from '../extensions/milestone-acceptance.js';
-import { createReviewAttemptLedger, REVIEW_QUOTA_POLICY, reviewBlockers } from './tier-review-policy.mjs';
+import { createReviewAttemptLedger, REVIEW_QUOTA_POLICY, effectiveReviewQuota, validateReviewQuotaExceptions, reviewBlockers } from './tier-review-policy.mjs';
 import { calculateExecutionBudget } from '../extensions/execution-budget.js';
 import { ResourceAwareExecutor, SCHEDULER_POLICY } from '../extensions/admission-scheduler.js';
 import { createWriteScopeLockManager } from '../extensions/write-scope-locks.js';
@@ -336,11 +337,15 @@ export function createGatewayRuntime(options) {
   ]);
   const executor = modules.get('executor'), audit = modules.get('audit'), circuit = modules.get('circuit');
   const ledger = modules.get('ledger'), writeLocks = modules.get('writeLocks'), taskMonitor = modules.get('taskMonitor');
+  const installationIntegrity = inspectInstallIntegrity(fileURLToPath(new URL('..',import.meta.url)));
+  try { if (installationIntegrity.state !== 'not-installed') audit?.record({auditVersion:1,timestamp:new Date().toISOString(),requestId:`install-${gatewayInstanceId}`,operation:'install_integrity',...installationIntegrity}); }
+  catch { /* Reporting an unavailable audit sink must not crash gateway startup. */ }
   const handoffWaiters=new Map();let handoffClosed=false;
   const publishHandoff=requestId=>{for(const waiter of [...(handoffWaiters.get(requestId)??[])])waiter.wake();};
   const unsubscribeHandoff=ledger?.subscribe?.(publishHandoff)??(()=>{});
   const finishHandoffWaiter=(waiter,value)=>{if(waiter.done)return;waiter.done=true;clearTimeout(waiter.timer);waiter.signal?.removeEventListener('abort',waiter.abort);const set=handoffWaiters.get(waiter.requestId);set?.delete(waiter);if(set?.size===0)handoffWaiters.delete(waiter.requestId);waiter.resolve(value);};
-  const reviewAttempts = options.requestLedgerDir ? createReviewAttemptLedger(resolve(options.requestLedgerDir, 'review-attempts')) : null;
+  const reviewQuotaExceptions = validateReviewQuotaExceptions(options.reviewQuotaExceptions ?? []);
+  const reviewAttempts = options.requestLedgerDir ? createReviewAttemptLedger(resolve(options.requestLedgerDir, 'review-attempts'), { reviewQuotaExceptions }) : null;
   const milestones=options.requestLedgerDir?createMilestoneLedger(resolve(options.requestLedgerDir,'milestones'),{instanceId:gatewayInstanceId}):null;
   let phase = 'running', inFlight = 0, replacing, shutdownPromise, mcpAdmissionClosed = false, mcpRecoveryReads = false;
   const responseSessions = createResponseSessionRegistry();
@@ -378,6 +383,8 @@ export function createGatewayRuntime(options) {
   const osSandbox = writeEnabled ? sandbox.backend : 'unavailable';
   const capabilities = () => ({
     ...publicCapabilities(),
+    installationIntegrity,
+    ...(installationIntegrity.code ? {code:installationIntegrity.code} : {}),
     lifecycle: { ...modules.snapshot(), phase, inFlight, pendingTasks:pendingTasks(), responseSessions:responseSessions.stats, replacement:'trusted-host-idle-only', replaceableAdapters:['dispatch','lsp'] },
     editors: EDITOR_POLICY,
     projectMemory: PROJECT_MEMORY_POLICY,
@@ -463,7 +470,7 @@ export function createGatewayRuntime(options) {
       timeouts: {independent:true,queueDefaultSeconds:120,queueMaximumSeconds:900,execution:'timeoutSeconds bounded by resourceProfile',completionWait:{tool:'wait_subagent',maxTimeoutMs:55000}}, 
       modelMismatchRejected: true, thinkingUnchanged: true, probeTargetExemptFromRoleBinding: true,
       acceptanceRequired: true, explicitReadScopeRequired: true, adaptiveThinking:TASK_PLANNING_POLICY,
-      workflowTiers:{version:2,reviewQuota:{version:REVIEW_QUOTA_POLICY.version,T1:{basePerStage:REVIEW_QUOTA_POLICY.T1.base,stageCap:REVIEW_QUOTA_POLICY.T1.stage,totalCap:REVIEW_QUOTA_POLICY.T1.total,timeMs:REVIEW_QUOTA_POLICY.T1.time},T2:{basePerStage:REVIEW_QUOTA_POLICY.T2.base,stageCap:REVIEW_QUOTA_POLICY.T2.stage,totalCap:REVIEW_QUOTA_POLICY.T2.total,timeMs:REVIEW_QUOTA_POLICY.T2.time,sharedExtensions:REVIEW_QUOTA_POLICY.T2.sharedExtensions}},levels:['T0','T1','T2'],semanticRisks:['publicApiOrProtocol','dependencyOrLockfile','securityAuthOrCredentials','migration','irreversibleOrNoRollback'],counts:'trusted unified patch files, added and deleted lines',t0:{files:3,lines:100,testsDocsFixturesExempt:true},t1:{postReviewAttempts:1,highThinking:false,reviewPacketMaxUtf8Bytes:T1_REVIEW_BUDGET.totalMaxUtf8Bytes,reviewMaterialBudget:T1_REVIEW_BUDGET},t2:{attemptsPerStage:2},riskProfiles:{canonicalCwd:true,longestAncestor:true,default:'standard'},hostExecutionAvailable,primaryDirectEnabled:false,milestones:{version:1,requiredFor:'new-workspace-write',failureThreshold:2,modelDispatchesPerMilestoneAdvisory:5,preReviewBinding:'explicit-definition-list',legacyMigration:'none'},enforcementBoundary:'actual patch classification before host-pending registration'},
+      workflowTiers:{version:2,reviewQuota:{version:REVIEW_QUOTA_POLICY.version,T1:{basePerStage:REVIEW_QUOTA_POLICY.T1.base,stageCap:REVIEW_QUOTA_POLICY.T1.stage,totalCap:REVIEW_QUOTA_POLICY.T1.total,timeMs:REVIEW_QUOTA_POLICY.T1.time},T2:{basePerStage:REVIEW_QUOTA_POLICY.T2.base,stageCap:REVIEW_QUOTA_POLICY.T2.stage,totalCap:REVIEW_QUOTA_POLICY.T2.total,timeMs:REVIEW_QUOTA_POLICY.T2.time,sharedExtensions:REVIEW_QUOTA_POLICY.T2.sharedExtensions}},reviewQuotaExceptionSummary:reviewQuotaExceptions.map(({id,totalCap,stageCap,phaseIndex})=>({id,totalCap,stageCap,phaseIndex})),levels:['T0','T1','T2'],semanticRisks:['publicApiOrProtocol','dependencyOrLockfile','securityAuthOrCredentials','migration','irreversibleOrNoRollback'],counts:'trusted unified patch files, added and deleted lines',t0:{files:3,lines:100,testsDocsFixturesExempt:true},t1:{postReviewAttempts:1,highThinking:false,reviewPacketMaxUtf8Bytes:T1_REVIEW_BUDGET.totalMaxUtf8Bytes,reviewMaterialBudget:T1_REVIEW_BUDGET},t2:{attemptsPerStage:2},riskProfiles:{canonicalCwd:true,longestAncestor:true,default:'standard'},hostExecutionAvailable,primaryDirectEnabled:false,milestones:{version:1,requiredFor:'new-workspace-write',failureThreshold:2,modelDispatchesPerMilestoneAdvisory:5,preReviewBinding:'explicit-definition-list',legacyMigration:'none'},enforcementBoundary:'actual patch classification before host-pending registration'},
       enforcementBoundary: 'Pi invocation validation; host-agent review stages are not attested',
       primaryHost: {protocol:'MCP',policyTool:'get_workflow',primaryModel:'host-selected',enforcement:'Pi invocation checks; host compliance is not attested',runtimePlatform:'Windows + WSL2'},
       requiredConnectorTools: ['diagnose_milestone_failure','abandon_artifact','reconcile_milestone','get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','wait_subagent','get_task_handoff','wait_task_handoff','probe_model','lsp_request','check_claude_auth'],
@@ -747,7 +754,7 @@ export function createGatewayRuntime(options) {
         release: lockRequest ? lock => writeLocks?.release(lock) : undefined,
       });
       const response = { ...result, thinkingDecision:invocation.request.thinkingDecision, preflight, timings, requestId, parentRunId: input.parentRunId, resourceLimits: invocation.request.resourceLimits, osSandbox: result.osSandbox ?? (cliReviewerCandidate || trustedCliRecoveryProbe ? 'none' : osSandbox), writeEnabled, writeScopeEnforced: input.access === 'workspace-write' };
-      if(reviewTicket){const snapshot=reviewAttempts.snapshot({workspaceSha256:reviewTicket.workspaceSha256,runAnchorSha256:reviewTicket.runAnchorSha256,stage:reviewTicket.stage,tier:reviewTicket.tier,requestId}),lim=REVIEW_QUOTA_POLICY[reviewTicket.tier],used=snapshot.attempts.filter(a=>a.status!=='released'),stageUsed=used.filter(a=>a.stage===reviewTicket.stage).length;response.reviewQuota={available:true,version:REVIEW_QUOTA_POLICY.version,tier:reviewTicket.tier,stage:reviewTicket.stage,used:used.length,stageUsed,base:lim.base,remainingBase:Math.max(0,lim.base-stageUsed),elasticSharedRemaining:Math.max(0,(lim.sharedExtensions??1)-(snapshot.extensionUsed?1:0)),stageCap:lim.stage,totalCap:lim.total,extensionUsed:snapshot.extensionUsed,extensionEligible:stageUsed>=lim.base&&!snapshot.extensionUsed&&snapshot.attempts.at(-1)?.progressVerified===true,nextAction:'review the validated decision and trusted progress before requesting another review',extensionEligibilityReason:snapshot.extensionUsed?'shared extension consumed':stageUsed<lim.base?'base quota remains':snapshot.attempts.at(-1)?.progressVerified===true?'deterministic eligibility only; semantic relevance remains reviewer judgment':'requires trusted relevant blocker correction and matching host proof',timeChargedMs:snapshot.timeUsedMs,measuredExecutionMs:snapshot.attempts.filter(a=>a.started).every(a=>a.timeKnown===true)?snapshot.attempts.filter(a=>a.started).reduce((sum,a)=>sum+(a.elapsedMs??0),0):null,timeRemainingMs:Math.max(0,lim.time-snapshot.timeUsedMs),timeKnown:snapshot.attempts.filter(a=>a.started).every(a=>a.timeKnown===true),unknownTimingCount:snapshot.attempts.filter(a=>a.started&&a.timeKnown!==true).length,tokens:null,admittedTimeoutSeconds:reviewTicket.timeoutSeconds};}
+      if(reviewTicket){const snapshot=reviewAttempts.snapshot({workspaceSha256:reviewTicket.workspaceSha256,runAnchorSha256:reviewTicket.runAnchorSha256,stage:reviewTicket.stage,tier:reviewTicket.tier,requestId}),lim=effectiveReviewQuota(reviewQuotaExceptions,{workspaceSha256:reviewTicket.workspaceSha256,runAnchorSha256:reviewTicket.runAnchorSha256,tier:reviewTicket.tier},{parentRunId:reviewTicket.parentRunId,phaseIndex:reviewTicket.phaseIndex,stage:reviewTicket.stage}),used=snapshot.attempts.filter(a=>a.status!=='released'),stageUsed=used.filter(a=>a.stage===reviewTicket.stage).length;response.reviewQuota={available:true,version:REVIEW_QUOTA_POLICY.version,tier:reviewTicket.tier,stage:reviewTicket.stage,exceptionSummary:lim.grantId?{id:lim.grantId,totalCap:lim.total,stageCap:lim.stage,phaseIndex:reviewTicket.phaseIndex}:undefined,used:used.length,stageUsed,base:lim.base,remainingBase:Math.max(0,lim.base-stageUsed),elasticSharedRemaining:Math.max(0,(lim.sharedExtensions??1)-used.filter(a=>a.extension).length),stageCap:lim.stage,totalCap:lim.total,extensionUsed:snapshot.extensionUsed,extensionEligible:(stageUsed>=lim.base&&!snapshot.extensionUsed&&snapshot.attempts.at(-1)?.progressVerified===true)||(stageUsed===2&&reviewTicket.phaseIndex===2&&lim.grantId!==undefined&&stageUsed<lim.stage),nextAction:'review the validated decision and trusted progress before requesting another review',extensionEligibilityReason:snapshot.extensionUsed?'shared extension consumed':stageUsed<lim.base?'base quota remains':(snapshot.attempts.at(-1)?.progressVerified===true||lim.grantId!==undefined&&stageUsed<lim.stage)?'deterministic eligibility only; semantic relevance remains reviewer judgment':'requires trusted relevant blocker correction and matching host proof',timeChargedMs:snapshot.timeUsedMs,measuredExecutionMs:snapshot.attempts.filter(a=>a.started).every(a=>a.timeKnown===true)?snapshot.attempts.filter(a=>a.started).reduce((sum,a)=>sum+(a.elapsedMs??0),0):null,timeRemainingMs:Math.max(0,lim.time-snapshot.timeUsedMs),timeKnown:snapshot.attempts.filter(a=>a.started).every(a=>a.timeKnown===true),unknownTimingCount:snapshot.attempts.filter(a=>a.started&&a.timeKnown!==true).length,tokens:null,admittedTimeoutSeconds:reviewTicket.timeoutSeconds};}
       let actualTier = null;
       delete response.contract;
       if (operation !== 'probe_model') {
@@ -1084,6 +1091,8 @@ export function createGatewayRuntime(options) {
       ok: true,
       gateway: {
         instanceId: gatewayInstanceId,
+        installationIntegrity,
+        ...(installationIntegrity.code ? {code:installationIntegrity.code} : {}),
         accepting: phase === 'running' && state.accepting && taskMonitor.resultCache.accepting,
         resultCache:taskMonitor.resultCache,
         active: state.active,
@@ -1102,7 +1111,7 @@ export function createGatewayRuntime(options) {
 
   function makeServer() {
     const server = new McpServer({ name: 'pi-kether-gateway', version: '1.0.0' }, {instructions:workflowInstructions});
-    registerHostWorkflow(server,{receipts:workflowReceipts,onRead:topic=>audit?.record({auditVersion:1,timestamp:new Date().toISOString(),requestId:`workflow-${gatewayInstanceId}`,operation:'get_workflow',topic,outcome:'completed'}),openItems:args=>{
+    registerHostWorkflow(server,{installationIntegrity,receipts:workflowReceipts,onRead:topic=>audit?.record({auditVersion:1,timestamp:new Date().toISOString(),requestId:`workflow-${gatewayInstanceId}`,operation:'get_workflow',topic,outcome:'completed'}),openItems:args=>{
       const page=milestones?.listOpen(args)??{items:[],cursor:null,snapshotSha256:null};
       const legacy=ledger?.listHostOpen({limit:args.limit??100,cursor:args.legacyCursor})??{items:[],cursor:null,damaged:0};
       const classification=milestones?.classifyRequests(legacy.items.map(item=>item.requestId))??{trackedIds:[],closedLegacyIds:[]};
@@ -1556,7 +1565,7 @@ export function createGatewayApp(options) {
     if (!auth.startsWith('Bearer ') || !safeEqual(auth.slice(7), options.token)) return res.status(401).json({ error: 'unauthorized' });
     if (req.headers.origin || req.headers['transfer-encoding'] || Number(req.headers['content-length'] || 0) !== 0) return res.status(400).json({ error: 'body and origin not allowed' });
     const action = req.params.action;
-    if (action === 'status') return res.json({ ok: true, gatewayInstanceId: runtime.gatewayInstanceId, pid: process.pid, phase: runtime.capabilities().lifecycle.phase });
+    if (action === 'status') { const status=runtime.capabilities(); return res.json({ ok: true, gatewayInstanceId: runtime.gatewayInstanceId, pid: process.pid, phase: status.lifecycle.phase,installationIntegrity:status.installationIntegrity,...(status.code ? {code:status.code} : {}) }); }
     if (action === 'stop') {
       if (runtime.capabilities().lifecycle.phase !== 'maintenance' || typeof options.onMaintenanceStop !== 'function') return res.status(409).json({ ok: false });
       try {
@@ -1640,6 +1649,7 @@ export function loadGatewayOptions(env = process.env) {
   const configPath = env.PI_GATEWAY_CONFIG;
   if (!configPath) throw new Error('PI_GATEWAY_CONFIG must point to the gateway config JSON');
   const config = JSON.parse(readFileSync(configPath, 'utf8'));
+  const reviewQuotaExceptions = validateReviewQuotaExceptions(config.reviewQuotaExceptions ?? []);
   const tokenPath = env.PI_GATEWAY_TOKEN_FILE || config.tokenFile;
   if (!tokenPath) throw new Error('gateway tokenFile is required');
   const auditFile = env.PI_GATEWAY_AUDIT_FILE || config.auditFile;
@@ -1656,6 +1666,7 @@ export function loadGatewayOptions(env = process.env) {
     providerCircuitFile,
     requestLedgerDir,
     riskProfiles: config.riskProfiles ?? [],
+    reviewQuotaExceptions,
     hostExecutionAvailable: config.hostExecutionAvailable === undefined ? true : config.hostExecutionAvailable,
     token: readFileSync(tokenPath, 'utf8').trim(),
   };
