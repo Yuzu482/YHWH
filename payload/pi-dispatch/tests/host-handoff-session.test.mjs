@@ -8,6 +8,19 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {captureFrozenPatch} from '../scripts/frozen-patch.mjs';
+
+test('host review refuses a changed frozen capture even with otherwise passing host records',async()=>{
+ const {input,options}=await sessionFixture();
+ input.frozenSources=[{path:'entry.py',before:null,beforeSha256:null,after:'main()\n',afterSha256:sha256('main()\n')}];
+ const result=reviewReadiness(input,options);assert.equal(result.ok,false);assert.match(result.issues[0].message,/frozen capture/);
+ const captured=captureFrozenPatch(input.frozenSources);assert.notEqual(captured.artifactSha256,input.candidate.artifactSha256);
+});
+
+test('readiness includes unknown coverage without treating sandbox absence as host failure',()=>{
+ const r=inspectDispatchReadiness({request:{task:{writeScope:['entry.py'],verify:{commands:[{id:'presentation'}]}}},hostCommands:[],checkAvailability:{available:false,reason:'not-registered'}});
+ assert.deepEqual(r.checkCoverage.uncovered,['entry.py']);assert.equal(r.checkCoverage.executionProven,false);assert.equal(r.sandboxChecks.hostVerificationRequired,true);
+});
 
 test('native review-budget CLI is offline, exclusive and returns actionable diagnostics',()=>{
  const dir=mkdtempSync(join(tmpdir(),'review-budget-cli-'));
