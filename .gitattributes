@@ -3,3 +3,8 @@
 *.jpg binary
 *.ico binary
 *.zip binary
+
+# Preserve the audited, authorization-bound legacy runtime bytes.
+payload/pi-dispatch/extensions/milestone-ledger.js -text
+payload/pi-dispatch/scripts/card-lab-interrupted-request-recovery.mjs -text
+payload/pi-dispatch/scripts/tier-review-policy.mjs -text whitespace=trailing-space,space-before-tab,cr-at-eol

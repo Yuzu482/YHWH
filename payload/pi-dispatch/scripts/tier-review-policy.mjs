@@ -33,12 +33,15 @@ export function validateReviewQuotaExceptions(value = []) {
         typeof grant.authorizationReference !== 'string' || !grant.authorizationReference.trim() || grant.authorizationReference.length > 256 ||
         !HEX.test(grant.workspaceSha256) || !HEX.test(grant.runAnchorSha256) || !ID.test(grant.parentRunId) ||
         grant.tier !== 'T2' || grant.phaseIndex !== 2 ||
-        !((grant.totalCap === 6 && grant.stageCap === 3) || (grant.totalCap === 8 && grant.stageCap === 5) || (grant.totalCap === 11 && grant.stageCap === 8) || (grant.totalCap === 13 && grant.stageCap === 9) || (grant.totalCap === 14 && grant.stageCap === 10)) ||
+        !((grant.totalCap === 6 && grant.stageCap === 3) || (grant.totalCap === 8 && grant.stageCap === 5) || (grant.totalCap === 11 && grant.stageCap === 8) || (grant.totalCap === 13 && grant.stageCap === 9) || (grant.totalCap === 14 && grant.stageCap === 10) || (grant.totalCap === 15 && grant.stageCap === 11) || (grant.totalCap === 16 && grant.stageCap === 12) || (grant.totalCap === 17 && grant.stageCap === 13)) ||
         (grant.totalCap > 6 && (grant.id !== 'infalsus-card-lab-phase2-20261012' ||
           grant.workspaceSha256 !== '3149a065938db19874bfdbcce8d6de2ca9c27645fa38f353cbd5c8245691d149' ||
           grant.runAnchorSha256 !== 'b991be558d49d9847f0eb12560d2cd2f1873b1f69146678a9e13b06d1286b062' ||
           grant.parentRunId !== 'infalsus-card-lab-20261012' ||
-          (grant.totalCap === 14 && grant.authorizationReference !== 'user-approval:quota14:4ae04ff18684e8ceab91d19b96296c43dc6e6bb64338ab2fc0ee7551249495d1')))) throw new TypeError('Invalid reviewQuotaExceptions entry');
+          (grant.totalCap === 14 && grant.authorizationReference !== 'user-approval:quota14:4ae04ff18684e8ceab91d19b96296c43dc6e6bb64338ab2fc0ee7551249495d1') ||
+          (grant.totalCap === 15 && grant.authorizationReference !== 'user-approval:quota15:6a003ad97028b560f2c4fe0073f0115d60b6ad4d91625e72776cfe9d00eefff9') ||
+          (grant.totalCap === 16 && grant.authorizationReference !== 'user-approval:quota16:b26b7a24e8d70f34812fc74524620c4bbd66beb9012aa661c8a15c50496c7120') ||
+          (grant.totalCap === 17 && grant.authorizationReference !== 'user-approval:quota17:a8e306108b7fdd6762f9ab6c67f46a303e50bc425f214e5971ed120668aaf99d')))) throw new TypeError('Invalid reviewQuotaExceptions entry');
     return Object.freeze({ ...grant });
   });
   for (let i = 0; i < grants.length; i++) for (let j = i + 1; j < grants.length; j++) {
@@ -51,8 +54,8 @@ export function effectiveReviewQuota(grants, identity, candidate) {
     item.parentRunId === candidate.parentRunId && item.phaseIndex === candidate.phaseIndex && item.tier === identity.tier && identity.tier === 'T2');
   if (!grant) return LIMITS[identity.tier];
   if (grant.totalCap > 6 && !STAGES.has(candidate.stage)) throw new TypeError('Review quota stage is required for extended grants');
-  return Object.freeze({ ...LIMITS.T2, total: grant.totalCap,
-    stage: [13, 14].includes(grant.totalCap) && candidate.stage === 'pre-review' ? 4 : grant.totalCap > 6 && candidate.stage === 'post-review' ? grant.stageCap : 3,
+  return Object.freeze({ ...LIMITS.T2, ...([16, 17].includes(grant.totalCap) ? { time: 1800000 } : {}), total: grant.totalCap,
+    stage: [13, 14, 15, 16, 17].includes(grant.totalCap) && candidate.stage === 'pre-review' ? 4 : grant.totalCap > 6 && candidate.stage === 'post-review' ? grant.stageCap : 3,
     sharedExtensions: grant.totalCap - 4, grantId: grant.id, authorizationReference: grant.authorizationReference,
     parentRunId: grant.parentRunId, totalCap: grant.totalCap, stageCap: grant.stageCap });
 }
@@ -290,7 +293,7 @@ function validateState(data, key, identity, grants = []) {
       if ((stageCounts[attempt.stage] > base) !== attempt.extension || stageCounts[attempt.stage] > rule.stage) invalid('Review extension flags disagree with stage attempt counts');
       if (attempt.extension) {
         const authorized = rule.grantId !== undefined && attempt.phaseIndex === 2 && attempt.parentRunId === rule.parentRunId &&
-          (attempt.stage === 'pre-review' ? priorStageCount === 2 || ([13, 14].includes(rule.totalCap) && priorStageCount === 3) : priorStageCount >= 2 && priorStageCount < rule.stage);
+          (attempt.stage === 'pre-review' ? priorStageCount === 2 || ([13, 14, 15, 16, 17].includes(rule.totalCap) && priorStageCount === 3) : priorStageCount >= 2 && priorStageCount < rule.stage);
         extensionAttempts.push({ authorized, totalCap: rule.total, grantId: rule.grantId });
         if (authorized) {
           const slot = `${attempt.stage}:${attempt.phaseIndex}:${wholeGoalCount}`;
@@ -319,7 +322,7 @@ function validateState(data, key, identity, grants = []) {
   const postStageCap = extendedGrant?.stageCap ?? LIMITS[data.identity.tier].stage;
   if (!same(requests, data.requests) || time !== data.timeUsedMs || extensions > (hasAuthorizedExtension && !mixedUnauthorized ? authorizedExtensionCap : 1) ||
       (extensions > 1 && (!hasAuthorizedExtension || mixedUnauthorized)) || (extensions > 0) !== data.extensionUsed ||
-      (data.identity.tier === 'T1' && stageCounts['pre-review'] !== 0) || stageCounts['pre-review'] > ([13, 14].includes(extendedGrant?.totalCap) ? 4 : LIMITS[data.identity.tier].stage) || stageCounts['post-review'] > postStageCap ||
+      (data.identity.tier === 'T1' && stageCounts['pre-review'] !== 0) || stageCounts['pre-review'] > ([13, 14, 15, 16, 17].includes(extendedGrant?.totalCap) ? 4 : LIMITS[data.identity.tier].stage) || stageCounts['post-review'] > postStageCap ||
       stageCounts['pre-review'] + stageCounts['post-review'] > (hasAuthorizedExtension && !mixedUnauthorized ? authorizedTotalCap : LIMITS[data.identity.tier].total)) invalid('Review state derived indexes or counters disagree');
   if (Object.keys(data.decisions).some(request => !ID.test(request) || !own(data.requests, request))) invalid('Invalid persisted decision index');
   for (const [request, value] of Object.entries(data.decisions)) {
@@ -408,11 +411,12 @@ function loadState(directory, key, identity, grants = []) {
 }
 
 const EVIDENCE_RECONSIDERATION = Object.freeze({
-  requestId:'card-lab-final-range-3-evidence-reconsideration-20261013',
+  requestId:'card-lab-final-range-3-evidence-reconsideration-normalized-20261013',
+  originalZeroLaunchRequestId:'card-lab-final-range-3-evidence-reconsideration-20261013',
   previousReviewRequestId:'card-lab-final-range-3-20261013',
   blockerKey:'72e17cb44d20fc848f4ab8e5d07ad9b29bc432feab9ab06a113e51c00e8d9fd4',
   path:'tests/native-planner.test.mjs',
-  materialDigest:'5b746af029241d283f06e0f867bdfbdc3f935de17bcd27f6ab48d55c1bc64ac1',
+  materialDigest:'4604e730441c9262d2724f84110353ee11704f50cb77572b2e608c94e86b528a',
   previousMaterialDigest:'5c420fd5b0707e63808164e0ca404554fc8ebe79ee2bfcab414b179df5f9f34f',
   artifactDigest:'cdd8518a02743d344645709600c8c6bce7564e2258d9a596b7b1f69c450e2184',
   hostRecordDigest:'873748be9c0e59041e1cba540cadb464bc43591b8ca1dbf510f9284eac00d706',
@@ -422,6 +426,8 @@ const EVIDENCE_RECONSIDERATION = Object.freeze({
 });
 
 function evidenceReconsiderationEligible(data, input, limits) {
+  // The rejected original ID had no quota reservation. Any historical attempt makes this exact successor ineligible.
+  if (data.attempts.some(attempt => attempt.requestId === EVIDENCE_RECONSIDERATION.originalZeroLaunchRequestId)) return false;
   if (input.requestId !== EVIDENCE_RECONSIDERATION.requestId || input.stage !== 'post-review' || input.phaseIndex !== 2 ||
       input.parentRunId !== EVIDENCE_RECONSIDERATION.parentRunId || limits.totalCap !== 14 ||
       limits.authorizationReference !== EVIDENCE_RECONSIDERATION.authorizationSha256 ||
@@ -449,6 +455,145 @@ function evidenceReconsiderationEligible(data, input, limits) {
   const closure = progress.closures[0];
   return closure.key === EVIDENCE_RECONSIDERATION.blockerKey && closure.paths.length === 1 &&
     closure.paths[0] === EVIDENCE_RECONSIDERATION.path && closure.evidence.includes(EVIDENCE_RECONSIDERATION.reportSha256);
+}
+
+const QUOTA15 = Object.freeze({
+  authorizationReference:'user-approval:quota15:6a003ad97028b560f2c4fe0073f0115d60b6ad4d91625e72776cfe9d00eefff9',
+  workspaceSha256:'3149a065938db19874bfdbcce8d6de2ca9c27645fa38f353cbd5c8245691d149',
+  runAnchorSha256:'b991be558d49d9847f0eb12560d2cd2f1873b1f69146678a9e13b06d1286b062', parentRunId:'infalsus-card-lab-20261012',
+  first13AttemptsSha256:'e55bc497cf035cf482ca2cd61d46621aebffc79a4225759fec0e8e0d8d63efa0',
+  first13DecisionsSha256:'03f6b01140dc4a9ff4193f2a1a47b007e8a2e3ff80b05d338736000f67a8817c', reportSha256:'8057236fc37780e35489e3420cec7fd6dec8950d6e11b68a427dbd186604dcec',
+  range5:{requestId:'card-lab-final-range-5-material-reconsideration-20261014',materialDigest:'ab927d179bb3d4eabfd05b544a7e33d235bc2041bf9a203c68aaebb65edf3887',artifactDigest:'be00d50cbcff3d58faf3ea0a6c025b2d31d9782d94a35a138866a1412fd00dff',hostRecordDigest:'446ccd9bbaa37ab8e0fdacf7f2a6e6ad27e63c69249a8fab5c2c5dc195fcc2bb',previous:'card-lab-final-range-5-20261013',previousMaterialDigest:'46994ecc3e5b3c12654d6bdd469b5abc0c28dd9178db965da6e051b3a0e78c58',sections:{requirements:'fd4338db5ba3ac6da6de6feca4a8abfca2fc71984bcbc44dcd83a3d7ead72969',changes:'9bcae0fdb7383a3cb227e830c13bbb4e52c6dc42cc60139c41c68741b6dcc71e'}},
+  range6:{requestId:'card-lab-final-range-6-20261013',materialDigest:'f21670d3bb5c8fb8e1eb7c6c25f9c8eae126eb867481e61f7b5d3dc66821e680',artifactDigest:'8513feb97c9ce4b3bbe94b0221e1a66a384184e9838f9604f031b8c32291fae4',hostRecordDigest:'23650f00b33b6509c03b6f320863d03526db7f7513a03b0efafb52b6ed00f460',sections:{requirements:'dde9d93daaee2ac0cbcdd952e9c77d449868f1a5e4f0e3c771bcde1c5eb96f31',changes:'8caf60450c0cdebadca255ac37ce73acedea3e065f078e6a4daae8ee6e6ffa79'}},
+  blockers:['1d71a3caf3534adfeddbe06d200fd6828bab4a37a93f344dc55714e0cff5b6b2','49475515cd6895cf3eb2a48939da51bca92c0312c0a7d03ed303724dde5f3686','5edc6b370e4e38418abe80a48ca3ec650b96ab0fee8566379a4eccb96f3343dd','5fa45d7d7851b980c4256eb509d41e9355ac4cfdfecb13d2b8ba397235c6ef78','61ab752db23346f74352c61dc7c395f234043ffc8470dfd7ba0c15e43b5fd2f7','6b240d3e5b74ae1108cb0bb3b7e21b9ceb53d6b2cdb9a1418c730f38b9930fd5','75dfc6d0f41da5538cb2a6ea2f018c0ae9ec17d836ff6de067be1b1c897589a4']
+});
+function quota15Prefix(data) {
+  return data.attempts.length >= 13 && data.attempts.slice(0,13).every(row => row.status !== 'released') &&
+    hash(JSON.stringify(data.attempts.slice(0,13))) === QUOTA15.first13AttemptsSha256 &&
+    hash(JSON.stringify(data.attempts.slice(0,13).map(row => [row.requestId,data.decisions[row.requestId]]))) === QUOTA15.first13DecisionsSha256;
+}
+function quota15Identity(input, limits) {
+  return limits.totalCap === 15 && limits.authorizationReference === QUOTA15.authorizationReference && input.workspaceSha256 === QUOTA15.workspaceSha256 &&
+    input.runAnchorSha256 === QUOTA15.runAnchorSha256 && input.parentRunId === QUOTA15.parentRunId && input.phaseIndex === 2 && input.stage === 'post-review';
+}
+function quota15SectionsMatch(actual, expected) {
+  return actual && actual.requirements === expected.requirements && actual.changes === expected.changes;
+}
+function quota15Range5Eligible(data,input,limits) {
+  const pin=QUOTA15.range5;
+  if (!quota15Identity(input,limits) || !quota15Prefix(data) || data.attempts.length!==13 || data.attempts.filter(row=>row.status!=='released').length!==13 ||
+      input.requestId!==pin.requestId || input.materialDigest!==pin.materialDigest || input.artifactDigest!==pin.artifactDigest || input.hostRecordDigest!==pin.hostRecordDigest ||
+      input.progress?.previousReviewRequestId!==pin.previous || !quota15SectionsMatch(input.materialSections,pin.sections)) return false;
+  const previous=data.attempts[12], prior=data.decisions[pin.previous];
+  if (previous.requestId!==pin.previous || previous.status!=='finished' || previous.materialDigest!==pin.previousMaterialDigest || previous.artifactDigest!==input.artifactDigest ||
+      previous.hostRecordDigest!==input.hostRecordDigest || !prior || prior.stage!=='post-review' || prior.phaseIndex!==2 || prior.materialDigest!==pin.previousMaterialDigest ||
+      prior.artifactDigest!==input.artifactDigest || prior.hostRecordDigest!==input.hostRecordDigest || prior.decision.reviewDecision!=='insufficient-materials') return false;
+  const blockers=reviewBlockers(prior.decision), paths=[['cancel/continue.'],[],[],[],['dist/index.html','import/commit'],[],['5/6','dist/app.mjs','progress/import/commit','source/test/tool/doc']];
+  if (blockers.length!==7 || !same(blockers.map(item=>[item.key,item.paths]),QUOTA15.blockers.map((key,i)=>[key,paths[i]]))) return false;
+  const closures=input.progress.closures;
+  const expected=QUOTA15.blockers.map((key,i)=>[key,[1,2,3,5].includes(i)?['materials/range5']:paths[i],QUOTA15.reportSha256]);
+  return closures.length===7 && same(closures.map(({key,paths,evidence})=>[key,paths,evidence]).sort(([a],[b])=>a.localeCompare(b)),expected.sort(([a],[b])=>a.localeCompare(b)));
+}
+function quota15Range6Eligible(data,input,limits) {
+  const pin=QUOTA15.range6;
+  if (!quota15Identity(input,limits) || !quota15Prefix(data) || data.attempts.length!==14 || data.attempts.filter(row=>row.status!=='released').length!==14 ||
+      input.requestId!==pin.requestId || input.materialDigest!==pin.materialDigest || input.artifactDigest!==pin.artifactDigest || input.hostRecordDigest!==pin.hostRecordDigest || !quota15SectionsMatch(input.materialSections,pin.sections)) return false;
+  const retry=data.attempts[13], prior=retry && data.decisions[retry.requestId];
+  return retry.requestId===QUOTA15.range5.requestId && retry.stage==='post-review' && retry.phaseIndex===2 && retry.parentRunId===QUOTA15.parentRunId &&
+    retry.status==='finished' && retry.progressVerified && retry.materialDigest===QUOTA15.range5.materialDigest && retry.artifactDigest===QUOTA15.range5.artifactDigest &&
+    retry.hostRecordDigest===QUOTA15.range5.hostRecordDigest && prior?.stage==='post-review' && prior.phaseIndex===2 && prior.materialDigest===QUOTA15.range5.materialDigest &&
+    prior.artifactDigest===QUOTA15.range5.artifactDigest && prior.hostRecordDigest===QUOTA15.range5.hostRecordDigest && ['approve','conditional-approve'].includes(prior.decision.reviewDecision);
+}
+
+const QUOTA16 = Object.freeze({
+  authorizationReference:'user-approval:quota16:b26b7a24e8d70f34812fc74524620c4bbd66beb9012aa661c8a15c50496c7120',
+  workspaceSha256:'3149a065938db19874bfdbcce8d6de2ca9c27645fa38f353cbd5c8245691d149',
+  runAnchorSha256:'b991be558d49d9847f0eb12560d2cd2f1873b1f69146678a9e13b06d1286b062', parentRunId:'infalsus-card-lab-20261012',
+  first14AttemptsSha256:'d70bb74ea953bccb7caeaec1bbc9a68421f08ce87e3c715ab39f5f8807e80c95',
+  first14DecisionsSha256:'3334332ecd09229a8f07c5c36112a77e209086a88cb7f79ab61a62c088bb6d2c',
+  timeoutRequestId:'card-lab-final-range-5-material-reconsideration-20261014',
+  range5:{requestId:'card-lab-final-range-5-material-timeout-recovery-20261014',materialDigest:'ab927d179bb3d4eabfd05b544a7e33d235bc2041bf9a203c68aaebb65edf3887',artifactDigest:'be00d50cbcff3d58faf3ea0a6c025b2d31d9782d94a35a138866a1412fd00dff',hostRecordDigest:'446ccd9bbaa37ab8e0fdacf7f2a6e6ad27e63c69249a8fab5c2c5dc195fcc2bb',previous:'card-lab-final-range-5-20261013',sections:{requirements:'fd4338db5ba3ac6da6de6feca4a8abfca2fc71984bcbc44dcd83a3d7ead72969',changes:'9bcae0fdb7383a3cb227e830c13bbb4e52c6dc42cc60139c41c68741b6dcc71e'}},
+  range6:{requestId:'card-lab-final-range-6-20261013',materialDigest:'f21670d3bb5c8fb8e1eb7c6c25f9c8eae126eb867481e61f7b5d3dc66821e680',artifactDigest:'8513feb97c9ce4b3bbe94b0221e1a66a384184e9838f9604f031b8c32291fae4',hostRecordDigest:'23650f00b33b6509c03b6f320863d03526db7f7513a03b0efafb52b6ed00f460',sections:{requirements:'dde9d93daaee2ac0cbcdd952e9c77d449868f1a5e4f0e3c771bcde1c5eb96f31',changes:'8caf60450c0cdebadca255ac37ce73acedea3e065f078e6a4daae8ee6e6ffa79'}},
+  reportSha256:'8057236fc37780e35489e3420cec7fd6dec8950d6e11b68a427dbd186604dcec'
+});
+const QUOTA17 = Object.freeze({
+  authorizationReference:'user-approval:quota17:a8e306108b7fdd6762f9ab6c67f46a303e50bc425f214e5971ed120668aaf99d',
+  workspaceSha256:'3149a065938db19874bfdbcce8d6de2ca9c27645fa38f353cbd5c8245691d149',
+  runAnchorSha256:'b991be558d49d9847f0eb12560d2cd2f1873b1f69146678a9e13b06d1286b062', parentRunId:'infalsus-card-lab-20261012',
+  first16AttemptsSha256:'78daf3670fcf0cd5498a67a35cb4b233e36a594e9a57d8538fa5cacba23d6561',
+  first16DecisionsSha256:'66b7b9c961944812687a859401fd7c32e3aa315b0d770eb99618461b75543063',
+  previous:'card-lab-final-range-6-20261013', requestId:'card-lab-final-range-6-material-reconsideration-20261014',
+  previousMaterialDigest:'f21670d3bb5c8fb8e1eb7c6c25f9c8eae126eb867481e61f7b5d3dc66821e680',
+  materialDigest:'cf222cdbea3f4d9fcb3eb3df7a42ff578192eeed0a2e272d8254b89a2fdede8a',
+  artifactDigest:'8513feb97c9ce4b3bbe94b0221e1a66a384184e9838f9604f031b8c32291fae4',
+  hostRecordDigest:'23650f00b33b6509c03b6f320863d03526db7f7513a03b0efafb52b6ed00f460',
+  sections:{requirements:'aff602a91426e3a8c14a23f3372c1b4c3c5f116800f3019aeaacf6ae737322a7',changes:'e44a45ecace60beee09a6f52123e18c8e5b917541cf6fee007761c465b95f88b'},
+  reportSha256:'8cc5b79656932534c0d16a100c60790818ec2077aafb10e0874cecf512bd8647',
+  blockers:['3cfc9bbfac23e7d21a8ec4d89c2fc9e2f4fe41d5ec401827001bb9d69c1c2759','3f622ba4f06cd738b4f043517947c0fed873669e1e1b4730b415c13bbbdb1e3e','665885e2c16b9d50215552b2ce9718747d0ac7215ca87c57992101ed636b4f77','6b38b7a61f6435b3a925f1f04e9614f4dd32d43c6fc2e4f0895b0cf96dd3f70e','fb476455718937fd9e3dbdf1c4f84817b1a273598f27045d31ca6393d958ea08']
+});
+function quota17Prefix(data) {
+  const attempts=data.attempts.slice(0,16);
+  return hash(JSON.stringify(attempts))===QUOTA17.first16AttemptsSha256 &&
+    hash(JSON.stringify(attempts.map(row=>[row.requestId,data.decisions[row.requestId]])))===QUOTA17.first16DecisionsSha256;
+}
+function quota17Identity(input,limits) {
+  return limits.totalCap===17 && limits.authorizationReference===QUOTA17.authorizationReference && input.workspaceSha256===QUOTA17.workspaceSha256 &&
+    input.runAnchorSha256===QUOTA17.runAnchorSha256 && input.parentRunId===QUOTA17.parentRunId && input.phaseIndex===2 && input.stage==='post-review';
+}
+function quota17Eligible(data,input,limits) {
+  if(!quota17Identity(input,limits))return false;
+  if(data.attempts.length!==16)return false;
+  if(data.attempts.some(row=>row.status==='released'))return false;
+  if(!quota17Prefix(data))return false;
+  if(input.requestId!==QUOTA17.requestId)return false;
+  const pin=QUOTA17,previous=data.attempts[15],prior=data.decisions[pin.previous];
+  if(input.materialDigest!==pin.materialDigest||input.artifactDigest!==pin.artifactDigest||input.hostRecordDigest!==pin.hostRecordDigest||
+    !quota15SectionsMatch(input.materialSections,pin.sections)||input.progress?.previousReviewRequestId!==pin.previous||
+    data.attempts.slice(0,16).some(row=>row.stage==='post-review'&&row.materialDigest===input.materialDigest))return false;
+  if(previous.requestId!==pin.previous||previous.stage!=='post-review'||previous.phaseIndex!==2||previous.parentRunId!==pin.parentRunId||previous.status!=='finished'||
+    !previous.started||!previous.timeKnown||previous.outcome!=='execution-finished'||previous.materialDigest!==pin.previousMaterialDigest||
+    previous.artifactDigest!==pin.artifactDigest||previous.hostRecordDigest!==pin.hostRecordDigest||
+    !prior||prior.stage!=='post-review'||prior.phaseIndex!==2||prior.materialDigest!==pin.previousMaterialDigest||prior.artifactDigest!==pin.artifactDigest||
+    prior.hostRecordDigest!==pin.hostRecordDigest||prior.decision.reviewDecision!=='insufficient-materials')return false;
+  const blockers=reviewBlockers(prior.decision),paths={'665885e2c16b9d50215552b2ce9718747d0ac7215ca87c57992101ed636b4f77':['import/commit','tools/compile-rules.mjs']};
+  if(blockers.length!==5||!same(blockers.map(item=>[item.key,item.paths]),pin.blockers.map(key=>[key,paths[key]||[]])))return false;
+  const closures=input.progress.closures,expected=pin.blockers.map(key=>[key,paths[key]||['materials/range6'],pin.reportSha256]);
+  return closures.length===5&&same(closures.map(({key,paths,evidence})=>[key,paths,evidence]).sort(([a],[b])=>a.localeCompare(b)),expected.sort(([a],[b])=>a.localeCompare(b)));
+}
+
+function quota16Prefix(data) {
+  return data.attempts.length >= 14 && data.attempts.slice(0,14).every(row=>row.status!=='released') &&
+    hash(JSON.stringify(data.attempts.slice(0,14)))===QUOTA16.first14AttemptsSha256 &&
+    hash(JSON.stringify(data.attempts.slice(0,14).map(row=>[row.requestId,data.decisions[row.requestId]])))===QUOTA16.first14DecisionsSha256;
+}
+function quota16Identity(input,limits) {
+  return limits.totalCap===16 && limits.authorizationReference===QUOTA16.authorizationReference && input.workspaceSha256===QUOTA16.workspaceSha256 &&
+    input.runAnchorSha256===QUOTA16.runAnchorSha256 && input.parentRunId===QUOTA16.parentRunId && input.phaseIndex===2 && input.stage==='post-review';
+}
+function quota16Range5Eligible(data,input,limits) {
+  const pin=QUOTA16.range5, timeout=data.attempts[13], prior=data.decisions[pin.previous];
+  if (!quota16Identity(input,limits)||!quota16Prefix(data)||data.attempts.length!==14||data.attempts.filter(row=>row.status!=='released').length!==14||
+      input.requestId!==pin.requestId||input.materialDigest!==pin.materialDigest||input.artifactDigest!==pin.artifactDigest||input.hostRecordDigest!==pin.hostRecordDigest||
+      input.progress?.previousReviewRequestId!==pin.previous||!quota15SectionsMatch(input.materialSections,pin.sections)||!timeout||timeout.requestId!==QUOTA16.timeoutRequestId||
+      timeout.stage!=='post-review'||timeout.phaseIndex!==2||timeout.parentRunId!==QUOTA16.parentRunId||timeout.status!=='finished'||!timeout.started||!timeout.timeKnown||
+      timeout.outcome!=='execution-finished'||timeout.reservedMs!==140000||timeout.elapsedMs!==136302||!timeout.progressVerified||data.decisions[timeout.requestId]||
+      !prior||prior.stage!=='post-review'||prior.phaseIndex!==2||prior.materialDigest!==QUOTA15.range5.previousMaterialDigest||prior.artifactDigest!==QUOTA15.range5.artifactDigest||
+      prior.hostRecordDigest!==QUOTA15.range5.hostRecordDigest||prior.decision.reviewDecision!=='insufficient-materials') return false;
+  const blockers=reviewBlockers(prior.decision), paths=[['cancel/continue.'],[],[],[],['dist/index.html','import/commit'],[],['5/6','dist/app.mjs','progress/import/commit','source/test/tool/doc']];
+  if(blockers.length!==7||!same(blockers.map(item=>[item.key,item.paths]),QUOTA15.blockers.map((key,i)=>[key,paths[i]])))return false;
+  const closures=input.progress.closures, expected=QUOTA15.blockers.map((key,i)=>[key,[1,2,3,5].includes(i)?['materials/range5']:paths[i],QUOTA16.reportSha256]);
+  return closures.length===7&&same(closures.map(({key,paths,evidence})=>[key,paths,evidence]).sort(([a],[b])=>a.localeCompare(b)),expected.sort(([a],[b])=>a.localeCompare(b)));
+}
+function quota16Range6Eligible(data,input,limits) {
+  const pin=QUOTA16.range6;
+  if(!quota16Identity(input,limits)||!quota16Prefix(data)||data.attempts.length!==15||data.attempts.filter(row=>row.status!=='released').length!==15||
+    input.requestId!==pin.requestId||input.materialDigest!==pin.materialDigest||input.artifactDigest!==pin.artifactDigest||input.hostRecordDigest!==pin.hostRecordDigest||!quota15SectionsMatch(input.materialSections,pin.sections))return false;
+  const recovery=data.attempts[14],decision=recovery&&data.decisions[recovery.requestId];
+  return recovery.requestId===QUOTA16.range5.requestId&&recovery.stage==='post-review'&&recovery.phaseIndex===2&&recovery.parentRunId===QUOTA16.parentRunId&&
+    recovery.status==='finished'&&recovery.started&&recovery.timeKnown&&recovery.progressVerified&&recovery.materialDigest===QUOTA16.range5.materialDigest&&
+    recovery.artifactDigest===QUOTA16.range5.artifactDigest&&recovery.hostRecordDigest===QUOTA16.range5.hostRecordDigest&&decision?.stage==='post-review'&&decision.phaseIndex===2&&
+    decision.materialDigest===QUOTA16.range5.materialDigest&&decision.artifactDigest===QUOTA16.range5.artifactDigest&&decision.hostRecordDigest===QUOTA16.range5.hostRecordDigest&&
+    ['approve','conditional-approve'].includes(decision.decision.reviewDecision);
 }
 
 function progressEligible(data, input) {
@@ -558,6 +703,13 @@ export function createReviewAttemptLedger(directory, options = {}) {
         const stageUsed = data.attempts.filter(attempt => attempt.status !== 'released' && attempt.stage === input.stage).length;
         const candidate = { stage: input.stage, phaseIndex: phase, parentRunId: input.parentRunId ?? null };
         const limits = effectiveReviewQuota(grants, identity, candidate);
+        const quota15Range5 = quota15Range5Eligible(data, input, limits);
+        const quota15Range6 = quota15Range6Eligible(data, input, limits);
+        const quota16Range5 = quota16Range5Eligible(data,input,limits);
+        const quota16Range6 = quota16Range6Eligible(data,input,limits);
+        if (limits.totalCap === 17 && !quota17Eligible(data,input,limits)) throw new ReviewAttemptError(LIMIT, 'Quota17 admits only the pinned final material reconsideration');
+        if (limits.totalCap === 16 && !quota16Range5 && !quota16Range6) throw new ReviewAttemptError(LIMIT, 'Quota16 admits only the pinned timeout recovery followed by original range6');
+        if (limits.totalCap === 15 && !quota15Range5 && !quota15Range6) throw new ReviewAttemptError(LIMIT, 'Quota15 admits only the pinned range5 reconsideration followed by original range6');
         const consumed = data.attempts.filter(attempt => attempt.status !== 'released');
         const approved = Object.values(data.decisions).some(decision => decision.stage === input.stage && decision.phaseIndex === phase &&
           ['approve', 'conditional-approve'].includes(decision.decision.reviewDecision));
@@ -569,12 +721,13 @@ export function createReviewAttemptLedger(directory, options = {}) {
         if (stalled(data, input)) throw new ReviewAttemptError(LIMIT, 'Review retries stopped after consecutive non-progress blocker sets');
 
         const evidenceOnlyReconsideration = input.stage === 'post-review' && evidenceReconsiderationEligible(data, input, limits);
-        const verified = progressEligible(data, input) || evidenceOnlyReconsideration;
+        const quota17Material = limits.totalCap === 17 && quota17Eligible(data,input,limits);
+        const verified = progressEligible(data, input) || evidenceOnlyReconsideration || quota15Range5 || quota16Range5 || quota17Material;
         const extendedGrant = limits.grantId !== undefined && limits.totalCap > 6;
         const phasePostHistory = consumed.filter(attempt => attempt.stage === 'post-review' && attempt.phaseIndex === phase && attempt.parentRunId === candidate.parentRunId);
         const postHistoryApproved = phasePostHistory.every(attempt => ['approve', 'conditional-approve'].includes(data.decisions[attempt.requestId]?.decision.reviewDecision));
-        const postRecoveryAllowed = [13, 14].includes(limits.totalCap) && recoverablePostHistory(data, phasePostHistory, verified);
-        const postDigestsDistinct = evidenceOnlyReconsideration || ['materialDigest', 'artifactDigest', 'hostRecordDigest'].every(key => input[key] &&
+        const postRecoveryAllowed = quota15Range5 || quota15Range6 || quota16Range5 || quota16Range6 || quota17Material || ([13, 14].includes(limits.totalCap) && recoverablePostHistory(data, phasePostHistory, verified));
+        const postDigestsDistinct = evidenceOnlyReconsideration || quota15Range5 || quota16Range5 || quota17Material || ['materialDigest', 'artifactDigest', 'hostRecordDigest'].every(key => input[key] &&
           phasePostHistory.every(attempt => attempt[key] !== input[key]));
         const authorizedPost = extendedGrant && input.stage === 'post-review' && phase === 2 && candidate.parentRunId === limits.parentRunId;
         if (authorizedPost && (!input.materialDigest || !input.artifactDigest || !input.hostRecordDigest || !(postHistoryApproved || postRecoveryAllowed) || !postDigestsDistinct)) {
