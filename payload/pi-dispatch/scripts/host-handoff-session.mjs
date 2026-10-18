@@ -6,6 +6,7 @@ import {prepareReviewBundle} from './host-handoff-flow.mjs';
 import {inspectPrimaryPacket,runtimePreflight} from './runtime-preflight.mjs';
 import {validateKetherInvocation} from './dispatch.mjs';
 import {inspectReviewPacketBudget,T1_REVIEW_BUDGET} from '../extensions/review-contract.js';
+import {inspectCheckCoverage} from './check-coverage.mjs';
 
 const fail = message => {throw new Error(message);};
 const clone = value => structuredClone(value);
@@ -56,7 +57,7 @@ export function reviewReadiness(input,options) {
 }
 
 // The host supplies already-inspected source and command availability, not task text.
-export function inspectDispatchReadiness({request,sourceFacts=[],authorization,hostCommands=[],checkAvailability={available:false,reason:'not-inspected'}}) {
+export function inspectDispatchReadiness({request,sourceFacts=[],authorization,hostCommands=[],coverageFacts=[],checkAvailability={available:false,reason:'not-inspected'}}) {
   const issues=[],packetCheck=inspectPrimaryPacket(request?.task);
   let reviewBudget=null;
   try {
@@ -87,7 +88,7 @@ export function inspectDispatchReadiness({request,sourceFacts=[],authorization,h
   else for(const command of hostCommands)if(command.available!==true||typeof command.name!=='string'||!command.name.trim()||!Array.isArray(command.argv)||!command.argv.length||command.argv.some(a=>typeof a!=='string'||a.includes('\0'))||typeof command.cwd!=='string'||command.cwd!==request?.cwd)
     issues.push({code:'HOST_CHECK_UNAVAILABLE',location:'hostCommands',checkName:command.name??null});
   return {ok:issues.length===0,readOnly:true,modelCalls:0,issues,packetCheck,preflight:runtimePreflight(request?.task),
-    reviewBudget,sandboxChecks:{available:checkAvailability.available===true,reason:checkAvailability.reason??null,advisory:true,hostVerificationRequired:true}};
+    reviewBudget,checkCoverage:inspectCheckCoverage(writes,request?.task?.verify?.commands??[],coverageFacts),sandboxChecks:{available:checkAvailability.available===true,reason:checkAvailability.reason??null,advisory:true,hostVerificationRequired:true}};
 }
 
 export function timingBreakdown({events=[],intervals=[]}) {

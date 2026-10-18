@@ -5,6 +5,7 @@ import {sanitizeResult} from '../extensions/result-export.js';
 import {buildReviewPacket} from './review-materials.mjs';
 import {measureReviewPacket} from '../extensions/review-contract.js';
 import {DATA_CAPACITY} from '../extensions/data-capacity.js';
+import {verifyFrozenPatch,verifyFrozenFiles} from './frozen-patch.mjs';
 
 export const sha256 = value => createHash('sha256').update(value).digest('hex');
 const receipts=new WeakMap();
@@ -177,9 +178,10 @@ export function assertHostCapture(candidate, hostCapture) {
 }
 
 // Explicit, already-read source excerpts only. No filesystem access or execution.
-export function prepareHostReview({request, candidate, hostCapture, sources, hostRecord}) {
+export function prepareHostReview({request, candidate, hostCapture, sources, hostRecord, frozenSources, capturedFiles}) {
   const started = performance.now();
   assertHostCapture(candidate,hostCapture);
+  if(frozenSources!==undefined){verifyFrozenPatch(candidate.result.patch,frozenSources);verifyFrozenFiles(frozenSources,capturedFiles);}
   if(hostRecord!==undefined && (hostRecord?.ok!==true||hostRecord.requestId!==candidate.requestId||hostRecord.artifactSha256!==candidate.artifactSha256||
     hostRecord.state!=='completed'||hostRecord.outcome!=='completed'||!hash(hostRecord.recordSha256)))fail('Completed current-artifact host record required');
   if (request?.requestId !== candidate.requestId || request.tier !== candidate.handoff.tier || !['T1','T2'].includes(request.tier)) fail('Review task/candidate mismatch');
