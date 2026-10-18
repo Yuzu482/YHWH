@@ -154,8 +154,8 @@ test('13/14 histories enforce pre4/post9 or10, whole-goal caps and restart',()=>
   },[pinnedGrant(cap,postCap)]);
 });
 
-const retry = extra => pinInput('card-lab-final-range-3-evidence-reconsideration-20261013','post-review',2,{
-  materialDigest:'5b746af029241d283f06e0f867bdfbdc3f935de17bcd27f6ab48d55c1bc64ac1',
+const retry = extra => pinInput('card-lab-final-range-3-evidence-reconsideration-normalized-20261013','post-review',2,{
+  materialDigest:'4604e730441c9262d2724f84110353ee11704f50cb77572b2e608c94e86b528a',
   artifactDigest:'cdd8518a02743d344645709600c8c6bce7564e2258d9a596b7b1f69c450e2184',
   hostRecordDigest:'873748be9c0e59041e1cba540cadb464bc43591b8ca1dbf510f9284eac00d706',
   materialSections:{requirements:sha('new-requirements'),changes:sha('new-changes')},...extra});
@@ -192,7 +192,7 @@ test('synthetic-pin reconsideration is single-use, evidence-bound, and reaches e
 },[pinnedGrant()],syntheticPolicy));
 
 test('every wrong reconsideration pin or closure fails without consuming a slot',()=>{
-  const mutations=[r=>({...r,requestId:'wrong'}),r=>({...r,materialDigest:sha('wrong')}),r=>({...r,artifactDigest:sha('wrong')}),
+  const mutations=[r=>({...r,requestId:'wrong'}),r=>({...r,requestId:'card-lab-final-range-3-evidence-reconsideration-20261013'}),r=>({...r,materialDigest:sha('wrong')}),r=>({...r,artifactDigest:sha('wrong')}),
     r=>({...r,hostRecordDigest:sha('wrong')}),r=>({...r,parentRunId:'wrong'}),r=>({...r,phaseIndex:1}),
     r=>({...r,progress:{...r.progress,previousReviewRequestId:'wrong'}}),
     r=>({...r,progress:{...r.progress,closures:[]}}),
