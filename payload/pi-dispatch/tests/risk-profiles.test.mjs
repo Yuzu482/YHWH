@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync,renameSync,symlinkSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync,renameSync,symlinkSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {createRiskProfileResolver,inspectGitWorktree,readOnlyGit} from '../scripts/risk-profiles.mjs';
@@ -18,6 +18,21 @@ function fixture(t) {
 }
 const critical=cwd=>({cwd,riskProfile:'critical'});
 const unresolved=e=>e.code==='PI_RISK_PROFILE_UNRESOLVED';
+
+test('Windows short paths preserve physical identity without broadening repository scope',{skip:process.platform!=='win32'},t=>{
+  const {base,main,linked,git}=fixture(t),clone=join(base,'clone'),sibling=main+'-sibling',spoof=join(base,'spoof');
+  const short=cwd=>{const r=spawnSync('cmd.exe',['/d','/c','for %I in (.) do @echo %~sI'],{cwd,encoding:'utf8',windowsHide:true,timeout:10000});assert.equal(r.error,undefined);assert.equal(r.signal,null);assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+  const shortMain=short(main);if(!shortMain.includes('~')){t.skip('Host volume does not provide an 8.3 short path');return;}
+  git(base,'clone','--no-hardlinks',main,clone);mkdirSync(sibling);mkdirSync(spoof);writeFileSync(join(spoof,'.git'),readFileSync(join(linked,'.git')));
+  const entry=critical(shortMain),before=readFileSync(join(main,'.git','index')),profile=createRiskProfileResolver([entry]);
+  assert.equal(entry.cwd,shortMain,'resolver must not mutate caller configuration');
+  for(const [cwd,expected] of [[main,main],[shortMain,main],[linked,linked],[short(linked),linked],[short(join(linked,'nested')),linked]]){assert.equal(profile(cwd),'critical');assert.equal(inspectGitWorktree(cwd).root,realpathSync.native(expected));}
+  for(const cwd of [short(clone),short(sibling)])assert.equal(profile(cwd),'standard');
+  assert.throws(()=>profile(short(spoof)),unresolved);
+  assert.deepEqual(readFileSync(join(main,'.git','index')),before);
+  const nested=join(main,'only-here');mkdirSync(nested);assert.equal(createRiskProfileResolver([critical(short(nested))])(short(linked)),'standard');
+  const ancestors=createRiskProfileResolver([{cwd:short(base),riskProfile:'personal'},{cwd:short(nested),riskProfile:'standard'}]);assert.equal(ancestors(short(nested)),'standard');assert.equal(ancestors(short(sibling)),'personal');
+});
 
 test('critical follows registered main, detached worktree and nested cwd; clone and prefix sibling stay standard',t=>{
   const {base,main,linked,git}=fixture(t),clone=join(base,'clone'),sibling=main+'-sibling';

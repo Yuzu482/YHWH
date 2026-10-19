@@ -10,7 +10,7 @@ export function inspectMaintenanceBaseline({sourceRoot,expectedCommit}={}) {
   const result={ok:false,readOnly:true,expectedCommit,scope:'momentary clean Git source gate; ignored files excluded; no provenance authentication or remote refresh'};
   if(typeof sourceRoot!=='string'||!isAbsolute(sourceRoot)||typeof expectedCommit!=='string'||!fullCommit.test(expectedCommit))return {...result,code:'INVALID_ARGUMENTS'};
   try {
-    const root=realpathSync(sourceRoot),deadline=Date.now()+10000;
+    const root=realpathSync.native(sourceRoot),deadline=Date.now()+10000;
     const gitVersion=readOnlyGit(root,['--version'],{deadline}).trim();
     const identity=inspectGitWorktree(root,{deadline});
     if(!identity||!same(root,identity.root))return {...result,code:'SOURCE_ROOT_REQUIRED'};

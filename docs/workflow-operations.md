@@ -72,7 +72,7 @@ node payload/pi-dispatch/scripts/change-impact.mjs C:/work/project
 
 宿主 `riskProfiles` 中，指向完整 Git 仓库根目录的 `critical` 配置对该仓库已登记的工作树（包括 detached HEAD 与子目录）提供 critical 下限。普通路径仍按最长祖先匹配；同仓库工作树内的 personal/standard 条目不能降低该下限。克隆、名称相近的兄弟目录、复制的 `.git` 指针不继承。指向仓库子目录的 critical 条目只作用于该路径，不提升整个仓库。允许根目录与 writeScope 的边界独立保留。
 
-仓库身份在每次判定时通过物理路径、Git common-dir 与 `worktree list --porcelain -z` 登记重新核对；身份损坏、检查超时/超量或 Git 不可用时拒绝判定，不回退到较低等级。一次风险判定共享 3 秒 Git 预算，启动时也检查配置的 critical 仓库身份；同步检查会占用宿主事件循环。这是源代码候选行为，只有单独授权安装后才影响运行网关。
+仓库身份在每次判定时通过物理路径、Git common-dir 与 `worktree list --porcelain -z` 登记重新核对；Windows 使用系统原生物理路径解析，统一 8.3 短路径与完整路径。身份损坏、检查超时/超量或 Git 不可用时拒绝判定，不回退到较低等级。一次风险判定共享 3 秒 Git 预算，启动时也检查配置的 critical 仓库身份；同步检查会占用宿主事件循环。这是源代码候选行为，只有单独授权安装后才影响运行网关。
 
 开始维护时，从已核对的安装来源记录选择完整提交；若使用更新的 main，需先明确核对并批准该提交。不要用目录修改时间或本地分支名称选择基线。在候选源码的 `payload/pi-dispatch` 中运行：
 
@@ -148,7 +148,7 @@ Candidates are neither complete call graphs nor proof of sufficient tests. Dynam
 
 A host critical riskProfiles entry at an exact Git repository root imposes a critical floor on its registered worktrees, including detached HEAD and nested working directories. Ordinary paths retain longest-ancestor matching; personal/standard entries in the same critical repository cannot lower that floor. Clones, prefix siblings and copied .git pointers do not inherit it. A critical entry on a repository subdirectory stays path-local. Allowed gateway roots and writeScope remain separate authorization boundaries.
 
-Each resolution rechecks physical paths, Git common-dir and worktree list --porcelain -z registration. Invalid identity, unavailable Git and time/output limits fail closed rather than downgrade. Git calls share a three-second resolution budget; configured critical repositories are also inspected at startup. These synchronous checks occupy the host event loop. This source candidate affects a running gateway only after a separately authorized installation.
+Each resolution rechecks physical paths, Git common-dir and worktree list --porcelain -z registration. Windows uses native physical path resolution to unify 8.3 short and full path spellings. Invalid identity, unavailable Git and time/output limits fail closed rather than downgrade. Git calls share a three-second resolution budget; configured critical repositories are also inspected at startup. These synchronous checks occupy the host event loop. This source candidate affects a running gateway only after a separately authorized installation.
 
 Before maintenance, select a full commit from verified installation provenance, or explicitly verify and approve a newer main commit. Directory timestamps and local branch names are insufficient. From the candidate payload/pi-dispatch directory run:
 

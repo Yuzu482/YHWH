@@ -20,7 +20,7 @@ export function readOnlyGit(root,args,{deadline=Date.now()+3000}={}) {
 }
 
 function markerRoot(cwd) {
-  let cursor=realpathSync(cwd);if(!statSync(cursor).isDirectory())fail('directory required');
+  let cursor=realpathSync.native(cwd);if(!statSync(cursor).isDirectory())fail('directory required');
   for(let depth=0;depth<128;depth++) {
     const marker=join(cursor,'.git');
     try{const s=lstatSync(marker);if(s.isSymbolicLink()||(!s.isFile()&&!s.isDirectory()))fail('unsafe .git marker');return cursor;}
@@ -35,14 +35,14 @@ export function inspectGitWorktree(cwd,{deadline=Date.now()+3000}={}) {
     const root=markerRoot(cwd);if(root===null)return null;
     const lines=readOnlyGit(root,['rev-parse','--path-format=absolute','--show-toplevel','--git-common-dir'],{deadline}).trimEnd().split(/\r?\n/);
     if(lines.length!==2||lines.some(p=>!isAbsolute(p)))fail('ambiguous identity');
-    const top=realpathSync(lines[0]),commonDir=realpathSync(lines[1]);
+    const top=realpathSync.native(lines[0]),commonDir=realpathSync.native(lines[1]);
     if(!same(top,root)||!statSync(commonDir).isDirectory())fail('root identity mismatch');
     const records=readOnlyGit(root,['worktree','list','--porcelain','-z'],{deadline}).split('\0');
     let registered=false;
     for(const line of records.filter(p=>p.startsWith('worktree '))) {
       const value=line.slice(9);if(!isAbsolute(value))fail('invalid registration');
       // Other historical registrations may have been removed; only this root must exist.
-      try{if(same(realpathSync(value),top))registered=true;}catch(e){if(e.code!=='ENOENT')throw e;}
+      try{if(same(realpathSync.native(value),top))registered=true;}catch(e){if(e.code!=='ENOENT')throw e;}
     }
     if(!registered)fail('unregistered worktree');
     return {root:top,commonDir};
@@ -52,12 +52,13 @@ export function inspectGitWorktree(cwd,{deadline=Date.now()+3000}={}) {
 // Entries are host-validated canonical directories. A startup pin is revalidated,
 // never a cached acceptance decision; disappearance cannot silently downgrade.
 export function createRiskProfileResolver(entries) {
+  entries=entries.map(entry=>({...entry,cwd:realpathSync.native(entry.cwd)}));
   const critical=entries.filter(e=>e.riskProfile==='critical').map(entry=>{
     const identity=inspectGitWorktree(entry.cwd);
     return {entry,pin:identity&&same(identity.root,entry.cwd)?identity:null};
   });
   return cwd=>{
-    const candidate=realpathSync(cwd),deadline=Date.now()+3000;
+    const candidate=realpathSync.native(cwd),deadline=Date.now()+3000;
     const matches=entries.filter(e=>within(e.cwd,candidate)).sort((a,b)=>b.cwd.length-a.cwd.length);
     const direct=matches[0]?.riskProfile??'standard';
     if(!critical.length)return direct;
