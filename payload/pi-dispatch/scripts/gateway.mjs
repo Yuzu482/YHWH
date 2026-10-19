@@ -11,6 +11,7 @@ import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {registerHostWorkflow,workflowInstructions,workflowTopic} from './host-workflow.mjs';
 import {inspectInstallIntegrity} from './install-integrity.mjs';
+import {createRiskProfileResolver} from './risk-profiles.mjs';
 import {createWorkflowReceipts} from './workflow-receipts.mjs';
 import {projectMemory,PROJECT_MEMORY_POLICY} from './project-memory.mjs';
 import {createProjectMemoryContext} from './project-memory-context.mjs';
@@ -297,11 +298,7 @@ export function createGatewayRuntime(options) {
   const workflowReceipts=createWorkflowReceipts(options.workflowReceiptOptions);
   const roots = options.roots.map(root => realpathSync(resolve(root)));
   const riskProfiles = validateRiskProfiles(options.riskProfiles ?? [], roots);
-  const riskProfileFor = cwd => {
-    const candidate = realpathSync(cwd);
-    const matches = riskProfiles.filter(entry => { const rel=relative(entry.cwd,candidate); const value=process.platform==='win32'?rel.toLowerCase():rel; return value===''||(!value.startsWith(`..${sep}`)&&value!=='..'&&!isAbsolute(value)); }).sort((a,b)=>b.cwd.length-a.cwd.length);
-    return matches[0]?.riskProfile ?? 'standard';
-  };
+  const riskProfileFor = createRiskProfileResolver(riskProfiles);
   const sandbox = options.sandboxStatus ?? probeWslSandbox();
   const factories = options.moduleFactories ?? {};
   const owned = new Set(options.ownedModules ?? []);
