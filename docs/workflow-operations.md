@@ -68,6 +68,22 @@ node payload/pi-dispatch/scripts/change-impact.mjs C:/work/project
 
 本地开发打包可用 `./Build-Release.ps1 -SkipTests -OutputDirectory .test/development-build`，避免覆盖 `release/` 已有附件；`-SkipTests` 只适用于同一源码已完成 Node/内存验证的情况，其余打包检查仍执行。实际结果记录在仓库 `VERIFICATION.md`。
 
+### 工作树风险与维护基线
+
+宿主 `riskProfiles` 中，指向完整 Git 仓库根目录的 `critical` 配置对该仓库已登记的工作树（包括 detached HEAD 与子目录）提供 critical 下限。普通路径仍按最长祖先匹配；同仓库工作树内的 personal/standard 条目不能降低该下限。克隆、名称相近的兄弟目录、复制的 `.git` 指针不继承。指向仓库子目录的 critical 条目只作用于该路径，不提升整个仓库。允许根目录与 writeScope 的边界独立保留。
+
+仓库身份在每次判定时通过物理路径、Git common-dir 与 `worktree list --porcelain -z` 登记重新核对；Windows 使用系统原生物理路径解析，统一 8.3 短路径与完整路径。身份损坏、检查超时/超量或 Git 不可用时拒绝判定，不回退到较低等级。一次风险判定共享 3 秒 Git 预算，启动时也检查配置的 critical 仓库身份；同步检查会占用宿主事件循环。这是源代码候选行为，只有单独授权安装后才影响运行网关。
+
+开始维护时，从已核对的安装来源记录选择完整提交；若使用更新的 main，需先明确核对并批准该提交。不要用目录修改时间或本地分支名称选择基线。在候选源码的 `payload/pi-dispatch` 中运行：
+
+```powershell
+node scripts/maintenance-baseline.mjs --source-root C:/work/YHWH-clean-source --expected-commit <完整提交SHA>
+```
+
+命令要求精确仓库根目录、HEAD 等于该提交，且暂存区、已跟踪及未忽略的新文件均干净。检查时禁用仓库配置的过滤器；含 Git 子模块的基线直接拒绝，不进入子仓库运行检查。退出码 0 为可用基线，1 为检查不通过（含缺 Git、身份损坏、基线错误、脏目录或子模块），2 为参数错误；只返回 JSON，不生成文件。忽略文件不在干净性保证内。预期提交是宿主提供的信任输入；此检查不验证安装来源真实性、不刷新远端，也不替代授权、补丁指纹或测试。
+
+先保留原目录状态和改动指纹；检查通过后，宿主显式从该完整 SHA 创建隔离工作树，再核对新工作树 HEAD/干净状态，并记录本轮逐文件范围、基准哈希和回滚位置。实现后在隔离候选记录完整差异、最终文件哈希、真实验证和独立审查。候选出现本轮改动后不再满足“干净基线”，应继续使用已冻结基线与当前补丁验收，不清理或移动原目录改动。该命令不创建工作树、不 reset/stash/checkout/clean/fetch，也不提交、推送、修改运行配置或部署。
+
 ## English
 
 This page describes workflow changes included in v0.12.0. Source, published assets and the installed service are separate states; source edits neither upgrade the service nor republish assets.
@@ -127,6 +143,22 @@ node payload/pi-dispatch/scripts/change-impact.mjs C:/work/project
 The report combines HEAD differences, staged differences and untracked files; the Node entry also accepts a full baseline commit SHA as its second argument. Existing source safety rules filter up to 512 candidate paths. A fresh graph supplies reverse relative-import relationships up to depth three to identify knowledge-review and test-file candidates. Missing/stale graphs retain direct changes only; explicitly refresh with the existing host command before checking again. Untracked sources are never staged merely for indexing.
 
 Candidates are neither complete call graphs nor proof of sufficient tests. Dynamic calls, non-relative module resolution and knowledge outside declared source relationships may be missed. The command executes no tests, refreshes no index, promotes no knowledge and mutates no Git state.
+
+### Worktree risk and maintenance baseline
+
+A host critical riskProfiles entry at an exact Git repository root imposes a critical floor on its registered worktrees, including detached HEAD and nested working directories. Ordinary paths retain longest-ancestor matching; personal/standard entries in the same critical repository cannot lower that floor. Clones, prefix siblings and copied .git pointers do not inherit it. A critical entry on a repository subdirectory stays path-local. Allowed gateway roots and writeScope remain separate authorization boundaries.
+
+Each resolution rechecks physical paths, Git common-dir and worktree list --porcelain -z registration. Windows uses native physical path resolution to unify 8.3 short and full path spellings. Invalid identity, unavailable Git and time/output limits fail closed rather than downgrade. Git calls share a three-second resolution budget; configured critical repositories are also inspected at startup. These synchronous checks occupy the host event loop. This source candidate affects a running gateway only after a separately authorized installation.
+
+Before maintenance, select a full commit from verified installation provenance, or explicitly verify and approve a newer main commit. Directory timestamps and local branch names are insufficient. From the candidate payload/pi-dispatch directory run:
+
+```powershell
+node scripts/maintenance-baseline.mjs --source-root C:/work/YHWH-clean-source --expected-commit <FULL_COMMIT_SHA>
+```
+
+The source must be an exact registered repository root with matching HEAD and no staged, tracked or nonignored untracked changes. Configured filters are disabled during inspection; baselines containing Git submodules are refused before child repositories are inspected. Exit 0 means baseline ready, 1 means inspection/dependency/identity/commit/cleanliness/submodule failure, and 2 means argument error. JSON is returned without output files. Ignored files are excluded. The expected commit is host-supplied trust input: the command does not authenticate provenance, refresh remote refs, authorize work or replace artifact fingerprints and tests.
+
+Preserve the original directory status and change fingerprints first. After a passing gate, the host explicitly creates an isolated worktree from the full SHA, verifies its initial HEAD/clean state and records exact file scope, before-hashes and rollback location. After implementation record the complete diff, final hashes, real checks and independent review in that candidate. A dirty implementation candidate is checked against its frozen baseline and patch; do not clean or move the original edits to satisfy the initial gate. This command creates no worktree, does not reset/stash/checkout/clean/fetch, and never commits, pushes, edits running configuration or deploys.
 
 ### CI and evidence
 
