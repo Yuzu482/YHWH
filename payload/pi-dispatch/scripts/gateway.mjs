@@ -11,7 +11,7 @@ import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {registerHostWorkflow,workflowInstructions,workflowTopic} from './host-workflow.mjs';
 import {inspectInstallIntegrity} from './install-integrity.mjs';
-import {createRiskProfileResolver} from './risk-profiles.mjs';
+import {createRiskProfileService} from './risk-profile-service.mjs';
 import {createWorkflowReceipts} from './workflow-receipts.mjs';
 import {projectMemory,PROJECT_MEMORY_POLICY} from './project-memory.mjs';
 import {createProjectMemoryContext} from './project-memory-context.mjs';
@@ -298,7 +298,8 @@ export function createGatewayRuntime(options) {
   const workflowReceipts=createWorkflowReceipts(options.workflowReceiptOptions);
   const roots = options.roots.map(root => realpathSync(resolve(root)));
   const riskProfiles = validateRiskProfiles(options.riskProfiles ?? [], roots);
-  const riskProfileFor = createRiskProfileResolver(riskProfiles);
+  const riskService = createRiskProfileService(riskProfiles);
+  const riskProfileFor = cwd => riskService.resolve(cwd);
   const sandbox = options.sandboxStatus ?? probeWslSandbox();
   const factories = options.moduleFactories ?? {};
   const owned = new Set(options.ownedModules ?? []);
@@ -529,6 +530,7 @@ export function createGatewayRuntime(options) {
     let executionStartedAt = null;
     let timings = {queueWaitMs:0,executionMs:0};
     let phaseTimings=null;
+    let resolvedRiskProfile;
     let milestoneAttempt=null;
     let hostCheckAvailability=null;
     const startMilestone=()=>{
@@ -624,7 +626,7 @@ export function createGatewayRuntime(options) {
       if (cliReviewerCandidate && (invocation.task.role !== 'Geburah' || invocation.request.provider !== 'claude-code-cli' || invocation.request.model !== ROLE_MODELS.Geburah || invocation.request.access !== 'none')) throw new Error('Claude Code CLI is restricted to the validated Geburah reviewer route');
       if (input.requestId && input.dependsOnRequestIds?.includes(input.requestId)) throw new Error('a task cannot depend on its own requestId');
       if (input.dependsOnRequestIds?.length && !ledger?.enabled) throw new Error('task dependencies require the persistent request ledger');
-      const trustedRiskProfile = input.access === 'workspace-write' ? riskProfileFor(cwd) : 'standard';
+      const trustedRiskProfile = resolvedRiskProfile = input.access === 'workspace-write' ? await riskProfileFor(cwd) : 'standard';
       const tierDecision = input.access === 'workspace-write'
         ? validateDeclaredWorkflowTier(input.tierDeclaration, input.tier, invocation.task.writeScope)
         : null;
@@ -993,8 +995,7 @@ export function createGatewayRuntime(options) {
         if (assessment.impact) error.providerCircuit = circuit.record({ provider: input.provider, model: input.model, ...assessment, durationMs, probe: operation === 'probe_model' });
       }
       error.timings=timings;error.phaseTimings=phaseTimings;
-      let failureAnchor=null, failureProfile; try { failureAnchor=task?.handoff?.version===2?runAnchor(task.handoff):runAnchor({runGoal:task?.objective,runAcceptance:task?.acceptance}); } catch {}
-      try { if(typeof input.cwd==='string') failureProfile=riskProfileFor(input.cwd); } catch {}
+      let failureAnchor=null, failureProfile=resolvedRiskProfile; try { failureAnchor=task?.handoff?.version===2?runAnchor(task.handoff):runAnchor({runGoal:task?.objective,runAcceptance:task?.acceptance}); } catch {}
       audit?.record(buildAuditRecord({ requestId, operation, input, task, result:{preflight,timings,phaseTimings}, durationMs, failure: error.message, telemetry:{parentRunId:input.parentRunId,workspaceSha256:typeof input.cwd==='string'?createHash('sha256').update(input.cwd).digest('hex'):undefined,runAnchorSha256:failureAnchor,declaredTier:input.tier,riskProfile:failureProfile,modelExecution:modelExecutionState,submittedAt:new Date(started).toISOString(),startedAt:executionStartedAt??undefined,completedAt:new Date().toISOString()} }));
       error.preflight=preflight;
       error.modelExecutionStarted=modelExecutionState;
@@ -1163,7 +1164,7 @@ export function createGatewayRuntime(options) {
       inputSchema: { ...routeSchema, ...traceSchema, reviewOfRequestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(), verificationOfRequestId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(), ...schedulingSchema, ...workflowTierFieldsSchema.shape, editorAuthorization:editorAuthorizationSchema.optional(), access: z.enum(['none', 'read', 'workspace-write']).default('none'), workflowReceipt:z.string().max(128).optional(), task: taskSchema },
     }, admitted(async (input, extra) => {
       const cwd = resolveAllowedCwd(input.cwd, roots);
-      validateWriteTier(input,requireTopic,riskProfileFor(cwd));
+      validateWriteTier(input,requireTopic,input.access === 'workspace-write' ? await riskProfileFor(cwd) : 'standard');
       const {workflowReceipt:_,...invocation}=input;
       const outcome = await executeSubagent(invocation, extra.signal);
       return textResult(outcome.response, outcome.isError);
@@ -1185,7 +1186,7 @@ export function createGatewayRuntime(options) {
       },
     }, admitted(async input => {
       const cwd = resolveAllowedCwd(input.cwd, roots);
-      validateWriteTier(input,requireTopic,riskProfileFor(cwd));
+      validateWriteTier(input,requireTopic,input.access === 'workspace-write' ? await riskProfileFor(cwd) : 'standard');
       const {workflowReceipt:_,...invocation}=input;
       try {
         const invalidReview=newReviewInputFailure(invocation);
@@ -1513,6 +1514,7 @@ export function createGatewayRuntime(options) {
       ]) {
         try { await action(); } catch (cause) { errors.push(new Error(`Shutdown maintenance failed: ${id}`, { cause })); }
       }
+      try { await riskService.close(); } catch (error) { errors.push(error); }
       try { await modules.dispose(); } catch (error) { errors.push(error); }
       phase = errors.length ? 'failed' : 'disposed';
       if (errors.length) throw new AggregateError(errors, 'Gateway shutdown failed; all eligible cleanup was attempted');
@@ -1522,7 +1524,8 @@ export function createGatewayRuntime(options) {
     return shutdownPromise;
   };
   function pauseForUpgrade() {
-    if (phase !== 'running' || inFlight || pendingTasks() || executor.state.active || executor.state.queued) return false;
+    const durability=taskMonitor.resultCache;
+    if (phase !== 'running' || inFlight || pendingTasks() || executor.state.active || executor.state.queued || durability.pendingWrites || durability.protectedResults) return false;
     phase = 'maintenance'; return true;
   }
   function resumeAfterUpgrade() { if (phase !== 'maintenance') return false; phase = 'running'; return true; }
@@ -1535,6 +1538,7 @@ export function createGatewayRuntime(options) {
     return body.method === 'tools/call' && ['list_capabilities','get_subagent_result','get_subagent_status',
       'list_subagents','list_host_verification_pending','get_task_handoff','cancel_subagent'].includes(body.params?.name);
   };
+  riskService.start();
   return { makeServer, executor, capabilities, gatewayInstanceId, taskMonitor, responseSessions, acceptsMcpRequests, shutdown, replaceAdapter, pauseForUpgrade, resumeAfterUpgrade };
 }
 

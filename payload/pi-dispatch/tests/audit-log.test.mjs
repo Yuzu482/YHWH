@@ -5,10 +5,16 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import {
-  buildAuditRecord, createAuditLogger, redactSensitiveText,
+  buildAuditRecord, createAuditLogger, previewAuditRetention, redactSensitiveText,
   summarizePatch, summarizeTaskEnvelope, summarizeUsage,
   summarizeOutputLimit,
 } from '../extensions/audit-log.js';
+
+test('audit preview on a missing directory creates no stream or directory',()=>{
+  const parent=mkdtempSync(join(tmpdir(),'audit-preview-')),target=join(parent,'missing','audit.jsonl');
+  try {const plan=previewAuditRetention(target);assert.equal(plan.completed.deletedFiles,0);assert.equal(plan.protectedRecords.retainedBytes,0);assert.equal(existsSync(join(parent,'missing')),false);}
+  finally {rmSync(parent,{recursive:true,force:true});}
+});
 
 test('worker runtime audit identity is allowlisted and distinct from transport runtime',()=>{
   for(const [workerRuntime,runtime] of [['pi','wsl2-bwrap'],['claude-code-cli','host-cli']]){
