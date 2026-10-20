@@ -78,17 +78,21 @@ export function planUpgrade({ sourceRoot, targetRoot, baselineRoot }) {
 export async function applyUpgrade(plan, runtime) {
   const { sha256, ...body } = plan;
   if (hash(JSON.stringify(body)) !== sha256 || !plan.admissible || plan.conflicts.length || plan.dependencyChange || plan.requiresFullInstall) throw Error('upgrade_plan_not_admissible');
-  for (const name of ['pause', 'stop', 'start', 'health']) if (typeof runtime[name] !== 'function') throw Error('trusted_runtime_adapter_required');
+  for (const name of ['pause', 'stop', 'start', 'health', 'captureEvidence']) if (typeof runtime[name] !== 'function') throw Error('trusted_runtime_adapter_required');
+  if(!path.isAbsolute(runtime.evidenceStateRoot ?? ''))throw Error('trusted_evidence_state_root_required');
+  // Baseline inventory/record CLI is intentionally self-contained. Only the
+  // actual deployment transaction needs the evidence module and ledger helpers.
+  const {verifyDeploymentEvidence}=await import('./deployment-evidence.mjs');
   const parent = path.dirname(fs.realpathSync(plan.targetRoot));
   const lockFile = path.join(parent, '.yhwh-upgrade.lock');
   const lock = fs.openSync(lockFile, 'wx', 0o600);
   const backup = path.join(parent, `.yhwh-upgrade-${randomUUID()}`);
   let applied = [], stopped = false, paused = false, releaseLock = true;
-  let oldMarker;
+  let oldMarker, evidence, failureReason;
   function validateFiles() {
     for (const a of plan.actions) if (digest(plan.targetRoot, a.path) !== a.before || digest(plan.sourceRoot, a.path) !== a.after) throw Error('upgrade_plan_stale');
   }
-  const journal = state => atomic(path.join(backup, 'journal.json'), JSON.stringify({ schemaVersion: 1, state, plan, applied }, null, 2));
+  const journal = state => atomic(path.join(backup, 'journal.json'), JSON.stringify({ schemaVersion: 1, state, plan, applied, evidence, failureReason }, null, 2));
   try {
     oldMarker = readMarker(plan.targetRoot);
     validateFiles();
@@ -100,8 +104,13 @@ export async function applyUpgrade(plan, runtime) {
     }
     if (oldMarker) fs.writeFileSync(path.join(backup, 'old-marker.json'), oldMarker, { mode: 0o600 });
     journal('prepared');
-    if (await runtime.pause() !== true) return { status: 'blocked', reason: 'runtime_busy_or_unavailable' };
+    if (await runtime.pause() !== true) {failureReason='runtime_busy_or_unavailable';journal('blocked');return { status:'blocked',reason:failureReason,backup };}
     paused = true;
+    const evidenceRoot=path.join(backup,'evidence');
+    const captured=await runtime.captureEvidence({backupRoot:evidenceRoot});
+    if(captured?.status!=='complete'||path.resolve(captured.backupRoot??'')!==evidenceRoot)throw Error('evidence_capture_invalid');
+    evidence=verifyDeploymentEvidence({backupRoot:evidenceRoot,stateRoot:runtime.evidenceStateRoot,configurationPaths:runtime.evidenceConfigurationPaths??[],manifestSha256:captured.manifestSha256,verifySource:true});
+    journal('evidence-verified');
     if (await runtime.stop() !== true) throw Error('runtime_stop_failed');
     stopped = true; validateFiles();
     journal('applying');
@@ -118,8 +127,9 @@ export async function applyUpgrade(plan, runtime) {
     await runtime.start();
     if (await runtime.health() !== true) throw Error('upgrade_health_failed');
     journal('completed');
-    return { status: 'completed', changedFiles: applied, backup, planSha256: sha256 };
+    return { status: 'completed', changedFiles: applied, backup, evidence, planSha256: sha256 };
   } catch (error) {
+    failureReason=error.message;
     if (!stopped) {
       if (paused || error.message === 'runtime_resume_failed') {
         let resumed = false;
@@ -129,7 +139,8 @@ export async function applyUpgrade(plan, runtime) {
           return { status: 'recovery-required', reason: 'runtime_resume_failed', backup };
         }
       }
-      return { status: 'blocked', reason: error.message };
+      if(fs.existsSync(backup))journal('blocked');
+      return { status: 'blocked', reason: error.message, backup };
     }
     try {
       if (await runtime.stop() !== true) throw Error('rollback_stop_failed');
