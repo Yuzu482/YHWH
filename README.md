@@ -8,9 +8,9 @@ YHWH 是面向 Windows 11 + WSL2 的便携式 Kether 治理规则与 Pi 执行�
 
 角色友好名称与内部 Kether ID 的对应关系见[Pi 角色预设指南](docs/pi-role-presets.md) / [English](docs/pi-role-presets.en.md)。
 
-**可切换的 worker 硬限制。** 新源码默认在 YHWH 受管入口拒绝非 Luna worker，保留受控 reviewer/心跳例外；独立无头 CLI 模型执行在严格模式下停用。宿主可通过 `YHWH_WORKER_ENFORCEMENT=strict|off` 切换，任务不能覆盖。已有服务需要单独升级；不包含对宿主自身终端/编辑器的操作系统隔离。详见[开关与约束范围](docs/worker-enforcement.md)。
+**可切换的 worker 硬限制。** 在严格模式下，YHWH 受管入口允许 Luna worker，并允许代码角色 Chesed 使用 Terra；reviewer 和心跳须符合各自的受控条件。独立无头 CLI 模型执行在严格模式下停用。宿主可通过 `YHWH_WORKER_ENFORCEMENT=strict|off` 切换，任务不能覆盖。已有服务需要单独升级；不包含对宿主自身终端/编辑器的操作系统隔离。详见[开关与约束范围](docs/worker-enforcement.md)。
 
-**主代理只负责思考与调度：** Astra（或宿主选择的主模型）负责方案、调度、补丁整合与验收；代码、测试和实现修复由 Pi 子代理编写，原生 worker 默认 Luna/medium，并按任务复杂度显式选择 low、high 或 max。子代理失败不自动回退为主代理编码。该策略是宿主指令约束，不能禁用所有客户端的编辑工具；详见[职责与失败处理](docs/coordinator-only.md)与[思考档位和交付预算](docs/worker-budgets.md)。
+**主代理与模型分流：** 主代理负责方案、实现选择和最终验收，可按宿主权限与用户授权直接实施，或使用 Pi 子代理。Pi 代码角色 Chesed 默认使用 Terra，明确的小型任务可使用 Luna；其他 worker 使用 Luna。思考档位按任务选择，详见[当前职责](templates/agent-references/coordinator-only.md)与[交付预算](docs/worker-budgets.md)。
 
 **写入任务分级：** 新源码按可观察条件将整项改动分为 T0/T1/T2。T0 实现后验证，T1 再加独立后评审，T2 还须在写入前通过 linked 前评审。网关要求显式分级与声明，将层级记录到账本，并拒绝缺失分级、低报及缺少前评审的 T2；T0 返回补丁还受单文件、20 行上限校验。声明中的风险语义仍由主代理核实；现有服务需要单独升级。见[分级规则](templates/agent-references/task-tiers.md)。
 
@@ -50,7 +50,7 @@ v0.15.0 汇总运行时质量与宿主验收改进：只读 fixture、新文件�
 - `templates/agent-references/`：按需加载的治理、路由、契约、认证和证据规则。
 - `install/`：安装、校验、宿主认证配置与 WSL 沙箱部署工具。
 
-当前规则固定原生 worker 使用 Luna，思考档位由主代理按任务选择，默认为 medium；reviewer 保持 Sonnet/max。实际可用性仍由目标账号、模型服务及网关能力检查决定。生命周期管理支持按依赖启动、失败回收和逆序释放；dispatch/LSP 适配器仅能由可信宿主在空闲时替换。接口见 [模块生命周期](payload/pi-dispatch/MODULE-LIFECYCLE.md)。
+当前源码将 Chesed 默认路由到 `gpt-6.1-terra`，将轻量 worker 路由到 `gpt-6-luna`；reviewer 默认使用 Claude Sonnet，也可按受控配置选择其他允许的审查路线。实际可用性仍由目标账号、模型目录、模型服务及网关能力检查决定；固定版 Pi 安装后的模型目录前提见[网关说明](payload/pi-dispatch/README.md)。生命周期管理支持按依赖启动、失败回收和逆序释放；dispatch/LSP 适配器仅能由可信宿主在空闲时替换。接口见 [模块生命周期](payload/pi-dispatch/MODULE-LIFECYCLE.md)。
 
 仓库不包含凭据、个人运行配置、请求账本、审计日志、缓存、依赖目录或机器备份。图片流程引用的 `image-prompt-review` 插件需单独安装，本仓库仅保留其规则引用。
 

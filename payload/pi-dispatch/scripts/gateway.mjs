@@ -1111,7 +1111,8 @@ export function createGatewayRuntime(options) {
   }
 
   function makeServer() {
-    const server = new McpServer({ name: 'pi-kether-gateway', version: '1.0.0' }, {instructions:workflowInstructions});
+    // Bound element counts before schema validation for HTTP and stdio callers.
+    const server = new McpServer({ name: 'pi-kether-gateway', version: '1.0.0' }, {instructions:workflowInstructions,maxToolInputElements:32768});
     registerHostWorkflow(server,{installationIntegrity,receipts:workflowReceipts,onRead:topic=>audit?.record({auditVersion:1,timestamp:new Date().toISOString(),requestId:`workflow-${gatewayInstanceId}`,operation:'get_workflow',topic,outcome:'completed'}),openItems:args=>{
       const page=milestones?.listOpen(args)??{items:[],cursor:null,snapshotSha256:null};
       const legacy=ledger?.listHostOpen({limit:args.limit??100,cursor:args.legacyCursor})??{items:[],cursor:null,damaged:0};
@@ -1595,7 +1596,7 @@ export function createGatewayApp(options) {
       return res.status(503).json({error:'gateway closing or unavailable'});
     }
     const server = runtime.makeServer();
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, maxRequestBodySize: maxRequestBytes });
     const cleanup = registerMcpResponseCleanup(res, transport, server, runtime.responseSessions);
     try {
       if (res.destroyed || res.closed) {

@@ -133,7 +133,7 @@ try {
     $parts = $relative.Split('/')
     if (-not $allowedSet.ContainsKey($parts[0])) { continue }
     # Repository-only synthetic integration fixtures must never enter an installed runtime.
-    if ($relative -in @('payload/pi-dispatch/tests/card-lab-interrupted-request-recovery.test.mjs','payload/pi-dispatch/tests/review-quota-adjudication.test.mjs','payload/pi-dispatch/tests/review-quota-material-reconsideration.test.mjs','payload/pi-dispatch/tests/helpers/legacy-state-fixtures.mjs','payload/pi-dispatch/tests/fixtures/legacy-state-pins.json')) { continue }
+    if ($relative -in @('payload/pi-dispatch/tests/card-lab-interrupted-request-recovery.test.mjs','payload/pi-dispatch/tests/review-quota-adjudication.test.mjs','payload/pi-dispatch/tests/review-quota-material-reconsideration.test.mjs','payload/pi-dispatch/tests/helpers/legacy-state-fixtures.mjs','payload/pi-dispatch/tests/fixtures/legacy-state-pins.json','payload/pi-dispatch/tests/fixtures/legacy-state-baseline-package.json')) { continue }
     $isBaselineFile = $relative -eq '.test/baseline-failures.json'
     $skip = $false
     foreach ($part in $parts) {

@@ -1,6 +1,8 @@
-# Primary reasoning and orchestration only
+# Historical record: primary reasoning and orchestration only
 
 [简体中文](coordinator-only.md) | [English](coordinator-only.en.md)
+
+> The responsibilities and validation below are retained as historical context. Current primary permissions and model routing follow the [current ownership template](../templates/agent-references/coordinator-only.md), actual host rules and user authorization; this historical document does not prohibit authorized direct implementation.
 
 YHWH uses the primary agent for requirements, architecture, decomposition, scheduling and final acceptance. This Codex host currently uses Astra; Pi subagents author source code, tests and implementation scripts. Native workers default to Luna/medium with task-proportional thinking; see [delivery budgets](worker-budgets.en.md). Other hosts may still select their own primary model.
 

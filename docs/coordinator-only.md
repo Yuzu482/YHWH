@@ -1,6 +1,8 @@
-# 主代理只负责思考与调度
+# 历史记录：主代理只负责思考与调度
 
 [简体中文](coordinator-only.md) | [English](coordinator-only.en.md)
+
+> 以下保留当时的职责与验证记录。当前主代理权限和模型分流以[当前职责模板](../templates/agent-references/coordinator-only.md)、实际宿主规则及用户授权为准；本历史文档不限制已授权的主代理直接实施。
 
 YHWH 将主代理作为需求、架构、任务拆分、调度和最终验收中心。当前 Codex 宿主使用 Astra；实际代码、测试和实现脚本由 Pi 子代理编写，原生 worker 默认 Luna/medium，并按任务复杂度选择档位，详见[交付预算](worker-budgets.md)。宿主仍可以选择其他主模型。
 

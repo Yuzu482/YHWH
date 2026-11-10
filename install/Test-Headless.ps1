@@ -9,7 +9,7 @@ $hadEnforcement=$null -ne $previousEnforcement
 New-Item -ItemType Directory -Force -Path $scratch | Out-Null
 try {
   # Reproduce just this feature's packaged files in an isolated installation.
-  foreach($relative in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','workflow/headless.example.json','workflow/catalog.json')) {
+  foreach($relative in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','scripts/reviewer-route-config.mjs','workflow/headless.example.json','workflow/catalog.json')) {
     $destination=Join-Path $scratch $relative
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
     Copy-Item -LiteralPath (Join-Path $plugin $relative) -Destination $destination
@@ -44,6 +44,11 @@ else { for await(const chunk of process.stdin){} console.log(JSON.stringify({typ
   if($events[0].type -ne 'batch-start' -or $events[-1].result.status -ne 'completed' -or $events[-1].result.summary.helpCacheHits -ne 1){throw 'Packaged batch stream failed.'}
   $workflowEvents=@(& (Join-Path $root 'Workflow.ps1') -Action HeadlessBatchEvents -HeadlessConfigFile $configFile -HeadlessRequestFile $requestsFile | ForEach-Object { $_ | ConvertFrom-Json })
   if($workflowEvents[-1].result.status -ne 'completed' -or @($workflowEvents | Where-Object type -eq 'request-result').Count -ne 2){throw 'Workflow batch entry failed.'}
+  Add-Content -LiteralPath (Join-Path $scratch 'scripts/reviewer-route-config.mjs') -Value '// drift fixture'
+  $rejected=$false
+  try { & $runner -Action Compare -ComparePluginRoot $scratch | Out-Null } catch { $rejected=$true }
+  if(-not $rejected){throw 'Installed reviewer route drift was not rejected.'}
+  Copy-Item -LiteralPath (Join-Path $plugin 'scripts/reviewer-route-config.mjs') -Destination (Join-Path $scratch 'scripts/reviewer-route-config.mjs') -Force
   Add-Content -LiteralPath (Join-Path $scratch 'scripts/headless-adapters.mjs') -Value '// drift fixture'
   $rejected=$false
   try { & $runner -Action Compare -ComparePluginRoot $scratch | Out-Null } catch { $rejected=$true }

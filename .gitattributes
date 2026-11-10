@@ -8,3 +8,4 @@
 payload/pi-dispatch/extensions/milestone-ledger.js -text
 payload/pi-dispatch/scripts/card-lab-interrupted-request-recovery.mjs -text
 payload/pi-dispatch/scripts/tier-review-policy.mjs -text whitespace=trailing-space,space-before-tab,cr-at-eol
+payload/pi-dispatch/tests/fixtures/legacy-state-baseline-package.json -text

@@ -238,7 +238,7 @@ test('warm calls avoid file reads but still recheck versions; clear and TTL forc
   assert(first.evidence.digestCache.bytesRead >= fs.statSync(process.execPath).size);
   assert.equal(first.evidence.digestCache.hits, 0);
   assert.equal(second.evidence.digestCache.bytesRead, 0);
-  assert.equal(second.evidence.digestCache.hits, 10);
+  assert.equal(second.evidence.digestCache.hits, Object.keys(fingerprint().files).length + 2);
   assert.deepEqual(fs.readFileSync(path.join(f.root, 'calls.log'), 'utf8').trim().split('\n'), ['version','help','run','version','run']);
   session.clear();
   const fresh = await session.run(f.config, f.request);
@@ -289,7 +289,7 @@ test('batch events arrive before completion, heartbeat during silence, and summa
   assert.equal(result.status, 'completed'); assert.equal(result.notRun, 0);
   assert(events.some(e => e.type === 'waiting' && e.phase === 'running'));
   assert(events.every(e => e.count === 2 && e.batchElapsedMs >= 0));
-  assert.equal(result.summary.helpCacheHits, 1); assert.equal(result.summary.digestCacheHits, 10);
+  assert.equal(result.summary.helpCacheHits, 1); assert.equal(result.summary.digestCacheHits, Object.keys(fingerprint().files).length + 2);
   assert.equal(result.summary.digestBytesRead, result.results[0].evidence.digestCache.bytesRead);
   assert.doesNotMatch(JSON.stringify(events.filter(e => e.type !== 'request-result')), /untrusted|User task|literal/);
 });

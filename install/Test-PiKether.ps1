@@ -19,7 +19,7 @@ try { $manifest = Get-Content -LiteralPath (Join-Path $packageRoot 'portable.man
 $payloadPlugin = Join-Path $packageRoot 'payload\pi-dispatch'
 Check (Test-Path -LiteralPath (Join-Path $packageRoot 'install\Apply-HindsightWrapper.ps1') -PathType Leaf) 'Hindsight wrapper installer included'
 Check (Test-Path -LiteralPath (Join-Path $packageRoot 'templates\hindsight-coding-agent\SKILL.md') -PathType Leaf) 'Hindsight wrapper template included'
-foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','workflow/headless.example.json','workflow/catalog.json')) {
+foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','scripts/reviewer-route-config.mjs','workflow/headless.example.json','workflow/catalog.json')) {
   Check (Test-Path -LiteralPath (Join-Path $payloadPlugin $headlessFile) -PathType Leaf) ('headless CLI payload: '+$headlessFile)
   if($Installed) {
     $installedFile=Join-Path (Join-Path $TargetHome 'plugins/pi-dispatch') $headlessFile

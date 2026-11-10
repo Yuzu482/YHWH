@@ -8,9 +8,9 @@
 
 该本机安装保留原有 `pi-claude-code-provider/claude-sonnet-5` reviewer；发布源码中的 API reviewer 路由不随本次升级迁入。本机旧网关测试有一项工具列表断言过期，已在升级前版本复现；未声称本机旧测试全通过，也未完成 Claude 独立审查。
 
-YHWH 默认启用 `strict` 模式，在受管模型执行前检查 worker 路由，包括无文件权限但可以输出代码的请求。普通 worker 仅允许原生 `openai-codex/gpt-6-luna`，或宿主已配置且语义模型为 Luna 的 `yhwh-worker-api`。Sol、Terra 等模型可以由外部宿主选择为主模型，但不能作为普通 Pi worker 执行。
+YHWH 默认启用 `strict` 模式，在受管模型执行前检查 worker 路由，包括无文件权限但可以输出代码的请求。原生 worker 允许 `openai-codex/gpt-6-luna`；代码角色 Chesed 也允许 `openai-codex/gpt-6.1-terra`。宿主还可配置语义模型为 Luna 的 `yhwh-worker-api`。Sol 不作为普通 worker 路由。
 
-仅保留两类受控例外：通过现有角色绑定、完整审查材料和无工具权限检查的 Sonnet reviewer，以及网关生成固定回显内容的无工具心跳。任务不能靠填写 reviewer 名称或增加 probe 字段取得例外。模型发现列表用于查询和探测，不代表 worker 执行许可。
+仅保留两类受控例外：通过角色绑定、完整审查材料和无工具权限检查的已允许 reviewer 路线，以及网关生成固定回显内容的无工具心跳。Reviewer 默认使用 Sonnet，也可按受控配置选择允许的 Sol 审查路线。任务不能靠填写 reviewer 名称或增加 probe 字段取得例外。模型发现列表用于查询和探测，不代表 worker 执行许可。
 
 独立无头 CLI 会绕开 Pi 的角色验证，因此严格模式拒绝其模型执行，包括单次、会话、批次和流式入口；版本、帮助、Doctor 与文件指纹检查仍可使用。需要原有无头 CLI 行为时，由宿主操作者显式关闭这个附加限制。
 

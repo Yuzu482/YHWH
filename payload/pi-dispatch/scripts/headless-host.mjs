@@ -7,7 +7,7 @@ import { adapters, invocation, parseResult } from './headless-adapters.mjs';
 import { assertHeadlessExecutionAllowed, getWorkerEnforcementStatus } from './worker-enforcement.mjs';
 
 const ownRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const files = ['scripts/headless-host.mjs', 'scripts/headless-adapters.mjs', 'scripts/headless-job.ps1', 'scripts/headless-acceptance.mjs', 'scripts/worker-enforcement.mjs', 'scripts/controlled-provider.mjs', 'workflow/headless.example.json', 'workflow/catalog.json'];
+const files = ['scripts/headless-host.mjs', 'scripts/headless-adapters.mjs', 'scripts/headless-job.ps1', 'scripts/headless-acceptance.mjs', 'scripts/worker-enforcement.mjs', 'scripts/controlled-provider.mjs', 'scripts/reviewer-route-config.mjs', 'workflow/headless.example.json', 'workflow/catalog.json'];
 const fail = code => { throw new Error(code); };
 const hash = value => createHash('sha256').update(value).digest('hex');
 const keys = (value, allowed) => {

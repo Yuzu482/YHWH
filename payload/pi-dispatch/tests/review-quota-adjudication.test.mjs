@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {join} from 'node:path';
+import {dirname,join} from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {createReviewAttemptLedger, effectiveReviewQuota, validateReviewQuotaExceptions} from '../scripts/tier-review-policy.mjs';
-import {quotaFixture, grant, reviewInput, finish, openState, sha, pins, packageRoot, checkSources, temp, clean} from './helpers/legacy-state-fixtures.mjs';
+import {quotaFixture, grant, reviewInput, finish, openState, sha, pins, packageRoot, checkSources, temp, clean, mirror} from './helpers/legacy-state-fixtures.mjs';
 
 test('quota: exact grant caps, times, identities and unchanged ordinary defaults',()=>{
   const identity={workspaceSha256:grant().workspaceSha256,runAnchorSha256:grant().runAnchorSha256,tier:'T2'};
@@ -74,14 +75,47 @@ test('quota lifecycle: zero-start never launches on replay, unknown execution re
 
 test('fixture provenance: pinned bytes, per-path binary attributes, exact release exclusions and no runtime helper import',()=>{
   checkSources();const repository=join(packageRoot,'../..'),attributes=fs.readFileSync(join(repository,'.gitattributes'),'utf8');
-  for(const p of ['extensions/milestone-ledger.js','scripts/card-lab-interrupted-request-recovery.mjs','scripts/tier-review-policy.mjs']){
+  for(const p of ['extensions/milestone-ledger.js','scripts/card-lab-interrupted-request-recovery.mjs','scripts/tier-review-policy.mjs','tests/fixtures/legacy-state-baseline-package.json']){
     assert.ok(attributes.split(/\r?\n/).some(line=>line==='payload/pi-dispatch/'+p+' -text'||line.startsWith('payload/pi-dispatch/'+p+' -text ')));
   }
   const build=fs.readFileSync(join(repository,'Build-Release.ps1'),'utf8');
-  for(const p of ['tests/card-lab-interrupted-request-recovery.test.mjs','tests/review-quota-adjudication.test.mjs','tests/review-quota-material-reconsideration.test.mjs','tests/helpers/legacy-state-fixtures.mjs','tests/fixtures/legacy-state-pins.json']){
+  for(const p of ['tests/card-lab-interrupted-request-recovery.test.mjs','tests/review-quota-adjudication.test.mjs','tests/review-quota-material-reconsideration.test.mjs','tests/helpers/legacy-state-fixtures.mjs','tests/fixtures/legacy-state-pins.json','tests/fixtures/legacy-state-baseline-package.json']){
     assert.ok(build.includes("'payload/pi-dispatch/"+p+"'"));
   }
   for(const p of Object.keys(pins.sourceFiles)){
     assert.doesNotMatch(fs.readFileSync(join(packageRoot,p),'utf8'),/from\s+['"][^'"]*legacy-state-fixtures/);
   }
+});
+
+test('historic package bytes remain pinned while current dependencies advance',()=>{
+  checkSources();
+  const historic=fs.readFileSync(join(packageRoot,'tests/fixtures/legacy-state-baseline-package.json'));
+  const current=fs.readFileSync(join(packageRoot,'package.json'));
+  assert.equal(sha(historic),pins.sourceFiles['package.json']);
+  assert.notEqual(sha(current),pins.sourceFiles['package.json']);
+  const root=temp();
+  try {
+    const runtime=mirror(join(root,'runtime'));
+    assert.deepEqual(fs.readFileSync(join(runtime,'package.json')),historic);
+    assert.equal(JSON.parse(current).dependencies['@modelcontextprotocol/sdk'],'1.32.2');
+    assert.equal(JSON.parse(current).dependencies.zod,'4.6.7');
+  } finally { clean(root); }
+});
+
+test('historical package and remaining audited source both reject tampering in an isolated copy',async()=>{
+  const root=temp();
+  const copy=rel=>{const dst=join(root,rel);fs.mkdirSync(dirname(dst),{recursive:true});fs.copyFileSync(join(packageRoot,rel),dst);};
+  try {
+    for(const rel of Object.keys(pins.sourceFiles)) copy(rel);
+    for(const rel of ['tests/helpers/legacy-state-fixtures.mjs','tests/fixtures/legacy-state-pins.json','tests/fixtures/legacy-state-baseline-package.json']) copy(rel);
+    const isolated=await import(pathToFileURL(join(root,'tests/helpers/legacy-state-fixtures.mjs')).href);
+    assert.doesNotThrow(()=>isolated.checkSources());
+    const historic=join(root,'tests/fixtures/legacy-state-baseline-package.json');
+    const before=fs.readFileSync(historic);
+    fs.appendFileSync(historic,' ');
+    assert.throws(()=>isolated.checkSources(),/Audited source changed: package\.json/);
+    fs.writeFileSync(historic,before);
+    fs.appendFileSync(join(root,'scripts/tier-review-policy.mjs'),'\n');
+    assert.throws(()=>isolated.checkSources(),/Audited source changed: scripts\/tier-review-policy\.mjs/);
+  } finally { clean(root); }
 });

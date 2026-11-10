@@ -2,7 +2,7 @@
 
 [简体中文](worker-budgets.md) · [English](worker-budgets.en.md)
 
-On 2026-09-22 the user authorized replacing fixed Luna/max thinking for native OpenAI Codex workers. The current native model is `gpt-6-luna`; the primary chooses effort, decomposes tasks and accepts results, while Pi authors code and tests. Reviewer policy, aggregator API routes, file permissions and resource caps remain unchanged.
+On 2026-09-22 the user authorized replacing fixed Luna/max thinking for native OpenAI Codex workers. In the current source, Chesed defaults to `gpt-6.1-terra`, clearly small tasks may use `gpt-6-luna`, and other native workers use Luna. The primary chooses direct implementation or delegation within host permissions and owns effort selection and acceptance. Controlled API routes, file permissions and resource caps retain their own rules.
 
 | Task | Explicit thinking | Conditions |
 | --- | --- | --- |
