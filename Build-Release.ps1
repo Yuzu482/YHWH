@@ -61,6 +61,8 @@ $licenseArgs=@('--check')
 if($PublicRelease){$licenseArgs+='--public'}
 node (Join-Path $root 'install/license-inventory.mjs') @licenseArgs
 if ($LASTEXITCODE -ne 0) { throw 'License inventory validation failed.' }
+node --test (Join-Path $root 'install/test-pi-model-metadata.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Pi model metadata validation failed.' }
 
 $plugin = Join-Path $root 'payload\pi-dispatch'
 if (-not $SkipTests) {

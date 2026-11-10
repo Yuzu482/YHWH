@@ -19,7 +19,7 @@ Pi 作为受 Tifereth 控制的下级 Agent 执行层、模型探针层和 LSP �
 - `openai-codex`（代码 worker Chesed 默认 `gpt-6.1-terra`；离线 task-plan 为明确的小型任务或授权编辑器任务选择 `gpt-6-luna`，也保留显式选择；其他 worker 使用 Luna；按任务选择思考深度，默认 `medium`）
 - `claude-code-cli`（Geburah/reviewer 默认 `claude-sonnet-5`，仅限 `access:none`；支持按配置显式选择其他审查路线）
 
-**Pi 模型目录前提：**固定版本 Pi 0.84.4 的内置 OpenAI Codex 模型目录不包含 `gpt-6.1-terra`、`gpt-6-luna` 或 `gpt-6-sol`，当前安装流程也不会自动补充其元数据。现有本地补充可能在 `npm ci` 或重装后被覆盖；使用前应检查实际目录，并在授权范围内运行无工具探针。网关的可发现列表本身不能证明模型可用。
+**Pi 模型目录：**固定版本 Pi 0.84.4 的内置 OpenAI Codex 目录不包含 `gpt-6.1-terra`、`gpt-6-luna` 或 `gpt-6-sol`。本源码的 Windows 与 WSL 安装流程会在重装前备份旧目录，在各自的 `npm ci` 后补充这些兼容条目，并保留不冲突的旧自定义条目。发现冲突时安装会停止并保留备份供核对；安装器不是事务式回滚。目录中的成本等元数据沿用本地兼容配置，不是实际费用或模型能力的保证。手动执行 `npm ci` 不会触发安装器补充步骤；修改源码也不会自动更新现有安装。使用前仍应检查实际目录并运行授权探针，网关发现列表本身不能证明模型可用。
 
 网关提供同步执行、异步监控、模型探针和 LSP 工具。监控路径使用 `submit_subagent`、`get_subagent_status`、`get_subagent_result`、`list_subagents`、`cancel_subagent` 和 `render_subagent_monitor`；最后一个工具返回 MCP Apps 对话内卡片，按 `parentRunId` 自动刷新任务树。调用方不能提交原始 Pi 参数、环境变量或自由工具列表；Pi 启动时禁用自动扩展发现，只按任务加载受控 provider 与 LSP extension。实际响应中的 provider、model 和 `toolsUsed` 会返回给 Tifereth 验收。
 

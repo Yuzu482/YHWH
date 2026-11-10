@@ -35,12 +35,31 @@ mv /opt/node.new /opt/node
 
 id pi-sandbox >/dev/null 2>&1 || useradd --system --create-home --home-dir /home/pi-sandbox --shell /usr/sbin/nologin pi-sandbox
 install -d -o root -g root -m 0755 /opt/pi-kether /opt/pi-kether/extensions /opt/pi-kether/scripts /opt/pi-kether/dotnet-tools
+model_catalog=/opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/providers/data/openai-codex.json
+model_backups=/var/lib/pi-kether/model-metadata-backups
+if [[ -e "$model_backups" ]]; then
+  [[ -d "$model_backups" && ! -L "$model_backups" && "$(stat -c '%u' "$model_backups")" == 0 ]] || { echo 'Unsafe model metadata backup directory' >&2; exit 1; }
+  mode="$(stat -c '%a' "$model_backups")"
+  (( (8#$mode & 8#022) == 0 )) || { echo 'Model metadata backup directory is writable by others' >&2; exit 1; }
+else
+  install -d -o root -g root -m 0700 "$model_backups"
+fi
+model_backup="$(mktemp -d "$model_backups/install-XXXXXXXX")"
+if [[ -e "$model_catalog" || -L "$model_catalog" ]]; then
+  [[ -f "$model_catalog" && ! -L "$model_catalog" ]] || { echo 'Unsafe existing Pi model catalog' >&2; exit 1; }
+  cp --archive -- "$model_catalog" "$model_backup/wsl-before-npm-ci.json"
+  cmp --silent -- "$model_catalog" "$model_backup/wsl-before-npm-ci.json" || { echo 'Pi model catalog backup verification failed' >&2; exit 1; }
+  /opt/node/bin/node /tmp/pi-kether-install/ensure-pi-model-metadata.mjs --preflight "$model_backup/wsl-before-npm-ci.json"
+fi
 cat >/opt/pi-kether/package.json <<JSON
 {"private":true,"dependencies":{"@earendil-works/pi-coding-agent":"${PI_VERSION}","pi-lsp-extension":"${LSP_VERSION}","pyright":"${PYRIGHT_VERSION}","typescript-language-server":"${TSLS_VERSION}","typescript":"${TYPESCRIPT_VERSION}","typescript-lsp":"npm:typescript@${TYPESCRIPT_LSP_VERSION}","vscode-languageserver-protocol":"${VSCODE_LSP_VERSION}"}}
 JSON
 install -o root -g root -m 0644 /tmp/pi-kether-install/wsl-package-lock.json /opt/pi-kether/package-lock.json
 (cd /opt/pi-kether && /opt/node/bin/npm ci --omit=dev --ignore-scripts=false)
 /opt/node/bin/node /tmp/pi-kether-install/patch-pi-lsp.mjs /opt/pi-kether/node_modules/pi-lsp-extension
+metadata_args=(/opt/pi-kether/node_modules/@earendil-works/pi-coding-agent "$model_backup/wsl-after-npm-ci.json")
+if [[ -f "$model_backup/wsl-before-npm-ci.json" ]]; then metadata_args+=(--previous "$model_backup/wsl-before-npm-ci.json"); fi
+/opt/node/bin/node /tmp/pi-kether-install/ensure-pi-model-metadata.mjs "${metadata_args[@]}"
 
 # Pinned Python 3.12 runtime; no automatic language-server downloads during probes.
 python3 -c 'import sys; assert sys.version_info[:2] == (3, 12), "multilspy requires the pinned Python 3.12 wheel set"'

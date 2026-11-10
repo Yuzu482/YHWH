@@ -154,6 +154,9 @@ if($Installer) {
   $representative='payload/pi-dispatch/.codex-plugin/plugin.json'
   Check ((Test-Path -LiteralPath (Join-Path $ps51Package $representative)) -and ((Get-FileHash -LiteralPath (Join-Path $ps51Package $representative) -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath (Join-Path (Join-Path $actualOut 'pi-kether-portable') $representative) -Algorithm SHA256).Hash)) 'PS51 generated installer extraction matches PS7 payload SHA256'
   $package=Join-Path $actualOut 'pi-kether-portable'
+  foreach($modelFile in @('install/ensure-pi-model-metadata.mjs','install/replace-pi-model-catalog.ps1','install/test-pi-model-metadata.mjs')) {
+    Check (Test-Path -LiteralPath (Join-Path $package $modelFile)) "Release contains $modelFile"
+  }
   foreach($required in @('Workflow.ps1','payload/pi-dispatch/.codex-plugin/plugin.json','payload/wsl-package-lock.json','templates/agent-references/pi-routing.md','README.md','README.en.md','.readme-assets/en.svg','install/bootstrap-dependencies.json','templates/host-primary.md','payload/pi-dispatch/workflow/catalog.json','payload/pi-dispatch/scripts/host-profiles.mjs','payload/pi-dispatch/scripts/check-host-connection.mjs','install/Export-HostProfiles.ps1','docs/host-integration.md','docs/host-integration.en.md','payload/pi-dispatch/scripts/common-client-profiles.mjs','docs/common-clients.md','docs/common-clients.en.md','install/Apply-HindsightWrapper.ps1','templates/hindsight-coding-agent/SKILL.md')) {
     Check (Test-Path -LiteralPath (Join-Path $package $required)) "Release contains $required"
   }

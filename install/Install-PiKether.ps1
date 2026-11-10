@@ -86,7 +86,7 @@ $pluginSource = Join-Path $payload 'pi-dispatch'
 $pluginIdentity = & (Join-Path $PSScriptRoot 'Get-PluginBuildIdentity.ps1') -PackageRoot $packageRoot
 $templatePath = Join-Path $packageRoot 'templates\AGENTS.kether.md'
 $referencesSource = Join-Path $packageRoot 'templates\agent-references'
-foreach ($required in @($pluginSource, $templatePath, $referencesSource, (Join-Path $packageRoot 'install\patch-pi-lsp.mjs'))) {
+foreach ($required in @($pluginSource, $templatePath, $referencesSource, (Join-Path $packageRoot 'install\patch-pi-lsp.mjs'), (Join-Path $packageRoot 'install\ensure-pi-model-metadata.mjs'), (Join-Path $packageRoot 'install\replace-pi-model-catalog.ps1'))) {
   if (-not (Test-Path -LiteralPath $required)) { throw "Package is incomplete: $required" }
 }
 
@@ -148,6 +148,23 @@ $mcp | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $pluginTarg
 
 $hostPiRoot = Join-Path $TargetHome '.pi\agent\npm'
 New-Item -ItemType Directory -Force -Path $hostPiRoot | Out-Null
+$hostPiAgent = Join-Path $hostPiRoot 'node_modules\@earendil-works\pi-coding-agent'
+$oldModelCatalog = Join-Path $hostPiAgent 'node_modules\@earendil-works\pi-ai\dist\providers\data\openai-codex.json'
+$modelBackupRoot = Join-Path $backupRoot 'pi-model-metadata'
+New-Item -ItemType Directory -Force -Path $modelBackupRoot | Out-Null
+$catalogBackup=$null
+if (Test-Path -LiteralPath $oldModelCatalog) {
+  $catalogItem=Get-Item -LiteralPath $oldModelCatalog -Force
+  if($catalogItem.PSIsContainer -or ($catalogItem.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Unsafe existing Pi model catalog.'}
+  $catalogBackup=Join-Path $modelBackupRoot 'windows-before-npm-ci.json'
+  if(Test-Path -LiteralPath $catalogBackup){throw 'Pi model catalog backup already exists.'}
+  $beforeCatalogHash=(Get-FileHash -LiteralPath $oldModelCatalog).Hash
+  Copy-Item -LiteralPath $oldModelCatalog -Destination $catalogBackup
+  if($beforeCatalogHash -cne (Get-FileHash -LiteralPath $oldModelCatalog).Hash -or $beforeCatalogHash -cne (Get-FileHash -LiteralPath $catalogBackup).Hash){throw 'Pi model catalog backup verification failed.'}
+  [IO.File]::WriteAllText((Join-Path $modelBackupRoot 'windows-before-npm-ci.sddl'),(Get-Acl -LiteralPath $oldModelCatalog).Sddl,[Text.UTF8Encoding]::new($false))
+  & $nodePath (Join-Path $packageRoot 'install\ensure-pi-model-metadata.mjs') --preflight $catalogBackup
+  if ($LASTEXITCODE -ne 0) { throw 'Existing Pi model metadata needs review; its backup is retained.' }
+}
 $hostPackage = [ordered]@{ private = $true; dependencies = [ordered]@{
   '@earendil-works/pi-coding-agent' = $manifest.components.piCodingAgent
   'pi-lsp-extension' = $manifest.components.piLspExtension
@@ -165,6 +182,10 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Host Pi dependency installation failed.' }
   & $nodePath (Join-Path $packageRoot 'install\patch-pi-lsp.mjs') (Join-Path $hostPiRoot 'node_modules\pi-lsp-extension')
   if ($LASTEXITCODE -ne 0) { throw 'Host Pi LSP patch failed.' }
+  $metadataArgs=@($hostPiAgent,(Join-Path $modelBackupRoot 'windows-after-npm-ci.json'))
+  if($catalogBackup){$metadataArgs+=@('--previous',$catalogBackup)}
+  & $nodePath (Join-Path $packageRoot 'install\ensure-pi-model-metadata.mjs') @metadataArgs
+  if ($LASTEXITCODE -ne 0) { throw 'Host Pi model metadata supplementation failed; backups are retained.' }
 } finally { Pop-Location }
 
 $piSettingsPath = Join-Path $TargetHome '.pi\agent\settings.json'
@@ -228,6 +249,7 @@ if ($installWsl) {
     (Join-Path $packageRoot 'install\provision-wsl.sh')='/tmp/pi-kether-install/provision-wsl.sh'
     (Join-Path $packageRoot 'install\provision-run-check-trust.py')='/tmp/pi-kether-install/provision-run-check-trust.py'
     (Join-Path $packageRoot 'install\patch-pi-lsp.mjs')='/tmp/pi-kether-install/patch-pi-lsp.mjs'
+    (Join-Path $packageRoot 'install\ensure-pi-model-metadata.mjs')='/tmp/pi-kether-install/ensure-pi-model-metadata.mjs'
     (Join-Path $payload 'wsl-package-lock.json')='/tmp/pi-kether-install/wsl-package-lock.json'
     (Join-Path $pluginTarget 'sandbox\pi-kether-sandbox')='/tmp/pi-kether-install/pi-kether-sandbox'
     (Join-Path $pluginTarget 'scripts\validate-write-scope.mjs')='/tmp/pi-kether-install/validate-write-scope.mjs'
