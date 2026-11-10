@@ -691,6 +691,20 @@ async function withGateway(run, options = {}) {
   }
 }
 
+test('gateway advertises Terra code default and routes explicit Terra or Luna workers', async () => {
+  await withGateway(async ({client}) => {
+    const capabilities=parsed(await client.callTool({name:'list_capabilities',arguments:{}}));
+    assert.equal(capabilities.governance.roleModels.Chesed,'gpt-6.1-terra');
+    assert.deepEqual(capabilities.governance.roleModelAlternates.Chesed,['gpt-6-luna']);
+    for(const model of ['gpt-6.1-terra','gpt-6-luna']){
+      const result=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model,access:'read',task:{role:'Chesed',objective:'Read one allowed file',readScope:['package.json'],acceptance:['Report the file']}}}));
+      assert.equal(result.ok,true);assert.equal(result.model,model);
+    }
+    const rejected=parsed(await client.callTool({name:'dispatch_subagent',arguments:{cwd:root,provider:'openai-codex',model:'gpt-6.1-terra',access:'read',task:{role:'Malkuth',objective:'Read one allowed file',readScope:['package.json'],acceptance:['Report the file']}}}));
+    assert.equal(rejected.ok,false);assert.match(rejected.error,/requires model/);
+  });
+});
+
 test('host upgrade maintenance requires authentication and closes admission until resumed', async () => {
   await withGateway(async ({ port, client }) => {
     const base = `http://127.0.0.1:${port}`;

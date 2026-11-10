@@ -16,8 +16,10 @@
 
 Pi 作为受 Tifereth 控制的下级 Agent 执行层、模型探针层和 LSP 层。默认安装使用 stdio；可选共享运行时使用本机 Streamable HTTP MCP 端点 `http://127.0.0.1:17331/mcp`。模型任务先经过 Kether 运行信封，再按精确 allowlist 路由到：
 
-- `openai-codex`（worker：`gpt-6-luna`，按任务选择思考深度，默认 `medium`）
-- `anthropic`（Geburah/reviewer：`claude-sonnet-5` / `max`，仅限 `access:none`）
+- `openai-codex`（代码 worker Chesed 默认 `gpt-6.1-terra`；离线 task-plan 为明确的小型任务或授权编辑器任务选择 `gpt-6-luna`，也保留显式选择；其他 worker 使用 Luna；按任务选择思考深度，默认 `medium`）
+- `claude-code-cli`（Geburah/reviewer 默认 `claude-sonnet-5`，仅限 `access:none`；支持按配置显式选择其他审查路线）
+
+**Pi 模型目录前提：**固定版本 Pi 0.84.4 的内置 OpenAI Codex 模型目录不包含 `gpt-6.1-terra`、`gpt-6-luna` 或 `gpt-6-sol`，当前安装流程也不会自动补充其元数据。现有本地补充可能在 `npm ci` 或重装后被覆盖；使用前应检查实际目录，并在授权范围内运行无工具探针。网关的可发现列表本身不能证明模型可用。
 
 网关提供同步执行、异步监控、模型探针和 LSP 工具。监控路径使用 `submit_subagent`、`get_subagent_status`、`get_subagent_result`、`list_subagents`、`cancel_subagent` 和 `render_subagent_monitor`；最后一个工具返回 MCP Apps 对话内卡片，按 `parentRunId` 自动刷新任务树。调用方不能提交原始 Pi 参数、环境变量或自由工具列表；Pi 启动时禁用自动扩展发现，只按任务加载受控 provider 与 LSP extension。实际响应中的 provider、model 和 `toolsUsed` 会返回给 Tifereth 验收。
 
@@ -36,6 +38,7 @@ API key 自 0.8 起以 Windows DPAPI CurrentUser 密文保存，Windows 解密�
 ## 运行边界
 
 - 只监听 loopback；`/mcp` 强制 Bearer token，默认请求上限 100 KiB。
+- 每次工具调用的参数中，所有嵌套对象键与数组元素合计最多 32768 项；超过时请求会被拒绝，需要缩小或拆分。此限制同样适用于直接 stdio 调用。
 - 最大进程数仍为 4，但准入按 6 GiB/2 CPU 的共享资源池计算：最多四个 `small`、两个 `standard` 或一个 `large`；同时要求主机在启动新任务后仍保留至少 `max(2 GiB, 宿主总内存的 10%)` 的内存预留。默认队列 16，排队期限与执行期限独立，取消会终止 Pi 进程树。
 - Provider 并发池为 `openai-codex=2`、`anthropic=1`（调度器保留的其他 Provider 容量项不代表路由已获准）。队列按 `priority`（0..9）、等待老化和 FIFO 排序，并跳过依赖未满足、资源不足或写锁冲突的条目，继续运行其他可执行任务。
 - 每个任务必须选择 Pi 内硬编码的 `small`、`standard` 或 `large` 资源档位，默认 `standard`。调用方只能用 `timeoutSeconds` 缩短档位时限，不能提交任意内存、CPU、进程数或输出上限。

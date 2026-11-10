@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { planCooperativeRun } from './cooperative-run.mjs';
 import { validateKetherInvocation } from './dispatch.mjs';
 import { inspectPrimaryPacket, runtimePreflight } from './runtime-preflight.mjs';
+import { inspectTaskPlanning } from './task-planning.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -54,12 +55,17 @@ async function main(args) {
     const value = JSON.parse(readFileSync(resolve(args[0]), 'utf8').replace(/^\uFEFF/, ''));
     const packetCheck = inspectPrimaryPacket(value?.task);
     if (!packetCheck.ok) return {ok: false, modelCalls: 0, readOnly: true, packetCheck};
+    // MCP still requires the selected model. Only select Luna automatically
+    // for a demonstrably small code task; preserve any explicit model choice.
+    const codeRole = ['Chesed','worker'].includes(value?.task?.role);
+    const lightCode = codeRole && inspectTaskPlanning(value.task).recommendedThinking === 'low';
+    const selectedModel = value.model ?? (codeRole && (lightCode || value.editorAuthorization) ? 'gpt-6-luna' : undefined);
     const {request, task} = validateKetherInvocation({
-      cwd: value.cwd, access: value.access, provider: value.provider, model: value.model,
+      cwd: value.cwd, access: value.access, provider: value.provider, model: selectedModel,
       thinking: value.thinking, timeoutSeconds: value.timeoutSeconds, resourceProfile: value.resourceProfile, task: value.task,
     }, value.access === 'workspace-write', value.cwd);
     return {ok: true, modelCalls: 0, readOnly: true, thinkingDecision: request.thinkingDecision,
-      packetCheck, preflight: runtimePreflight(task), request: {...value, thinking: request.thinking, task}};
+      packetCheck, preflight: runtimePreflight(task), request: {...value, provider: request.provider, model: request.model, thinking: request.thinking, task}};
   }
   if ((command === 'cooperative-plan' || command === 'cooperative-submit') && args.length === 1) {
     const spec = JSON.parse(readFileSync(resolve(args[0]), 'utf8').replace(/^\uFEFF/, ''));

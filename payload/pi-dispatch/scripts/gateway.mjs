@@ -42,7 +42,8 @@ import { ResourceAwareExecutor, SCHEDULER_POLICY } from '../extensions/admission
 import { createWriteScopeLockManager } from '../extensions/write-scope-locks.js';
 import { createTaskMonitor } from '../extensions/task-monitor.js';
 import {projectTaskHandoff,TASK_HANDOFF_POLICY} from '../extensions/task-handoff.js';
-import { ROLE_MODELS, ROLE_ALIASES, ROLE_PROVIDERS, effectiveRoleProviders } from './role-policy.mjs';
+import { ROLE_MODELS, ROLE_MODEL_ALTERNATES, ROLE_ALIASES, ROLE_PROVIDERS, effectiveRoleProviders, effectiveRoleModels } from './role-policy.mjs';
+import { REVIEWER_ROUTES, reviewerThinkingLevels } from './reviewer-route-config.mjs';
 import {isReviewer,validateReviewDecision,validateReviewPacket,missingReviewPatchMaterials,requireReviewMaterials,enforceT1ReviewBudget,T1_REVIEW_BUDGET} from '../extensions/review-contract.js';
 import {editorAuthorizationSchema,authorizeEditors,createEditorBroker,EDITOR_POLICY} from './editor-authorization.mjs';
 import { buildReviewPacket } from './review-materials.mjs';
@@ -460,7 +461,7 @@ export function createGatewayRuntime(options) {
     },
     governance: {
       resultContract:{version:2,enforced:true,schemas:ROLE_SCHEMAS}, handoff:HANDOFF_POLICY,
-      roleModels: ROLE_MODELS, roleProviders: effectiveRoleProviders(process.env.USERPROFILE ?? process.env.HOME), controlledRoleProviders:{workers:'yhwh-worker-api',reviewer:'yhwh-reviewer-api',activation:'explicit provider selection after host configuration'}, roleAliases: ROLE_ALIASES, unknownRolesRejected: true,
+      roleModels: effectiveRoleModels(process.env.USERPROFILE ?? process.env.HOME), roleModelAlternates: ROLE_MODEL_ALTERNATES, roleProviders: effectiveRoleProviders(process.env.USERPROFILE ?? process.env.HOME), reviewerRoutes: REVIEWER_ROUTES, reviewerEffort:{native:['medium','high','xhigh'],controlledApi:['max']}, controlledRoleProviders:{workers:'yhwh-worker-api',reviewer:'yhwh-reviewer-api',activation:'explicit provider selection after host configuration'}, roleAliases: ROLE_ALIASES, unknownRolesRejected: true,
       providerMismatchRejected: true, claudeReviewAccess: 'none',
       reviewExecution:{recommendedProfile:'standard',recommendedTimeoutSeconds:300,thinkingUnchanged:true,materialStrategy:'one independently reviewable change per packet; Tifereth chooses the budget'},
       reviewContract: {version:1,requiredFor:['Geburah','reviewer'],sections:['requirements','changes','context','verification'],missingMaterials:'blocked-before-model',semanticCompleteness:'reviewer-and-primary'},
@@ -598,7 +599,7 @@ export function createGatewayRuntime(options) {
         const linkedValid=contract?.mode==='linked' && linked && contract.handoffVersion===2 && contract.runAnchorSha256===linkedAnchor && contract.phaseIndex===task.handoff.phaseIndex;
         if (claimedReview && input.reviewOfRequestId && contract?.tierPolicyVersion!==1) throw Object.assign(new Error('Legacy review state lacks tier policy proof'),{code:'PI_LEGACY_REVIEW_STATE_UNKNOWN'});
         if (!claimedReview || !input.reviewOfRequestId || contract?.tierPolicyVersion!==1 || !/^[a-f0-9]{64}$/.test(sourceAnchor??'') || prior?.state!=='completed' || !verified || contract?.role!=='Chesed' || contract?.stage!=='implementing' || contract?.tier!=='T1' || contract.parentRunId!==(input.parentRunId??null) || contract.workspaceSha256!==workspaceSha256 || !(standalone || linkedValid)) throw Object.assign(new Error('T1 post-review requires a trusted completed T1 implementation reference in the same workspace, parent and anchor'),{code:'PI_T1_REVIEW_REFERENCE_REQUIRED'});
-        if (task.reviewPacket.stage!=='post-change' || !['medium','high','xhigh'].includes(input.thinking ?? PROVIDER_POLICY[input.provider]?.defaultThinking ?? 'medium')) throw Object.assign(new Error('T1 post-review requires medium/high/xhigh thinking and post-change material'),{code:'PI_T1_REVIEW_PACKET_INVALID'});
+        if (task.reviewPacket.stage!=='post-change' || !reviewerThinkingLevels(input.provider).includes(input.thinking ?? (input.provider==='yhwh-reviewer-api'?'max':PROVIDER_POLICY[input.provider]?.defaultThinking ?? 'medium'))) throw Object.assign(new Error('T1 post-review requires transport-supported reviewer thinking and post-change material'),{code:'PI_T1_REVIEW_PACKET_INVALID'});
         const changedFiles=source?.patchValidation?.changedFiles ?? source?.originalResult?.patchValidation?.changedFiles;
         const missingPatchFiles=missingReviewPatchMaterials(changedFiles,task?.reviewPacket?.changes?.content);
         if (missingPatchFiles.length) throw Object.assign(new Error(`T1 review packet omits changed-file patch material: ${missingPatchFiles.slice(0,16).join(', ')}`),{code:'REVIEW_MATERIALS_MISSING',missingMaterials:missingPatchFiles.slice(0,16)});
@@ -731,6 +732,9 @@ export function createGatewayRuntime(options) {
           else if(!modelExecutionState)modelExecutionState=null;
           if(modelExecutionState===true)startMilestone();
           if(result?.modelExecutionStarted!==false&&reviewTicket&&!reviewStarted){reviewAttempts.markStarted(reviewTicket);reviewStarted=true;reviewStartedAt=reviewDispatchAt;}
+          if (isReviewer(invocation.task.role) && (result?.toolsUsed?.length > 0 || invocation.request.provider === 'openai-codex' && !Array.isArray(result?.toolsUsed))) {
+            result={...result,ok:false,failureCode:'REVIEW_TOOLS_NOT_ALLOWED',failure:'Independent reviewer must report zero tool use'};
+          }
           if(editorBroker){await editorBroker.close();result.editorExecution=editorBroker.report();if(!result.editorExecution.ok){result.ok=false;result.failure='EDITOR_OPERATION_FAILED_OR_UNCERTAIN';}}
           reviewOutputSuccessful=result?.ok===true&&result?.modelExecutionStarted!==false&&!result?.transportError&&!result?.cleanupError&&!result?.timedOut&&!result?.failureCode&&!result?.authFailure&&result?.cleanup?.ok!==false&&!(result?.unrecoveredErrors>0)&&(!Number.isInteger(result?.exitCode)||result.exitCode===0);
           return result;

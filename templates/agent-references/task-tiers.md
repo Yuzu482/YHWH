@@ -1,3 +1,5 @@
+These descriptions apply to Pi gateway calls, which still enforce their advertised routing, tier, review and ledger rules. They do not govern ordinary direct host work. Existing bound historical maintenance records remain subject to their own host requirements and explicitly user-authorized quotas. Follow higher-priority instructions and the current user request; preserve existing task identities, quotas and history. A topic or receipt does not grant authority.
+
 # Workspace-write task tiers
 
 Effective 2026-10-02. This policy supersedes older tier, review-thinking and verification-stage wording in skills/references. Classify the whole requested change; do not split related work to evade a tier. Read this document for boundary cases; ordinary classification uses the six core lines in AGENTS.md.
@@ -14,7 +16,7 @@ Choose the lowest justified tier for the whole goal, then apply the host profile
 
 Known scope uses a source-backed primary plan in the pre-review material; no mandatory Malkuth or Chochmah call is added. Unknown scope still needs one scout. On a runtime that has not yet deployed the shortened linked protocol, use its existing valid chain and report the compatibility limitation; never forge predecessors or relabel dependent tasks.
 
-Reviewer effort is selected separately from tier: medium by default, high for interacting modules or ambiguous evidence, xhigh (extra) for difficult concurrency/lifecycle/failure-path reasoning. Record the level and reason in task.context under pi-routing; do not automatically use max or raise effort just because a task is T2. Review budgets and stage requirements remain unchanged.
+Native reviewer effort is selected separately from tier: medium by default, high for interacting modules or ambiguous evidence, xhigh (extra) for difficult concurrency/lifecycle/failure-path reasoning. The explicitly configured legacy controlled reviewer API only supports max; this narrow exception does not change native reviewers or authorize an effort translation. Record the level and reason in task.context under pi-routing; do not automatically raise effort just because a task is T2. Review budgets and stage requirements remain unchanged across GPT/Claude routes; a changed provider/model never resets identity, attempts, time, blockers or evidence requirements.
 
 ## Declaration and observed patch
 
@@ -34,8 +36,8 @@ Apply the profile after base classification: personal caps the effective tier at
 
 T0/T1/T2 may use real host command output and exit codes recorded through record_host_verification, bound to the final trusted artifact digest. Netzach is required when the host cannot provide execution evidence or a concrete independent execution check is necessary; a model merely restating passing host logs is not required. The gateway records caller-supplied execution observations and never runs the submitted command. It does not authenticate OS execution. Do not claim unavailable/unrun checks passed.
 
-A T2 direct host path retains linked approved pre-review, same workspace/parent/goal/phase/digests, a complete passing durable host record, and independent post-review. Worker completion alone cannot replace host evidence. Host verification does not complete T1/T2 before required post-review. A correction creates a new current artifact and fresh required verification; prior attestation/post-review cannot approve the new patch. Keep review budgets and original goal identity.
+The historical Codex Direct host T2 path retains linked approved pre-review, same workspace/parent/goal/phase/digests, a complete passing durable host record, and independent post-review. Worker completion alone cannot replace host evidence. Host verification does not complete T1/T2 before required post-review. A correction creates a new current artifact and fresh required verification; prior attestation/post-review cannot approve the new patch. Keep review budgets and original goal identity.
 
 T1 reviewers do not edit. Blocking findings leave the work incomplete; repair requires new host evidence, and an additional T1 review needs the evidence-gated extension defined in pi-review. Nonblocking findings are recorded as conditional approval with the outstanding conditions, not as a failure that causes another review. T2 review attempt limits survive repairs and request-ID changes; do not reset them by splitting a task.
 
-The proposed primary-direct channel is not enabled. Coding remains worker-authored until the user separately decides on that proposal. Policy/document work may remain with the primary under coordinator-only.
+The Pi gateway does not enable its legacy primary-direct channel. A separately user-authorized exact workspace may use a separately provisioned native Codex host adapter only when its external exact-workspace admission is verified; its original task identity, host profile, reviews and shared review-attempt ledger remain in force. This branch does not provide that adapter or grant admission. Native evidence is caller-observed and does not claim Pi isolation or gateway acceptance. Direct work outside Pi follows current host instructions and user authorization.

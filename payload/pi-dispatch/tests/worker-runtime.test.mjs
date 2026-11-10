@@ -172,7 +172,7 @@ test('dispatch keeps credential progress, prepare/run order and private API pack
   const prior=process.env.PI_DISPATCH_SANDBOX;process.env.PI_DISPATCH_SANDBOX='wsl2-bwrap';
   const trace=[],signal=new AbortController().signal,packet={credentials:{synthetic:'must-not-leak'}},authentication={ok:true,authentication:'fixture'};
   const request={target:'model',provider:'openai-codex',model:'gpt-6-luna',access:'none',timeoutSeconds:30,resourceLimits:{profile:'small',timeoutSeconds:30,outputBytes:1048576}};
-  const fake={id:'pi',async prepareAuthentication(received,ctx){trace.push('authentication');assert.equal(received,request);assert.equal(ctx.signal,signal);assert.equal(typeof ctx.findPiEntry,'function');assert.deepEqual(Object.keys(ctx).sort(),['findPiEntry','signal']);return {authentication,apiPacket:packet};},
+  const fake={id:'pi',async prepareAuthentication(received,ctx){trace.push('authentication');assert.notEqual(received,request);assert.deepEqual(received,request);assert.equal(ctx.signal,signal);assert.equal(typeof ctx.findPiEntry,'function');assert.deepEqual(Object.keys(ctx).sort(),['findPiEntry','signal']);return {authentication,apiPacket:packet};},
     prepare(){trace.push('prepare');return {input:'fixture'};},
     async run(_prepared,ctx){trace.push('run');assert.equal(ctx.apiPacket,packet);assert.equal(ctx.signal,signal);assert.ok(ctx.resourceLimits.timeoutSeconds>0);return {stdout:'',exitCode:0,phaseTimings:{startupMs:1}};},
     summarize(){return {ok:true,runtime:'wsl2-bwrap'};}};

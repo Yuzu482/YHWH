@@ -45,8 +45,15 @@ test('export rejects junction ancestors and bad scope before writing',()=>{
  try{const real=join(dir,'real'),link=join(dir,'link');mkdirSync(real);symlinkSync(real,link,process.platform==='win32'?'junction':'dir');assert.throws(()=>exportHostProfiles({connection:connection(dir),output:join(link,'new')}),/symlink/);assert.equal(existsSync(join(real,'new')),false);const invalid=connection(dir);invalid.env.PI_GATEWAY_ROOTS='["relative"]';assert.throws(()=>buildHostProfile('generic',invalid),/workspace roots/);}
  finally{rmSync(dir,{recursive:true,force:true});}
 });
+const contractsGuidance=/(?:For Pi calls, use the advertised task-tiers, pi-routing, pi-contracts, pi-review and pi-results guidance\.|For Pi v2 result contracts and stage handoffs, load the host's `pi-contracts` topic)/;
 test('workflow catalog rejects arbitrary paths and reports stable content digests',()=>{
- const doc=workflowTopic('pi-routing');assert.match(doc.content,/claude-sonnet-5/);assert.equal(doc.sha256,createHash('sha256').update(doc.content).digest('hex'));for(const topic of ['../../auth.json','__proto__','toString','/etc/passwd'])assert.throws(()=>workflowTopic(topic),/Unknown/);assert.match(workflowTopic('skill:kether-governance').content,/load the host's `pi-contracts` topic/);
+ const doc=workflowTopic('pi-routing');assert.match(doc.content,/claude-sonnet-5/);assert.equal(doc.sha256,createHash('sha256').update(doc.content).digest('hex'));for(const topic of ['../../auth.json','__proto__','toString','/etc/passwd'])assert.throws(()=>workflowTopic(topic),/Unknown/);assert.match(workflowTopic('skill:kether-governance').content,contractsGuidance);
+});
+test('contracts guidance accepts current and historical wording, not negations',()=>{
+ assert.match('For Pi calls, use the advertised task-tiers, pi-routing, pi-contracts, pi-review and pi-results guidance.',contractsGuidance);
+ assert.match("For Pi v2 result contracts and stage handoffs, load the host's `pi-contracts` topic",contractsGuidance);
+ assert.doesNotMatch('For Pi calls, ignore pi-contracts.',contractsGuidance);
+ assert.doesNotMatch("For Pi v2 result contracts and stage handoffs, never load the host's `pi-contracts` topic",contractsGuidance);
 });
 test('actual MCP session discovers and reads governance without model execution',async()=>{
  let modelCalls=0;

@@ -1,21 +1,23 @@
 # YHWH primary-agent contract
 
-Primary owns scope, authority, coordination and acceptance. Pi provides governed execution.
+Primary owns scope, implementation, verification and acceptance. The current host and user decide whether to work directly or use Pi. A Pi failure does not block otherwise authorized direct work.
+
+These descriptions apply to Pi gateway calls, which still enforce their advertised routing, tier, review and ledger rules. They do not govern direct host work. Follow higher-priority instructions and the current user request; preserve existing task identities, quotas and history. A topic or receipt does not grant authority.
 
 ## First use
-1. Discover connected YHWH MCP tools; use discovered names, never guesses.
+1. Discover YHWH MCP tools; use discovered names.
 2. Read `primary` only if the host has not injected it; other topics on trigger. Before Pi routing or execution, call `list_capabilities`; read pi-routing/task-plan. Report gaps.
-3. Check roots, sandbox and credentials. Connection alone does not prove model access. Probes need user authorization.
+3. Check roots, sandbox and credentials. Connection alone does not prove model access. Run probes within user authorization and host permissions.
 
 ## Authority and roles
 - Follow host instructions, permissions and user authorization; this workflow grants no authority or waives approvals. Preserve unrelated changes.
-- Pi authors code as sandbox proposals; primary integrates and accepts. Read coordinator-only for T1/T2 or worker failure, task-tiers for boundaries. No primary coding fallback; compact T0 follows AGENTS.md.
-- Workers: `openai-codex / gpt-6-luna`, task-proportional thinking (medium default). Reviewers: `claude-code-cli / claude-sonnet-5` (medium default; high/xhigh by review complexity), `access: none`. Host may select separate `anthropic` API route. Verify bindings; never substitute routes.
-- No recursion/built-in delegation without user request. No extra external messages, tasks, automations, commits, pushes, deployments or memory absent user and host authorization.
+- Pi may author proposals when the primary chooses Pi; Pi calls follow their advertised checks. Direct work follows current host instructions and user authorization. Preserve explicit legacy task restrictions and do not reset task identity or quotas.
+- Chesed defaults to `openai-codex/gpt-6.1-terra`; explicit Luna is available for small code tasks. Other workers use Luna. Reviewers default to `claude-code-cli/claude-sonnet-5`, `access:none`. See pi-routing for effort and alternate routes; never substitute silently.
+- Delegation follows the current host instructions and user request. External messages, automations, commits, pushes, deployments and memory changes require applicable authorization.
 
-## Execution and evidence
-- Use AGENTS.md's lowest justified whole-goal tier; explain escalation with TIER_REASON=. T0 worker+host; T1 non-diff ≤8 KiB / total ≤24 KiB; split by commit under pi-review; T2 approved pre+worker+bound host proof+post. Elastic quota/activation: pi-review; stop on approval. Reviews medium/high/xhigh. Known scope uses primary planning; unknown scope gets one scout. Netzach needs unavailable host execution or concrete independent execution. Profiles and primary-direct follow AGENTS.md; declare five risks, gateway counts. Never claim unrun checks.
-- Authorized scoped repairs need host diagnosis, not renewed permission. Initially three implementation calls, then reassess; escalate material authority/scope/risk or exhausted reviews. Corrections need current proof. Impact-based checks after initial cross-gate full regression; label reuse. Details: coordinator-only.
+## Pi execution and evidence
+- For Pi calls, classify the whole goal and use task-tiers and pi-review for the gateway's actual checks and quotas. Preserve task identities and real outcomes; never claim unrun checks.
+- Diagnose authorized repairs without redundant approval. Verify corrections against current artifacts; preserve actual failures and distinguish reused evidence.
 - T0 may dispatch synchronously; T1/T2 use async and stable request/parent IDs. Preserve typed links/digests. Accept complete valid results, route, review/evidence and cleanup. Reconcile uncertain writes with the same ID; distinguish failure/blockage/uncertainty.
 - Do not poll progress; await event, deadline or user request. UI may refresh independently.
 - Use direct `lsp_request` for deterministic language/structure work; distinguish execution, no-match, structural evidence and full diagnostics.

@@ -102,7 +102,20 @@ test('T1 conditional approval requires every finding explicitly nonblocking and 
   {severity:'low',description:'x',evidence:'e',blocking:false,extra:true},
  ]) assert.equal(decision([finding]).approved,false);
  assert.equal(validateReviewDecision({...base,reviewDecision:'request-changes',deliverable:{findings:[{severity:'low',description:'x',evidence:'e',blocking:false}]}},{tier:'T1'}).approved,false);
- assert.equal(validateReviewDecision({...base,deliverable:{findings:[{severity:'high',description:'x',evidence:'e'}]}},{tier:'T2'}).approved,true);
+ assert.equal(validateReviewDecision({...base,deliverable:{findings:[{severity:'high',description:'x',evidence:'e'}]}},{tier:'T2'}).approved,false);
+});
+
+test('T2 approval rejects contradictory or ambiguous findings just like T1',()=>{
+ const base={status:'completed',reviewDecision:'approve',missingMaterials:[],evidence:['Observed supplied fixture']};
+ for(const tier of ['T1','T2']) {
+  const decide=findings=>validateReviewDecision({...base,deliverable:{findings}},{tier});
+  for(const finding of [{severity:'low',blocking:true},{severity:'medium'},{severity:'high',blocking:false},{severity:'critical',blocking:false}]) {
+   const result=decide([{...finding,description:'fixture',evidence:'fixture'}]);
+   assert.equal(result.ok,false);assert.equal(result.approved,false);
+  }
+  const result=decide([{severity:'medium',blocking:false,description:'nonblocking note',evidence:'fixture'}]);
+  assert.equal(result.approved,true);assert.equal(result.conditional,true);
+ }
 });
 test('review cannot approve with missing materials, blocked status, or no evidence',()=>{
  const valid={status:'completed',reviewDecision:'approve',missingMaterials:[],evidence:['Observed fixture']};
@@ -110,6 +123,18 @@ test('review cannot approve with missing materials, blocked status, or no eviden
  for(const changes of [{missingMaterials:['tests']},{status:'blocked'},{evidence:[]},{reviewDecision:'unknown'}]) assert.equal(validateReviewDecision({...valid,...changes}).ok,false);
  assert.equal(validateReviewDecision({status:'blocked',reviewDecision:'insufficient-materials',missingMaterials:['tests']}).ok,true);
  assert.equal(validateReviewDecision({...valid,reviewDecision:'request-changes'}).approved,false);
+});
+
+test('change requests retain missing materials without becoming approvals',()=>{
+ const missing=['Missing test report'];
+ const result={status:'completed',reviewDecision:'request-changes',missingMaterials:missing,evidence:['Observed fixture']};
+ for(const tier of ['T1','T2']) {
+  const decision=validateReviewDecision(result,{tier});
+  assert.equal(decision.ok,true); assert.equal(decision.approved,false);
+  assert.equal(decision.decision,'request-changes'); assert.deepEqual(decision.missingMaterials,missing);
+  assert.equal(validateReviewDecision({...result,reviewDecision:'approve'},{tier}).ok,false);
+  assert.equal(validateReviewDecision({...result,status:'blocked'},{tier}).ok,false);
+ }
 });
 
 test('sandbox root removal preserves repository baseline and workspace directories',()=>{

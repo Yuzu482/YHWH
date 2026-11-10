@@ -1,4 +1,5 @@
 import { configuredRoute, loadProviderConfig } from './controlled-provider.mjs';
+import { REVIEWER_ROUTES } from './reviewer-route-config.mjs';
 
 export const WORKER_ENFORCEMENT_INVALID = 'YHWH_WORKER_ENFORCEMENT_INVALID';
 export const WORKER_ENFORCEMENT_REJECTED = 'YHWH_WORKER_ENFORCEMENT_REJECTED';
@@ -18,14 +19,14 @@ export function getWorkerEnforcementStatus(env = process.env) {
 }
 
 export function isReviewerRoute(provider, model, config) {
-  if (provider === 'claude-code-cli' || provider === 'anthropic') return model === 'claude-sonnet-5';
+  if (Object.hasOwn(REVIEWER_ROUTES, provider)) return model === REVIEWER_ROUTES[provider].model;
   if (provider !== 'yhwh-reviewer-api') return false;
   const route = configuredRoute(provider, config ?? loadProviderConfig());
   return route?.semanticModel === 'claude-sonnet-5' && route.model === model;
 }
 
-function isWorkerRoute(provider, model, config) {
-  if (provider === 'openai-codex') return model === 'gpt-6-luna';
+function isWorkerRoute(provider, model, config, task) {
+  if (provider === 'openai-codex') return model === 'gpt-6-luna' || (model === 'gpt-6.1-terra' && task?.role === 'Chesed');
   if (provider !== 'yhwh-worker-api') return false;
   const route = configuredRoute(provider, config ?? loadProviderConfig());
   return route?.semanticModel === 'gpt-5.6-luna' && route.model === model;
@@ -47,7 +48,7 @@ export function enforceWorkerExecution({ provider, model, access = 'none', revie
     if (access === 'none' && probeApproved && isGatewayProbeTask(task, probeToken)) return status;
     fail(WORKER_ENFORCEMENT_REJECTED);
   }
-  if (isWorkerRoute(provider, model)) return status;
+  if (isWorkerRoute(provider, model, undefined, task)) return status;
   if (access === 'none' && reviewerValidated && isReviewerRoute(provider, model)) return status;
   fail(WORKER_ENFORCEMENT_REJECTED);
 }

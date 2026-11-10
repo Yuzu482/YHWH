@@ -10,12 +10,24 @@ export const PROVIDER_POLICY = Object.freeze({
   'openai-codex': Object.freeze({
     defaultModel: 'gpt-6-luna',
     defaultThinking: 'medium',
-    models: Object.freeze(['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-luna', 'gpt-6-sol']),
+    models: Object.freeze(['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-terra']),
   }),
 
 });
 
+// Exact provider/model pairs from the local model exclusion policy. Keep this
+// independent of worker-enforcement mode and provider allowlist changes.
+const DENIED_MODEL_PAIRS = new Set([
+  'dsh\0gpt-5.6-sol',
+  'openai-codex\0gpt-5.3-codex-spark',
+  'opencode-go\0minimax-m2.7',
+  'pi-claude-code-provider\0fable',
+]);
+
 export function validateRoute(provider, model) {
+  if (DENIED_MODEL_PAIRS.has(`${provider}\0${model}`)) {
+    throw Object.assign(new Error('The provider/model pair is disabled by the Pi gateway model policy'), {code:'PI_MODEL_DENIED'});
+  }
   const policy = PROVIDER_POLICY[provider] ?? providerPolicy(provider);
   if (!policy) throw new Error('provider is not in the Pi gateway allowlist');
   if (!policy.models.includes(model)) throw new Error('provider/model tuple is not in the Pi gateway allowlist');

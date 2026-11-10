@@ -23,7 +23,7 @@ export function pinnedSdkMatches(read=readFileSync){
 }
 const REQUIRED=['--offline','--no-approve','--no-skills','--no-prompt-templates','--no-context-files','--no-themes','--no-extensions','--print','--no-session'];
 const EXTENSIONS=new Set(['role-presets','read-scope-guard','lsp-proxy','write-scope-guard','auth-scrub','source-window','result-submit','run-check-proxy','editor-proxy'].map(n=>'/opt/pi-kether/extensions/'+n+'.js'));
-const MODELS=new Set(['gpt-5.4','gpt-5.4-mini','gpt-5.5','gpt-5.6-luna','gpt-5.6-sol','gpt-5.6-terra','gpt-6-luna','gpt-6-sol']);
+const MODELS=new Set(['gpt-5.4','gpt-5.4-mini','gpt-5.5','gpt-5.6-luna','gpt-5.6-sol','gpt-5.6-terra','gpt-6-luna','gpt-6-sol','gpt-6.1-terra']);
 const ROLES=new Set(['Yesod','Binah','Malkuth','Hod','Chochmah','Chesed','Netzach','Geburah']);
 const TOOLS=new Set(['read','grep','find','ls','edit','write','yhwh_source_window','yhwh_submit_result','yhwh_run_check','pi_editor_execute',...['diagnostics','hover','definition','references','symbols','completions','code_actions'].map(n=>'yhwh_lsp_'+n)]);
 export function isSingleShotArgs(args){

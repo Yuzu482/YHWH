@@ -16,8 +16,10 @@ The primary can run in any host with MCP tool calling and persistent instruction
 
 Pi is the lower-agent execution, model-probe and LSP layer controlled by Tifereth. The default installation uses stdio; an optional shared runtime uses the local Streamable HTTP MCP endpoint `http://127.0.0.1:17331/mcp`. Model tasks first pass through a Kether execution envelope, then route through an exact allowlist to:
 
-- `openai-codex` (workers: `gpt-6-luna`, task-proportional thinking with `medium` by default).
-- `anthropic` (Geburah/reviewer: `claude-sonnet-5` / `max`, restricted to `access:none`).
+- `openai-codex` (code worker Chesed defaults to `gpt-6.1-terra`; offline task-plan selects `gpt-6-luna` for clearly small or authorized editor tasks and preserves explicit choices; other workers use Luna; task-proportional thinking defaults to `medium`).
+- `claude-code-cli` (Geburah/reviewer defaults to `claude-sonnet-5`, restricted to `access:none`; other reviewer routes can be selected explicitly when configured).
+
+**Pi model-catalog prerequisite:** The bundled OpenAI Codex catalog in pinned Pi 0.84.4 does not include `gpt-6.1-terra`, `gpt-6-luna` or `gpt-6-sol`, and provisioning does not add their metadata. Existing local additions can be overwritten by `npm ci` or reinstall. Inspect the actual catalog and run an authorized no-tools probe before relying on these routes; gateway discovery alone does not establish model availability.
 
 The gateway provides synchronous execution, asynchronous monitoring, model probes and LSP tools. Monitoring uses `submit_subagent`, `get_subagent_status`, `get_subagent_result`, `list_subagents`, `cancel_subagent` and `render_subagent_monitor`. The last tool returns an MCP Apps conversation card that refreshes the task tree by `parentRunId`. Callers cannot supply raw Pi arguments, environment variables or arbitrary tool lists. Pi starts with automatic extension discovery disabled and loads only controlled provider and LSP extensions for the task. Actual provider, model and `toolsUsed` are returned for Tifereth's acceptance checks.
 

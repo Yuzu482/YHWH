@@ -2,7 +2,22 @@
 import { lstatSync, readFileSync } from 'node:fs';
 import { join, resolve, isAbsolute, sep } from 'node:path';
 
-export const REVIEWER_TRANSPORTS = Object.freeze(['claude-code-cli', 'anthropic']);
+export const REVIEWER_ROUTES = Object.freeze({
+  'claude-code-cli': Object.freeze({model:'claude-sonnet-5',runtime:'claude-code-cli'}),
+  anthropic: Object.freeze({model:'claude-sonnet-5',runtime:'pi'}),
+  'openai-codex': Object.freeze({model:'gpt-6-sol',runtime:'pi'}),
+});
+export const REVIEWER_TRANSPORTS = Object.freeze(Object.keys(REVIEWER_ROUTES));
+export function nativeReviewerRoute(provider) {
+  if (!Object.hasOwn(REVIEWER_ROUTES, provider)) throw new Error('Unsupported native reviewer provider');
+  return REVIEWER_ROUTES[provider];
+}
+// The legacy controlled API transport only implements max; never translate effort.
+export function reviewerThinkingLevels(provider) {
+  if (provider === 'yhwh-reviewer-api') return ['max'];
+  nativeReviewerRoute(provider);
+  return ['medium','high','xhigh'];
+}
 const fail = () => { throw Object.assign(new Error('PI_REVIEWER_ROUTE_CONFIG_INVALID'), { code: 'PI_REVIEWER_ROUTE_CONFIG_INVALID' }); };
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 

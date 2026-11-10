@@ -19,6 +19,7 @@ import { validateRoleAccess } from './role-presets.mjs';
 import { requireReviewMaterials, validateReviewPacket } from '../extensions/review-contract.js';
 import { calculateExecutionBudget } from '../extensions/execution-budget.js';
 import { editorRouteAllowed, enforceWorkerExecution, isReviewerRoute } from './worker-enforcement.mjs';
+import { reviewerThinkingLevels } from './reviewer-route-config.mjs';
 
 // Invoke Node entrypoints, never npm's .cmd shim or a shell containing user text.
 export function findPiEntry(env = process.env) {
@@ -72,7 +73,8 @@ export function validateRequest(value, allowWrite = false, launchRoot = process.
   if (request.thinking === undefined) request.thinking = policy.defaultThinking;
   if (['anthropic','yhwh-reviewer-api'].includes(request.provider) && request.access !== 'none') throw new Error('Claude review requires none access');
   if (request.thinking !== undefined && !['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(request.thinking)) throw new Error('Invalid thinking');
-  if (reviewerValidated && !probe && !['medium','high','xhigh'].includes(request.thinking)) throw Object.assign(new Error('Reviewer thinking must be medium, high, or xhigh'),{code:'REVIEW_TIER_THINKING_INVALID'});
+  if (reviewerValidated && !probe && (request.access !== 'none' || task?.role !== 'Geburah' || task?.readScope?.length || task?.writeScope?.length || task?.fixtureScope?.length)) throw new Error('Validated review requires Geburah, none access and no file scopes');
+  if (reviewerValidated && !probe && !reviewerThinkingLevels(request.provider).includes(request.thinking)) throw Object.assign(new Error('Reviewer thinking must satisfy the selected reviewer transport'),{code:'REVIEW_TIER_THINKING_INVALID'});
   if (API_PROVIDERS.includes(request.provider)) {
     const config=loadProviderConfig();
     const route=configuredRoute(request.provider,config);
@@ -198,10 +200,16 @@ export function findClaudeCliEntry() {
 
 export async function dispatch(request, signal, task = null, { resultFormat = 'json', onProgress, upstreamResults=[], editorBroker=null, probe = false, probeToken, claudeReviewerRunner = runClaudeReviewerCli, claudeCliEntryResolver = findClaudeCliEntry, onModelStart, runtimeResolver = resolveRuntime } = {}) {
   const dispatchStarted = performance.now();
+  // The caller can retain its request while authentication is pending. Snapshot
+  // before validation and make the validated route immutable for every runtime.
+  request = Object.freeze(structuredClone(request));
+  // dispatch is also exported to callers that do not pass through validateRequest.
+  // Enforce the route independently of optional worker enforcement before auth.
+  validateRoute(request.provider, request.model);
   const structuredResultTool = !!task && resultFormat === 'json' && !probe && request.access !== 'none';
   if (editorBroker && (!editorRouteAllowed(request.provider, request.model) || probe)) throw Object.assign(new Error('Editor proxy is restricted to the native Luna worker route'), { code: 'YHWH_EDITOR_ROUTE_REJECTED' });
   let reviewerValidated = false;
-  if (!probe && isReviewerRoute(request.provider, request.model) && task && request.access === 'none') {
+  if (!probe && isReviewerRoute(request.provider, request.model) && ['Geburah','reviewer'].includes(task?.role) && request.access === 'none') {
     const normalizedTask = validateKetherTask(task);
     if (normalizedTask.readScope?.length || normalizedTask.writeScope?.length || normalizedTask.fixtureScope?.length) throw new Error('none access cannot declare file scopes');
     const roleRoute = resolveRoleModel(normalizedTask.role, request.model, request.provider);
@@ -213,10 +221,7 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
     requireReviewMaterials(reviewerTask);
     reviewerValidated = roleRoute.role === 'Geburah';
   }
-  let probeApproved = false;
-  if (probe) {
-    try { validateRoute(request.provider, request.model); probeApproved = true; } catch { /* Gate below rejects unapproved probe routes. */ }
-  }
+  const probeApproved = probe;
   enforceWorkerExecution({ provider: request.provider, model: request.model, access: request.access, reviewerValidated, probe, probeToken, probeApproved, task });
   if (process.env.PI_DISPATCH_ACTIVE === '1') throw new Error('Recursive Pi dispatch is disabled');
   const runtime = runtimeResolver(request);
@@ -240,7 +245,7 @@ export async function dispatch(request, signal, task = null, { resultFormat = 'j
   if (!executionBudget.ok) return { ok:false, ...runtimeMetadata, ...(structuredResultTool ? {resultSubmissionRequired:true} : {}), target:request.target, requestedProvider:request.provider, requestedModel:request.model, failureCode:'PI_EXECUTION_BUDGET_EXHAUSTED', failure:'No whole sandbox second remains', authentication, phaseTimings:{authenticationMs}, resourceLimits:request.resourceLimits, executionBudget };
   const sandboxResourceLimits = { ...request.resourceLimits, timeoutSeconds: executionBudget.sandboxSeconds };
   const raw = await runtime.run(prepared, {request,task,signal,editorBroker,apiPacket,resourceLimits:sandboxResourceLimits,onProgress:progress});
-  return { ...runtime.summarize(raw, { ...request, resultSubmissionRequired: structuredResultTool }), ...runtimeMetadata, ...(raw.outputLimitObservation?{outputLimitObservation:raw.outputLimitObservation}:{}), ...(structuredResultTool ? { resultSubmissionRequired: true } : {}), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits, executionBudget };
+  return { ...runtime.summarize(raw, Object.freeze({ ...request, resultSubmissionRequired: structuredResultTool })), ...runtimeMetadata, ...(raw.outputLimitObservation?{outputLimitObservation:raw.outputLimitObservation}:{}), ...(structuredResultTool ? { resultSubmissionRequired: true } : {}), authentication, phaseTimings:{authenticationMs,...raw.phaseTimings},resourceLimits: request.resourceLimits, executionBudget };
 }
 
 async function main(args, signal) {

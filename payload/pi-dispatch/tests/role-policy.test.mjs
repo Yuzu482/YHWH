@@ -14,7 +14,9 @@ test('Claude review is pinned and cannot gain tools or filesystem scope',()=>{
  assert.equal(request.model,'claude-sonnet-5');
  assert.equal(task.role,'Geburah');
  assert.equal(request.thinking,'medium');
- assert.throws(()=>validateKetherInvocation({...value,provider:'openai-codex'}),/requires provider/);
+ const gpt=validateKetherInvocation({...value,provider:'openai-codex'});
+ assert.equal(gpt.request.model,'gpt-6-sol');
+ assert.equal(gpt.task.role,'Geburah');
  assert.throws(()=>validateKetherInvocation({...value,model:'sonnet'}),/requires model/);
  assert.throws(()=>validateKetherInvocation({...value,access:'read',task:{...value.task,readScope:['package.json']}}),/Role Geburah does not allow read access/);
  assert.throws(()=>validateKetherInvocation({...value,access:'workspace-write',task:{...value.task,writeScope:['package.json']}},true),/Role Geburah does not allow workspace-write access/);
@@ -37,7 +39,7 @@ test('Geburah defaults to CLI, permits explicit API opt-in, and honors host API 
  const model='claude-sonnet-5';
  assert.deepEqual(resolveRoleModel('Geburah'),{role:'Geburah',model,provider:'claude-code-cli'});
  assert.deepEqual(resolveRoleModel('Geburah',undefined,'anthropic'),{role:'Geburah',model,provider:'anthropic'});
- assert.throws(()=>resolveRoleModel('Geburah',undefined,'openai-codex'),/requires provider/);
+ assert.deepEqual(resolveRoleModel('Geburah',undefined,'openai-codex'),{role:'Geburah',model:'gpt-6-sol',provider:'openai-codex'});
  const home=mkdtempSync(join(tmpdir(),'role-policy-'));
  try {
   const dir=join(home,'.local','state','pi-kether');

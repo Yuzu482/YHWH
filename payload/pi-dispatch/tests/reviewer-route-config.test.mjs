@@ -20,10 +20,12 @@ test('missing host config defaults to Claude Code CLI', () => {
 
 test('strict schema accepts only an explicit supported transport', () => {
   assert.deepEqual(validateReviewerRouteConfig({ schemaVersion: 1, defaultTransport: 'anthropic' }), { schemaVersion: 1, defaultTransport: 'anthropic' });
+  assert.deepEqual(validateReviewerRouteConfig({ schemaVersion: 1, defaultTransport: 'openai-codex' }), { schemaVersion: 1, defaultTransport: 'openai-codex' });
   for (const value of [
     { schemaVersion: 2, defaultTransport: 'anthropic' },
     { schemaVersion: 1, defaultTransport: 'other' },
     { schemaVersion: 1, defaultTransport: 'anthropic', credential: 'secret' },
+    { schemaVersion: 1, defaultTransport: 'openai-codex', model: 'gpt-6-luna' },
     { schemaVersion: 1, defaultTransport: 'claude-code-cli', apiKey: 'secret' },
   ]) assert.throws(() => validateReviewerRouteConfig(value), /PI_REVIEWER_ROUTE_CONFIG_INVALID/);
 });

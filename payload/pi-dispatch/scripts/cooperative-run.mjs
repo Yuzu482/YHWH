@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { validateDeclaredWorkflowTier } from '../extensions/workflow-tier.js';
+import { inspectTaskPlanning } from './task-planning.mjs';
 
 const fail = message => { throw new TypeError(message); };
 
@@ -82,7 +83,7 @@ export function planCooperativeRun(spec) {
     const request = {
       requestId: `cooperative-${createHash('sha256').update(`${runAnchor}\0${unit.id}`).digest('hex').slice(0, 32)}`,
       parentRunId,
-      provider: 'openai-codex', model: 'gpt-6-luna', thinking, resourceProfile: 'small', timeoutSeconds: 120,
+      provider: 'openai-codex', model: unit.writeScope.length && inspectTaskPlanning(task).recommendedThinking !== 'low' ? 'gpt-6.1-terra' : 'gpt-6-luna', thinking, resourceProfile: 'small', timeoutSeconds: 120,
       cwd, access: unit.writeScope.length ? 'workspace-write' : 'read', task,
     };
     if (unit.writeScope.length) {

@@ -46,6 +46,8 @@ test('validated Luna and reviewer envelopes are distinct from raw routes', () =>
 });
 
 test('direct dispatch rejects before sandbox or authentication', async () => {
+  await assert.rejects(() => dispatch(raw('openai-codex', 'gpt-6-sol')), /YHWH_WORKER_ENFORCEMENT_REJECTED/);
+  assert.doesNotThrow(()=>validateKetherInvocation({cwd,provider:'openai-codex',model:'gpt-6-sol',access:'none',task:reviewerTask}));
   await assert.rejects(() => dispatch(raw('openai-codex', 'gpt-5.4')), /YHWH_WORKER_ENFORCEMENT_REJECTED/);
   await assert.rejects(() => dispatch(raw('anthropic', 'claude-sonnet-5'), undefined, { role: 'reviewer', objective: 'Incomplete review', acceptance: ['Return findings'] }), /review|materials/i);
   await assert.rejects(() => dispatch(raw('anthropic', 'claude-sonnet-5'), undefined, { ...reviewerTask, readScope: ['secret.txt'] }), /none access|file scopes/);

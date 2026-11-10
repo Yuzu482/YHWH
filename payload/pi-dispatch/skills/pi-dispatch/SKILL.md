@@ -1,16 +1,16 @@
 ---
 name: pi-dispatch
-description: Governed local Pi MCP gateway for Tifereth's default lower-agent execution/probe layer; not Codex desktop task management.
+description: Pi gateway for optional delegated execution, probes and LSP; not Codex chat management.
 ---
 
 # Pi Dispatch
 
-Use `http://127.0.0.1:17331/mcp`. Tifereth owns scope, routing, integration and acceptance. Use bounded Pi tasks; built-in subagents need explicit user request. No recursion.
+Use `http://127.0.0.1:17331/mcp` when selected. The primary owns scope and acceptance. Native delegation follows host and user instructions; Pi forbids recursion. The rules below apply to Pi calls.
 
 ## Before dispatch
 
 - Check `list_capabilities` and read `pi-routing` for scope, acceptance and adaptive thinking. Listed tuples are allowlists, not live access; only an authorized `probe_model` tests access.
-- Workers use `openai-codex / gpt-6-luna`; Geburah reviewer uses `claude-code-cli / claude-sonnet-5` (medium default; high/xhigh by review complexity), `access:none` and `task.reviewPacket`. The host may explicitly select the separate `anthropic` API route. No automatic route substitution; exact role bindings are in `pi-routing`.
+- Chesed defaults to `openai-codex/gpt-6.1-terra`; `task-plan` selects Luna for clearly small code or editor tasks. Explicit choices are preserved. Other workers use Luna. Geburah defaults to `claude-code-cli/claude-sonnet-5`, `access:none`. See `pi-routing` for details.
 - Grant least privilege (`none`, `read`, verified sandboxed `workspace-write`) and allowed absolute `cwd`; writes are proposals. Pi roots only; credentials runtime-side, never prompts/tasks/packages. See `pi-routing` for conditional gateway mechanics.
 
 ## Submit and wait

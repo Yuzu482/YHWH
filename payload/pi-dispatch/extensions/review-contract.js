@@ -177,15 +177,15 @@ export function validateReviewDecision(value, {tier='T2'}={}) {
   const decisions=['approve','request-changes','insufficient-materials'];
   if (!decisions.includes(value?.reviewDecision) || !Array.isArray(value.missingMaterials) || value.missingMaterials.length>32 || value.missingMaterials.some(v=>typeof v!=='string'||!v.trim()||v.length>2000)) return {ok:false,code:'invalid_review_decision',approved:false};
   const insufficient=value.reviewDecision==='insufficient-materials';
-  if ((insufficient && (!value.missingMaterials.length || value.status!=='blocked')) || (!insufficient && (value.missingMaterials.length || value.status!=='completed'))) return {ok:false,code:'inconsistent_review_decision',approved:false};
+  if ((insufficient && (!value.missingMaterials.length || value.status!=='blocked')) || (!insufficient && (value.status!=='completed' || (value.reviewDecision==='approve' && value.missingMaterials.length)))) return {ok:false,code:'inconsistent_review_decision',approved:false};
   if (value.reviewDecision==='approve' && !(typeof value.evidence==='string' ? value.evidence.trim() : Array.isArray(value.evidence)&&value.evidence.length)) return {ok:false,code:'review_evidence_missing',approved:false};
   let conditional=false;
   const findings=value.deliverable?.findings;
   const severities=['info','low','medium','high','critical'];
   if (findings!==undefined && (!Array.isArray(findings) || findings.some(f=>!f||typeof f!=='object'||Array.isArray(f)||!severities.includes(f.severity)||(Object.hasOwn(f,'blocking')&&typeof f.blocking!=='boolean')||Object.keys(f).some(k=>!['severity','description','evidence','blocking'].includes(k))))) return {ok:false,code:'invalid_review_findings',approved:false};
-  if (value.reviewDecision==='approve' && tier==='T1' && findings?.length) {
+  if (value.reviewDecision==='approve' && findings?.length) {
     conditional=findings.every(f=>f.blocking===false && !['high','critical'].includes(f.severity));
-    if (!conditional) return {ok:false,code:'t1_findings_block_approval',approved:false};
+    if (!conditional) return {ok:false,code:tier==='T1'?'t1_findings_block_approval':'review_findings_block_approval',approved:false};
   }
   return {ok:true,code:conditional?'conditional_approval':'valid',approved:value.reviewDecision==='approve',conditional,decision:value.reviewDecision,missingMaterials:value.missingMaterials};
 }
