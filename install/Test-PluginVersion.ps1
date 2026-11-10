@@ -38,6 +38,11 @@ try {
   [IO.File]::WriteAllText((Join-Path $source 'portable.manifest.json'), $portableText)
   New-Item -ItemType Directory -Path (Join-Path $source 'payload/pi-dispatch/scripts') -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $repo 'payload/pi-dispatch/scripts/plugin-upgrade.mjs') -Destination (Join-Path $source 'payload/pi-dispatch/scripts/plugin-upgrade.mjs')
+  $repositoryOnly=@(& (Join-Path $PSScriptRoot 'Get-ReleaseExcludedPaths.ps1'))
+  foreach($relative in $repositoryOnly){$fixturePath=Join-Path $source $relative;New-Item -ItemType Directory -Force -Path (Split-Path -Parent $fixturePath) | Out-Null;[IO.File]::WriteAllText($fixturePath,'repository-only fixture')}
+  $sameName='payload/pi-dispatch/tests/other/legacy-state-pins.json'
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $source $sameName)) | Out-Null
+  [IO.File]::WriteAllText((Join-Path $source $sameName),'unrelated file with the same name')
   Invoke-FixtureGit $source @('init','-q')
   Invoke-FixtureGit $source @('config','user.email','test@example.invalid')
   Invoke-FixtureGit $source @('config','user.name','Plugin Version Test')
@@ -68,6 +73,8 @@ try {
     $target=Join-Path $full ('install-target-'+[guid]::NewGuid().ToString('N'))
     $before=[IO.File]::ReadAllText((Join-Path $source $pluginRel))
     $actual=& (Join-Path $PSScriptRoot 'Stage-InstalledPlugin.ps1') -PackageRoot $source -Destination $copy
+    foreach($relative in $repositoryOnly){if(Test-Path -LiteralPath (Join-Path $copy $relative.Substring('payload/pi-dispatch/'.Length))){throw 'Repository-only fixture entered installed staging.'};if(-not (Test-Path -LiteralPath (Join-Path $source $relative))){throw 'Source fixture was removed.'}}
+    if(-not (Test-Path -LiteralPath (Join-Path $copy $sameName.Substring('payload/pi-dispatch/'.Length)))){throw 'Unrelated file with the same name was removed.'}
     Copy-Item -LiteralPath $actual -Destination $target -Recurse
     $nodePath=(Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
     $checker=Join-Path $repo 'payload/pi-dispatch/scripts/install-integrity.mjs'

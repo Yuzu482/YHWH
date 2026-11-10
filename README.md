@@ -80,7 +80,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps
 
 默认导出通用 MCP 接入配置，不修改 Codex 全局设置。用 `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"` 选择宿主；包含 `codex` 时才执行原有 Codex 集成。接入文件还需按宿主提示导入，并加载主代理规则；已有配置不会被导出器覆盖。
 
-安装器在 `%LOCALAPPDATA%\YHWH` 准备固定版本的 PowerShell 7 和 Node，无需预装它们或 Git，也不要求登录 GitHub。工作流源码已嵌入脚本；运行环境和依赖仍需联网下载。Windows 端运行包和 Ubuntu 镜像使用构建时记录的 SHA256 校验，下载内容变化会停止安装，不会自动接受新校验值。
+安装器在 `%LOCALAPPDATA%\YHWH` 准备固定版本的 PowerShell 7 和 Node；需要预装 Git。生成脚本包含便携包，并从构建时记录的无凭据 HTTPS origin 获取完整 Git 源码，在安装前验证与包一致的提交、远端分支及主线关系。默认要求该提交已进入远端 main；明确授权的预合并安装需传入 `-PreMergeDeploy -Reason "原因"`。私有仓库需要相应读取权限。运行环境和依赖仍需联网下载；Windows 运行包和 Ubuntu 镜像按构建时记录的 SHA256 校验。
 
 它会导入专用 `YHWH` WSL2 Ubuntu 24.04 环境，安装 Windows 插件、治理规则和 WSL 沙箱/LSP，再运行安装检查。首次启用 WSL 可能出现 Windows 管理员授权，并需要重启后重新运行脚本；脚本以 `3010` 表示这一步尚待重启，不会声称安装完成。需要启用硬件虚拟化，且组织策略允许 WSL。WSL 安装方式依据 [Microsoft 官方说明](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)。
 

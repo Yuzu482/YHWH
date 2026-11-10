@@ -35,7 +35,7 @@ if ($version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$') { throw 'Invalid r
 $release = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $release | Out-Null
 
-foreach($script in @('Test-PiKether.ps1','Test-HostWorkflowSync.ps1','Test-HindsightWrapper.ps1','Test-WorkflowConfig.ps1','Test-Headless.ps1','Test-PluginVersion.ps1','Test-DeploymentSource.ps1')) {
+foreach($script in @('Test-PiKether.ps1','Test-HostWorkflowSync.ps1','Test-HindsightWrapper.ps1','Test-WorkflowConfig.ps1','Test-Headless.ps1','Test-PluginVersion.ps1','Test-DeploymentSource.ps1','Test-OneClickSource.ps1')) {
   $r=Invoke-ValidationProcess $pwsh @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $root ('install/'+$script))) 300 $root
   Assert-ValidationSuccess $r $pwsh 300
 }
@@ -128,6 +128,7 @@ try {
   finally { $gitProcess.Dispose() }
   $allowedSet = @{}
   foreach ($name in $allowed) { $allowedSet[$name] = $true }
+  $repositoryOnly = @(& (Join-Path $root 'install/Get-ReleaseExcludedPaths.ps1'))
   foreach ($relative in ($trackedOutput -split "`0")) {
     if (-not $relative) { continue }
     $relative = $relative.Replace('\\','/')
@@ -135,7 +136,7 @@ try {
     $parts = $relative.Split('/')
     if (-not $allowedSet.ContainsKey($parts[0])) { continue }
     # Repository-only synthetic integration fixtures must never enter an installed runtime.
-    if ($relative -in @('payload/pi-dispatch/tests/card-lab-interrupted-request-recovery.test.mjs','payload/pi-dispatch/tests/review-quota-adjudication.test.mjs','payload/pi-dispatch/tests/review-quota-material-reconsideration.test.mjs','payload/pi-dispatch/tests/helpers/legacy-state-fixtures.mjs','payload/pi-dispatch/tests/fixtures/legacy-state-pins.json','payload/pi-dispatch/tests/fixtures/legacy-state-baseline-package.json')) { continue }
+    if ($relative -in $repositoryOnly) { continue }
     $isBaselineFile = $relative -eq '.test/baseline-failures.json'
     $skip = $false
     foreach ($part in $parts) {

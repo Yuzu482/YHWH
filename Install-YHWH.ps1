@@ -11,6 +11,8 @@ param(
   [Parameter(ParameterSetName='Install')][string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'YHWH'),
   [Parameter(ParameterSetName='Install')][switch]$NonInteractive,
   [Parameter(ParameterSetName='Install')][switch]$UpgradeExisting,
+  [Parameter(ParameterSetName='Install')][switch]$PreMergeDeploy,
+  [Parameter(ParameterSetName='Install')][string]$Reason,
   [Parameter(ParameterSetName='Install')][switch]$PlanOnly,
   [Parameter(Mandatory,ParameterSetName='Extract')][switch]$ExtractOnly,
   [Parameter(Mandatory,ParameterSetName='Extract')][string]$Destination
@@ -18,6 +20,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $script:PayloadSha256 = '__YHWH_PAYLOAD_SHA256__'
 $script:PayloadBase64 = '__YHWH_PAYLOAD_BASE64__'
+$script:SourceUrl = '__YHWH_SOURCE_URL__'
 
 function Assert-YhwhHash([string]$Path, [string]$Expected) {
   if ($Expected -notmatch '^[a-f0-9]{64}$' -or (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -ne $Expected) {
@@ -168,11 +171,13 @@ function Invoke-YhwhMain {
     Write-Host '[PLAN] No changes or network requests. Full installation requires Windows 11 x64, network access, WSL2/virtualization and a stopped Pi runtime. Provider login remains manual.'
     return
   }
+  if (-not (Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue)) { throw 'Git is required to verify the installation source.' }
+  if ($Reason -and -not $PreMergeDeploy) { throw 'Reason requires -PreMergeDeploy.' }
+  if ($PreMergeDeploy -and ([string]::IsNullOrWhiteSpace($Reason) -or $Reason.Length -gt 512 -or [Text.Encoding]::UTF8.GetByteCount($Reason) -gt 2048 -or $Reason -match '[\x00-\x1f\x7f-\x9f\u2028\u2029]')) { throw 'PreMergeDeploy requires a nonempty single-line Reason.' }
   if (-not [Environment]::Is64BitProcess -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64' -or [Environment]::OSVersion.Version.Build -lt 22000) {
     throw 'This installer supports Windows 11 x64 only. Use 64-bit Windows PowerShell.'
   }
   Assert-YhwhInstallAllowed (Join-Path $HOME 'plugins\pi-dispatch') -Upgrade:$UpgradeExisting
-  if (-not (Initialize-YhwhWsl -Unattended:$NonInteractive)) { exit 3010 }
   if (-not $NonInteractive -and -not $script:PSBoundParameters.ContainsKey('WorkspaceRoots')) {
     $answer = Read-Host "Workspace directory (Enter for $($roots[0]))"
     if ($answer) { $roots = @(Assert-YhwhDestination $answer) }
@@ -201,6 +206,19 @@ function Invoke-YhwhMain {
   $node = Join-Path $nodeBin 'node.exe'
   if ((& $node --version) -ne ('v' + $deps.node.version)) { throw 'Private Node runtime version mismatch.' }
   if ((& $pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()') -ne $deps.powershell.version) { throw 'Private PowerShell runtime version mismatch.' }
+  if (-not $script:PayloadBase64.StartsWith('__YHWH_')) {
+    $sourceParent = Join-Path $root 'verified-sources'
+    New-Item -ItemType Directory -Force -Path $sourceParent | Out-Null
+    $sourcePath = Join-Path $sourceParent ([guid]::NewGuid().ToString('N'))
+    $sourceArgs = @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $package 'install\Resolve-OneClickSource.ps1'),'-PackageRoot',$package,'-CheckoutPath',$sourcePath,'-SourceUrl',$script:SourceUrl)
+    if ($PreMergeDeploy) { $sourceArgs += '-PreMergeDeploy' }
+    if ($Reason) { $sourceArgs += @('-Reason',$Reason) }
+    $resolved = & $pwsh @sourceArgs
+    if ($LASTEXITCODE -ne 0) { throw 'Verified source checkout failed; workflow installation did not start. Bootstrap files may remain.' }
+    $package = ($resolved | ConvertFrom-Json).path
+    if (-not $package -or -not (Test-Path -LiteralPath (Join-Path $package 'Workflow.ps1'))) { throw 'Verified source checkout is incomplete.' }
+  }
+  if (-not (Initialize-YhwhWsl -Unattended:$NonInteractive)) { exit 3010 }
   Initialize-YhwhDistro $root $deps.ubuntu $cache
   foreach ($workspace in $roots) { New-Item -ItemType Directory -Force -Path $workspace | Out-Null }
   $configPath = Join-Path $root 'install.config.json'
@@ -209,7 +227,10 @@ function Invoke-YhwhMain {
   $oldPath = $env:PATH
   try {
     $env:PATH = $nodeBin + ';' + $psDir + ';' + $oldPath
-    & $pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $package 'Workflow.ps1') -Action Install -ConfigFile $configPath
+    $workflowArgs = @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $package 'Workflow.ps1'),'-Action','Install','-ConfigFile',$configPath)
+    if ($PreMergeDeploy) { $workflowArgs += '-PreMergeDeploy' }
+    if ($Reason) { $workflowArgs += @('-Reason',$Reason) }
+    & $pwsh @workflowArgs
     if ($LASTEXITCODE -ne 0) { throw "Workflow installation failed (exit $LASTEXITCODE). Inspect the error and backups, then retry with -UpgradeExisting." }
   } finally { $env:PATH = $oldPath }
   # Store paths as JSON data; never interpolate user paths into executable command text.

@@ -5,11 +5,13 @@ $ErrorActionPreference = 'Stop'
 $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'portable.manifest.json') -Raw | ConvertFrom-Json
 $archive = (Resolve-Path -LiteralPath $PortableZip).Path
 $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+$sourceUrl = (& git.exe -c core.fsmonitor=false -C $PSScriptRoot remote get-url origin).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceUrl -cnotmatch '^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?/[A-Za-z0-9._/-]+$') { throw 'One-click builds require a credential-free HTTPS origin.' }
 $template = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Install-YHWH.ps1') -Raw
-foreach ($marker in @('__YHWH_PAYLOAD_SHA256__','__YHWH_PAYLOAD_BASE64__')) {
+foreach ($marker in @('__YHWH_PAYLOAD_SHA256__','__YHWH_PAYLOAD_BASE64__','__YHWH_SOURCE_URL__')) {
   if ([regex]::Matches($template, $marker).Count -ne 1) { throw "Expected exactly one marker: $marker" }
 }
-$script = $template.Replace('__YHWH_PAYLOAD_SHA256__', $hash).Replace('__YHWH_PAYLOAD_BASE64__', [Convert]::ToBase64String([IO.File]::ReadAllBytes($archive)))
+$script = $template.Replace('__YHWH_PAYLOAD_SHA256__', $hash).Replace('__YHWH_PAYLOAD_BASE64__', [Convert]::ToBase64String([IO.File]::ReadAllBytes($archive))).Replace('__YHWH_SOURCE_URL__', $sourceUrl)
 $fileName = "Install-YHWH-$($manifest.version).ps1"
 $output = Join-Path (Split-Path -Parent $archive) $fileName
 [IO.File]::WriteAllText($output, $script, [Text.UTF8Encoding]::new($true))
