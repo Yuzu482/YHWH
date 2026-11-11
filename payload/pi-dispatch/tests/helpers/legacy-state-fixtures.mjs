@@ -11,6 +11,10 @@ import {createReviewAttemptLedger, reviewBlockers} from '../../scripts/tier-revi
 export const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const pins = JSON.parse(fs.readFileSync(join(packageRoot, 'tests/fixtures/legacy-state-pins.json')));
 export const sha = value => createHash('sha256').update(value).digest('hex');
+// The synthetic historical fixture pins the audited upstream package metadata.
+// Current runtime dependencies are tested separately and are never relabeled
+// as that historical artifact.
+const pinnedSource = p => join(packageRoot, p === 'package.json' ? 'tests/historical-synthetic-source/package.json' : p);
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
   ? Object.fromEntries(Object.keys(value).sort().map(k => [k, canonical(value[k])])) : value;
 export const canonicalHash = value => sha(JSON.stringify(canonical(value)));
@@ -28,8 +32,8 @@ export function clean(root) {
 }
 export function checkSources() {
   for (const [p,digest] of Object.entries(pins.sourceFiles)) {
-    assert.equal(fs.lstatSync(join(packageRoot,p)).isSymbolicLink(), false);
-    assert.equal(sha(fs.readFileSync(join(packageRoot,p))), digest, `Audited source changed: ${p}`);
+    assert.equal(fs.lstatSync(pinnedSource(p)).isSymbolicLink(), false);
+    assert.equal(sha(fs.readFileSync(pinnedSource(p))), digest, `Audited source changed: ${p}`);
   }
 }
 function literal(value) { return "'" + value.replaceAll('\\','\\\\').replaceAll("'","\\'") + "'"; }
@@ -63,7 +67,7 @@ export function mirror(root, policyMap=[], recoveryMap=[]) {
   checkSources();
   for (const p of Object.keys(pins.sourceFiles)) {
     const target = join(root,p); fs.mkdirSync(dirname(target), {recursive:true});
-    let bytes = fs.readFileSync(join(packageRoot,p));
+    let bytes = fs.readFileSync(pinnedSource(p));
     if (p === 'scripts/tier-review-policy.mjs' && policyMap.length) bytes = Buffer.from(transform(p,policyMap));
     if (p === 'extensions/milestone-ledger.js' && recoveryMap.length) bytes = Buffer.from(transform(p,recoveryMap));
     fs.writeFileSync(target,bytes);

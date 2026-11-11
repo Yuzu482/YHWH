@@ -202,8 +202,8 @@ test('model allowlists and exact provider/model routing', (t) => {
     'npm',
     'node_modules',
     'pi-lsp-extension',
-    'src',
-    'index.ts',
+    'dist',
+    'index.js',
   );
   mkdirSync(dirname(inertExtensionEntry), { recursive: true });
   writeFileSync(inertExtensionEntry, '');
@@ -245,6 +245,7 @@ test('model allowlists and exact provider/model routing', (t) => {
   const wslArgs = wslWriteArgs;
   assert.ok(wslArgs.includes('/opt/pi-kether/extensions/auth-scrub.js'));
   assert.equal(new Set(wslArgs).has('/opt/pi-kether/node_modules/pi-lsp-extension/src/index.ts'), false);
+  assert.equal(new Set(wslArgs).has('/opt/pi-kether/node_modules/pi-lsp-extension/dist/index.js'), false);
   assert.deepEqual(new Set(wslArgs.at(-1).split(',')), new Set(['read', 'grep', 'find', 'ls', 'edit', 'write', 'yhwh_source_window', 'yhwh_lsp_diagnostics', 'yhwh_lsp_hover', 'yhwh_lsp_definition', 'yhwh_lsp_references', 'yhwh_lsp_symbols', 'yhwh_lsp_completions', 'yhwh_lsp_code_actions']));
   assert.ok(wslArgs.includes('/opt/pi-kether/extensions/write-scope-guard.js'));
   assert.ok(!wslArgs.at(-1).split(',').includes('powershell'));

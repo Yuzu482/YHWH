@@ -78,8 +78,11 @@ test('fixture provenance: pinned bytes, per-path binary attributes, exact releas
     assert.ok(attributes.split(/\r?\n/).some(line=>line==='payload/pi-dispatch/'+p+' -text'||line.startsWith('payload/pi-dispatch/'+p+' -text ')));
   }
   const build=fs.readFileSync(join(repository,'Build-Release.ps1'),'utf8');
+  const inventory=fs.readFileSync(join(repository,'install/Release-Files.ps1'),'utf8');
+  assert.ok(build.includes('install/Release-Files.ps1'));
+  assert.ok(inventory.includes('payload/pi-dispatch/tests/historical-synthetic-source/'));
   for(const p of ['tests/card-lab-interrupted-request-recovery.test.mjs','tests/review-quota-adjudication.test.mjs','tests/review-quota-material-reconsideration.test.mjs','tests/helpers/legacy-state-fixtures.mjs','tests/fixtures/legacy-state-pins.json']){
-    assert.ok(build.includes("'payload/pi-dispatch/"+p+"'"));
+    assert.ok(inventory.includes("'payload/pi-dispatch/"+p+"'"));
   }
   for(const p of Object.keys(pins.sourceFiles)){
     assert.doesNotMatch(fs.readFileSync(join(packageRoot,p),'utf8'),/from\s+['"][^'"]*legacy-state-fixtures/);
