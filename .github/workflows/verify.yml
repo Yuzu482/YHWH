@@ -1,40 +1,35 @@
-name: Isolated WSL fixture discovery checks
+name: Isolated release artifact transport probe
 on:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  fixture-probe:
+  artifact-probe:
     runs-on: windows-2025
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '22.23.1'
-      - name: Install locked dependencies
-        working-directory: payload/pi-dispatch
-        shell: pwsh
-        run: |
-          npm ci
-          if ($LASTEXITCODE -ne 0) { throw 'Dependency install failed' }
-      - name: Check absent default and required distro
-        working-directory: payload/pi-dispatch
+      - name: Create synthetic release files
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $lines = @(& node --test '--test-name-pattern=WSL fixture discovery|production root functions' 'tests/patch-policy.test.mjs' 2>&1)
-          $code = $LASTEXITCODE
-          $text = $lines -join "`n"
-          $lines | ForEach-Object { Write-Host $_ }
-          if ($code -ne 0 -or -not $text.Contains('SKIP WSL test distribution Ubuntu-24.04 is not installed')) { throw 'Absent default distro was not reported as a skip' }
-          $env:PI_TEST_WSL_DISTRO = 'YHWH-intentionally-absent'
-          $lines = @(& node --test '--test-name-pattern=production root functions' 'tests/patch-policy.test.mjs' 2>&1)
-          $code = $LASTEXITCODE
-          Remove-Item Env:PI_TEST_WSL_DISTRO
-          $text = $lines -join "`n"
-          $lines | ForEach-Object { Write-Host $_ }
-          if ($code -ne 1 -or -not $text.Contains('Configured WSL test distribution YHWH-intentionally-absent is not installed')) { throw 'Explicitly requested missing distro was not rejected' }
-          $global:LASTEXITCODE = 0
+          $dir = Join-Path $env:RUNNER_TEMP 'yhwh-verified-release'
+          if (Test-Path -LiteralPath $dir) { throw 'Synthetic output already exists' }
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          $names = @('Install-YHWH-0.15.1.ps1', 'Install-YHWH-0.15.1.ps1.sha256', 'pi-kether-portable-0.15.1.zip', 'pi-kether-portable-0.15.1.zip.sha256', 'release-manifest.json', 'SHA256SUMS.txt', 'SOURCE_COMMIT.txt', 'YHWH-OneClick-0.15.1.zip', 'YHWH-OneClick-0.15.1.zip.sha256')
+          foreach ($name in $names) { [IO.File]::WriteAllText((Join-Path $dir $name), ('synthetic transport probe: ' + $name), [Text.Encoding]::ASCII) }
+      - name: Upload synthetic files only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: yhwh-release-transport-probe
+          path: |
+            ${{ runner.temp }}/yhwh-verified-release/Install-YHWH-0.15.1.ps1
+            ${{ runner.temp }}/yhwh-verified-release/Install-YHWH-0.15.1.ps1.sha256
+            ${{ runner.temp }}/yhwh-verified-release/pi-kether-portable-0.15.1.zip
+            ${{ runner.temp }}/yhwh-verified-release/pi-kether-portable-0.15.1.zip.sha256
+            ${{ runner.temp }}/yhwh-verified-release/release-manifest.json
+            ${{ runner.temp }}/yhwh-verified-release/SHA256SUMS.txt
+            ${{ runner.temp }}/yhwh-verified-release/SOURCE_COMMIT.txt
+            ${{ runner.temp }}/yhwh-verified-release/YHWH-OneClick-0.15.1.zip
+            ${{ runner.temp }}/yhwh-verified-release/YHWH-OneClick-0.15.1.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
