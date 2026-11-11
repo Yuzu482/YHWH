@@ -5,7 +5,8 @@ export function installTransportFence(packet, target=globalThis) {
   const endpoint=packet.route.baseUrl+(packet.route.protocol==='anthropic-messages'?'/v1/messages':'/responses');
   target.fetch=async (input,init={})=>{
     const url=typeof input==='string'?input:input instanceof URL?input.href:input.url;
-    if(url!==endpoint) throw new Error('PI_PROVIDER_ENDPOINT_REJECTED');
+    const supportedBeta=packet.route.protocol==='anthropic-messages' && url===endpoint+'?beta=true';
+    if(url!==endpoint && !supportedBeta) throw new Error('PI_PROVIDER_ENDPOINT_REJECTED');
     return original(input,{...init,redirect:'error'});
   };
   // Strip even nonstandard aggregator secrets from streaming JSON/errors, across chunks.

@@ -13,11 +13,27 @@ const json = file => JSON.parse(read(file).toString('utf8').replace(/^\uFEFF/, '
 const requireTrue = (value, message) => { if (!value) throw new Error(message); };
 const plugin = 'payload/pi-dispatch/';
 if(args.includes('--public')) {
-  const evidence=json('licenses/pi-lsp-extension-evidence.json');
-  requireTrue(evidence.status === 'upstream-notice-verified', 'Public release blocked: complete upstream pi-lsp-extension notice is still pending. Local preview packaging remains available.');
+  const version=json('portable.manifest.json').components.piLspExtension;
+  requireTrue(['1.3.0','1.4.0'].includes(version),'Public release blocked: unsupported pi-lsp-extension licensing evidence.');
+  // Preserve the historical 1.3.0 hold. The new evidence applies only to the
+  // 1.4.0 npm archive, which itself includes the verified upstream notice.
+  const evidence=json(version==='1.3.0'?'licenses/pi-lsp-extension-evidence.json':'licenses/pi-lsp-extension-1.4.0-evidence.json');
+  requireTrue(evidence.status === 'upstream-notice-verified', 'Public release blocked: the upstream pi-lsp-extension notice or its explicit coverage of the pinned version is not verified. Local preview packaging remains available.');
   const notice=evidence.upstreamNotice;
   requireTrue(notice && typeof notice.file==='string' && notice.file.startsWith('licenses/') && !notice.file.includes('..') && /^https:\/\/(?:raw\.githubusercontent\.com|github\.com)\/samfoy\/pi-lsp-extension\//.test(notice.source), 'Public release requires a traceable upstream notice.');
   requireTrue(createHash('sha256').update(read(notice.file)).digest('hex')===notice.sha256, 'Upstream notice digest mismatch.');
+  if(version==='1.4.0') {
+    const lock=json('payload/wsl-package-lock.json'), entry=lock.packages['node_modules/pi-lsp-extension'];
+    const metadata=json('licenses/pi-lsp-extension-1.4.0.package.json');
+    requireTrue(evidence.version===version && evidence.declaredLicense==='MIT' && evidence.licenseInPublishedTarball===true &&
+      evidence.gitHead==='ca0b3b8e53da5b814bf851bca0be47e7b413b122' &&
+      evidence.integrity==='sha512-FOwGIivoZt5YfVY/LGqQZf4+wPXT+73loKOQ3Lu6zeG2UAPCxelHT21zXG/qCVD32epq8FymH9dJ8EnotXkv4Q==' &&
+      notice.sha256==='65966b294b74544c0fbd282e30d64a736956110370a20d3f86dc2b7358cda3ba' &&
+      notice.source==='https://raw.githubusercontent.com/samfoy/pi-lsp-extension/ca0b3b8e53da5b814bf851bca0be47e7b413b122/LICENSE' &&
+      lock.packages[''].dependencies['pi-lsp-extension']===version && entry?.version===version && entry.integrity===evidence.integrity &&
+      metadata.name==='pi-lsp-extension' && metadata.version===version && metadata.license==='MIT',
+      'Public release requires matching 1.4.0 archive, lockfile and upstream license evidence.');
+  }
 }
 requireTrue(json('portable.manifest.json').license === 'Apache-2.0', 'Manifest license mismatch');
 requireTrue(json(plugin+'package.json').license === 'Apache-2.0', 'Package license mismatch');
@@ -43,7 +59,7 @@ const packages = locks.flatMap(lockfile => Object.entries(json(lockfile).package
   optional: entry.optional === true,
 })));
 const inventory = {schemaVersion:1, scope:'npm lockfile declarations only; includes optional/transitive packages; excludes system dependencies; not a license-text or provenance audit', packages};
-const notices = ['licenses/code-graph-tree-sitter-notices.txt','licenses/multilspy-dependency-notices.txt','licenses/pi-0.84.4-MIT.txt','licenses/pi-claude-code-provider-0.1.4-MIT.txt','licenses/MIT-standard-reference.txt','licenses/pi-lsp-extension-NOTICE.txt','licenses/claude-code-2.1.250-NOTICE.txt'];
+const notices = ['licenses/code-graph-tree-sitter-notices.txt','licenses/multilspy-dependency-notices.txt','licenses/pi-1.5.1-MIT.txt','licenses/pi-claude-code-provider-0.1.4-MIT.txt','licenses/MIT-standard-reference.txt','licenses/pi-lsp-extension-NOTICE.txt','licenses/pi-lsp-extension-upstream-20260924-LICENSE.txt','licenses/claude-code-2.1.250-NOTICE.txt'];
 const standalone = 'Third-party notices for the YHWH Pi integration\n\nDependencies retain their own licenses. These notices do not license Claude services.\nThe complete source distribution also contains THIRD_PARTY.md and a lockfile inventory.\n\n'+notices.map(file => `${path.basename(file)}\n${'='.repeat(60)}\n${read(file).toString('utf8').trim()}\n`).join('\n');
 const outputs = new Map([
   ['licenses/dependency-inventory.json', Buffer.from(JSON.stringify(inventory,null,2)+'\n')],

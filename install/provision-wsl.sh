@@ -2,8 +2,8 @@
 set -euo pipefail
 
 NODE_VERSION="22.23.1"
-PI_VERSION="0.84.4"
-LSP_VERSION="1.3.0"
+PI_VERSION="1.5.1"
+LSP_VERSION="1.4.0"
 PYRIGHT_VERSION="1.1.413"
 TSLS_VERSION="6.0.0"
 TYPESCRIPT_VERSION="7.0.2"
@@ -14,6 +14,17 @@ JDTLS_BUILD="202606262232"
 DOTNET_VERSION="10.0.400"
 CSHARP_LS_VERSION="0.26.0"
 HARDEN_DISTRO="${PI_KETHER_HARDEN_DISTRO:-0}"
+
+# Do not let an older installer replace a newer or unclassifiable WSL Pi.
+# A fresh distro does not need Python until the normal dependency installation.
+if [[ -e /opt/pi-kether || -L /opt/pi-kether ]]; then
+  command -v python3 >/dev/null || { echo 'Cannot safely inspect the existing Pi version.' >&2; exit 1; }
+  python3 /tmp/pi-kether-install/check-pi-downgrade.py /opt/pi-kether "$PI_VERSION"
+  if [[ -e /opt/pi-kether/node_modules || -L /opt/pi-kether/node_modules ]]; then
+    [[ -x /opt/node/bin/node && ! -L /opt/node/bin/node ]] || { echo 'Cannot verify the existing Pi dependency tree.' >&2; exit 1; }
+    /opt/node/bin/node /tmp/pi-kether-install/check-pi-runtime-tree.mjs /opt/pi-kether/node_modules
+  fi
+fi
 
 export DEBIAN_FRONTEND=noninteractive
 export PATH=/opt/node/bin:/opt/pi-kether/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -39,8 +50,15 @@ cat >/opt/pi-kether/package.json <<JSON
 {"private":true,"dependencies":{"@earendil-works/pi-coding-agent":"${PI_VERSION}","pi-lsp-extension":"${LSP_VERSION}","pyright":"${PYRIGHT_VERSION}","typescript-language-server":"${TSLS_VERSION}","typescript":"${TYPESCRIPT_VERSION}","typescript-lsp":"npm:typescript@${TYPESCRIPT_LSP_VERSION}","vscode-languageserver-protocol":"${VSCODE_LSP_VERSION}"}}
 JSON
 install -o root -g root -m 0644 /tmp/pi-kether-install/wsl-package-lock.json /opt/pi-kether/package-lock.json
-(cd /opt/pi-kether && /opt/node/bin/npm ci --omit=dev --ignore-scripts=false)
-/opt/node/bin/node /tmp/pi-kether-install/patch-pi-lsp.mjs /opt/pi-kether/node_modules/pi-lsp-extension
+# BEGIN PINNED PI RUNTIME
+(
+  umask 022
+  cd /opt/pi-kether
+  /opt/node/bin/npm ci --omit=dev --ignore-scripts=false
+  /opt/node/bin/node /tmp/pi-kether-install/patch-pi-lsp.mjs /opt/pi-kether/node_modules/pi-lsp-extension
+)
+/opt/node/bin/node --input-type=module -e 'import {sdkTreeDigest,PI_151_TREE_SHA256} from "/tmp/pi-kether-install/sdk-tree-integrity.mjs"; if (sdkTreeDigest("/opt/pi-kether/node_modules") !== PI_151_TREE_SHA256) throw new Error("Pi 1.5.1 runtime integrity mismatch");'
+# END PINNED PI RUNTIME
 
 # Pinned Python 3.12 runtime; no automatic language-server downloads during probes.
 python3 -c 'import sys; assert sys.version_info[:2] == (3, 12), "multilspy requires the pinned Python 3.12 wheel set"'
@@ -69,6 +87,8 @@ install -o root -g root -m 0644 /tmp/pi-kether-install/legacy-structural-bootstr
 install -o root -g root -m 0644 /tmp/pi-kether-install/multilspy-probe.py /opt/pi-kether/scripts/multilspy-probe.py
 install -o root -g root -m 0644 /tmp/pi-kether-install/secure-pi-bootstrap.mjs /opt/pi-kether/scripts/secure-pi-bootstrap.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/pi-single-shot-lifecycle.mjs /opt/pi-kether/scripts/pi-single-shot-lifecycle.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/sdk-tree-integrity.mjs /opt/pi-kether/scripts/sdk-tree-integrity.mjs
+install -o root -g root -m 0644 /tmp/pi-kether-install/pi-151-home.mjs /opt/pi-kether/scripts/pi-151-home.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/single-shot-lifecycle.js /opt/pi-kether/extensions/single-shot-lifecycle.js
 install -o root -g root -m 0644 /tmp/pi-kether-install/editor-pi-bootstrap.mjs /opt/pi-kether/scripts/editor-pi-bootstrap.mjs
 install -o root -g root -m 0644 /tmp/pi-kether-install/lsp-sandbox-broker.mjs /opt/pi-kether/scripts/lsp-sandbox-broker.mjs

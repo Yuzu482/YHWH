@@ -52,9 +52,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Runtime tests failed' }
           node --expose-gc tests/memory-regression.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Memory regression failed' }
-      - name: Package and verify extracted installer
+      - name: Package and verify extracted installer from main
+        if: github.event_name != 'pull_request'
         run: |
           ./Build-Release.ps1 -SkipTests
+      - name: Package and verify pull request in a local Git fixture
+        if: github.event_name == 'pull_request'
+        run: |
+          ./install/Invoke-CiReleasePreview.ps1 -FixtureParent $env:RUNNER_TEMP
       - name: Clean target installation plan
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'yhwh-empty-home'

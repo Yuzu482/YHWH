@@ -40,6 +40,13 @@ test('candidate selector is host-branded, changes patch prefixes and never admit
   const v=validateSandboxPatch(patch,{job,requestId:rid,writeScope:['dir/a.txt'],access:'workspace-write',candidate:c});
   assert.equal(v.patchValidation.ok,true);assert.match(v.patch,/\+\+\+ b\/dir\/a.txt/);
 });
+test('host check policy follows the OS account profile, not an injected USERPROFILE',{skip:process.platform!=='win32'},()=>{
+  const broker=new URL('../scripts/run-check-broker.mjs',import.meta.url).href;
+  const code=`import {trustedCheckConfiguration} from ${JSON.stringify(broker)}; process.stdout.write(trustedCheckConfiguration().policyPath);`;
+  const child=spawnSync(process.execPath,['--input-type=module','-e',code],{env:{...process.env,USERPROFILE:process.platform==='win32'?'C:\\untrusted-profile':'/untrusted-profile'},encoding:'utf8',timeout:15000,windowsHide:true});
+  assert.equal(child.status,0,child.stderr);
+  assert.equal(child.stdout,path.join(os.userInfo().homedir,'.local','state','pi-kether','run-check','check-policy.json'));
+});
 test('tool is limited to host-enabled Chesed write launch, absent from default and other roles',()=>{
   const req={provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',rolePresetId:'Chesed'};
   assert.ok(!buildPiArgs(req,'wsl2',false,true).join(' ').includes('yhwh_run_check'));

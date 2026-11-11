@@ -14,6 +14,13 @@
       "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48"
     },
     {
+      "file": "licenses/pi-1.5.1-MIT.txt",
+      "component": "Pi 1.5.1",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/v1.5.1/LICENSE",
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+      "checkedAt": "2026-11-11"
+    },
+    {
       "file": "licenses/pi-claude-code-provider-0.1.4-MIT.txt",
       "component": "pi-claude-code-provider 0.1.4",
       "source": "https://raw.githubusercontent.com/chem/pi-claude-code-provider/v0.1.4/LICENSE",
@@ -24,6 +31,20 @@
       "component": "pi-lsp-extension 1.3.0 package.json",
       "source": "https://registry.npmjs.org/pi-lsp-extension/-/pi-lsp-extension-1.3.0.tgz",
       "sha256": "57e79e296d7cdfa54e5c7917ca9d0d81ae3b1b0a9e76e56c2649eacb104c7a30"
+    },
+    {
+      "file": "licenses/pi-lsp-extension-1.4.0.package.json",
+      "component": "pi-lsp-extension 1.4.0 package.json",
+      "source": "https://registry.npmjs.org/pi-lsp-extension/-/pi-lsp-extension-1.4.0.tgz",
+      "sha256": "aa8397831f96fd352af2ccb7283756e467edaa0a55aa5c7ccf386c659832daee",
+      "checkedAt": "2026-11-11"
+    },
+    {
+      "file": "licenses/pi-lsp-extension-upstream-20260924-LICENSE.txt",
+      "component": "pi-lsp-extension upstream notice added 2026-09-24; applicability to 1.3.0 unconfirmed",
+      "source": "https://raw.githubusercontent.com/samfoy/pi-lsp-extension/a9a9df4de0d5831fdad3494b338d655491297006/LICENSE",
+      "sha256": "65966b294b74544c0fbd282e30d64a736956110370a20d3f86dc2b7358cda3ba",
+      "checkedAt": "2026-11-11"
     },
     {
       "file": "licenses/claude-code-2.1.250-NOTICE.txt",

@@ -11,9 +11,9 @@
 | 入口 | 后端 | 行为 |
 | --- | --- | --- |
 | diagnostics、hover、definition、references、symbols、completions、code_actions | multilspy 0.0.15 官方语言适配器或受控协议配置 + 预装语言服务器 | 无模型、只读查询；代码操作仅返回建议，拒绝服务端写入请求 |
-| overview、search | pi-lsp-extension 1.3.0 / Tree-sitter | 保留原结构分析能力；不是 multilspy，也不是语义查询失败后的回退 |
+| overview、search | pi-lsp-extension 1.4.0 / Tree-sitter | 保留原结构分析能力；不是 multilspy，也不是语义查询失败后的回退 |
 | Pi 模型任务的 `yhwh_lsp_*` | YHWH 自有 Pi 适配插件 + multilspy | 七项只读语义工具，使用当前任务文件的隔离快照；[接入说明](pi-lsp-adapter.md) |
-| Pi 模型任务的旧工具名称 | 原 pi-lsp-extension | 兼容保留，不表示已移除旧扩展或解决其许可缺口 |
+| Pi 模型任务的旧工具名称 | pi-lsp-extension | 兼容保留；历史 1.3.0 许可覆盖问题仍单独记录 |
 
 `list_capabilities.lsp` 公布语义和结构后端，结果包含 `engine`、版本、`adapter`、`adapterVersion`、`backend` 和 `modelCalls:0`。缺少依赖、服务不支持某方法或初始化失败会返回 unavailable/failed，不自动切回旧语义后端。
 
@@ -41,7 +41,7 @@ JavaScript/TypeScript 的诊断及代码建议不能用第一条通知判断分�
 
 YHWH 自有适配器采用 Apache-2.0；multilspy 的 [Microsoft MIT 文本](../licenses/multilspy-0.0.15-MIT.txt)和协议客户端内嵌的 [OLSP MIT 通知](../licenses/multilspy-OLSP-MIT.txt)均保留。[Python 依赖通知](../licenses/multilspy-dependency-notices.txt)来自散列核验的官方轮包。
 
-仍保留 pi-lsp-extension 的结构后端和模型工具，因此其完整上游通知问题没有消失。[上游 Issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14)和 [补齐记录](lsp-license-remediation.md)继续有效，`Build-Release.ps1 -PublicRelease` 继续阻断。语言服务器和依赖分别保留自己的许可；此清单不代表整个产品完成合规审计。
+当前源码固定的 pi-lsp-extension 1.4.0 包含完整上游 MIT 通知；[包证据](../licenses/pi-lsp-extension-1.4.0-evidence.json)记录其散列及来源。历史 1.3.0 的通知覆盖仍未明确，[补齐记录](lsp-license-remediation.md)继续保留。语言服务器和依赖分别保留自己的许可；此清单不代表整个产品完成合规审计。
 
 ## 复现验证
 

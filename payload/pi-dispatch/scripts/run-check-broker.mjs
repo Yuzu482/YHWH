@@ -1,5 +1,6 @@
 // Trusted Windows admission + Linux root broker. Never imported by model extensions.
 import fs from 'node:fs';
+import {userInfo} from 'node:os';
 import path from 'node:path';
 import {createHash,createHmac,timingSafeEqual,randomBytes} from 'node:crypto';
 import {spawn,execFile} from 'node:child_process';
@@ -64,7 +65,12 @@ export function createCandidateCheckConfiguration({candidateSha256,policyPath,tr
 }
 export function trustedCheckConfiguration(candidate){
   if(candidate!==undefined&&!candidateConfigs.has(candidate))throw Error('CHECK_CANDIDATE_CONFIGURATION');
-  return candidate??Object.freeze({launcher:'/usr/local/libexec/pi-kether-sandbox',trustRoot:'/var/lib/pi-kether-run-check/trust',policyPath:'C:/Users/asus/.local/state/pi-kether/run-check/check-policy.json',groupPrefix:'pi-kether-',jobs:'/var/lib/pi-kether/jobs'});
+  if(candidate!==undefined)return candidate;
+  // Use the OS account profile, not an environment-selected directory. The
+  // native reader still verifies the owner, ACL, path, links and held handles.
+  const profile=userInfo().homedir;
+  if(!profile||!path.isAbsolute(profile))throw Error('CHECK_HOST_PROFILE_UNAVAILABLE');
+  return Object.freeze({launcher:'/usr/local/libexec/pi-kether-sandbox',trustRoot:'/var/lib/pi-kether-run-check/trust',policyPath:path.join(profile,'.local','state','pi-kether','run-check','check-policy.json'),groupPrefix:'pi-kether-',jobs:'/var/lib/pi-kether/jobs'});
 }
 export function parsePolicyReadResult(stdout,expectedPath){
   if(typeof stdout!=='string'||stdout.charCodeAt(0)===0xfeff)throw Error('CHECK_POLICY_RESPONSE');

@@ -28,7 +28,7 @@ New optional feature: official Codex, Claude Code and Antigravity headless prima
 
 **0.11 persistent code relationships.** `.yhwh/code-graph/index.json` initially covers files, classes, functions and syntax relationships in JS/TS (including JSX/TSX) and Python. Read-only `code_graph` searches relationships and reverse relative-import impact; the host CLI incrementally refreshes by source hash and offers explicit bounded watching. Unresolved calls, syntax errors and stale state are reported; this is not a complete semantic call graph. See [usage, Git management and limits](docs/code-graph.md#english). The maintainer's local Pi has been updated and verified through actual MCP and incremental refresh checks; this feature shipped in v0.11.0.
 
-v0.15.0 consolidates runtime quality and host verification: read-only fixtures, scoped new-file parents, advisory task checks, the hostEvidence fix, raw-byte patch policy, tiered governance and the Claude CLI reviewer. Packaged plugin versions are generated from Git commits. The local runtime passed zero-drift checks and both route probes; no quantified speed claim is made. This distribution retains the previously authorized exception, bundles no third-party dependencies and discloses the pinned pi-lsp-extension 1.3.0 license gap. See the [release notes](docs/release-notes-0.15.0.md).
+v0.15.0 consolidated runtime quality and host verification: read-only fixtures, scoped new-file parents, advisory task checks, the hostEvidence fix, raw-byte patch policy, tiered governance and the Claude CLI reviewer. Packaged plugin versions are generated from Git commits. Its local zero-drift checks and two route probes do not establish deployment of later candidates, and no quantified speed claim is made. That release used an authorized exception and disclosed the LSP 1.3.0 license gap; the current source candidate's 1.4.0 evidence is checked separately. See the [historical release notes](docs/release-notes-0.15.0.md).
 
 See the [architecture development history (Chinese)](docs/architecture-history.md) for the background, evolution, key decisions and historical verification limits. The [history evidence index (Chinese)](docs/history-evidence.json) contains the corresponding sanitized records.
 
@@ -72,15 +72,15 @@ It provides:
 
 ### One-click installation (Windows 11 x64)
 
-The generated `YHWH-OneClick-0.15.0.zip` contains a self-contained script, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
+The generated `YHWH-OneClick-0.15.1.zip` contains a script with an embedded package, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.1.ps1
 ```
 
 The default exports generic MCP configuration without changing Codex global settings. Select hosts with `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"`; including `codex` enables the original Codex integration. Import the generated connection profile and load the primary instructions in each host. The exporter never overwrites existing host configuration.
 
-The installer prepares pinned PowerShell 7 and Node runtimes under `%LOCALAPPDATA%\YHWH`. Neither runtime nor Git needs to be preinstalled, and GitHub login is not required. Workflow source is embedded; runtimes and dependencies still require network access. Windows runtime archives and the Ubuntu image are checked against SHA256 values recorded at build time. Changed downloads stop installation instead of silently accepting new hashes.
+The installer prepares pinned PowerShell 7 and Node runtimes under `%LOCALAPPDATA%\YHWH`. Git must be installed and the remote reachable: the embedded package obtains source from the official repository, verifies its recorded commit is pushed and belongs to main, and compares every packaged file before running the source installer. Alternatively, `-SourceRepository D:\path\to\checkout` selects a clean local Git checkout, which must still pass its own `origin` pushed-commit and main-branch checks. Windows runtime archives and the Ubuntu image are checked against SHA256 values recorded at build time. Changed downloads stop installation instead of silently accepting new hashes.
 
 It imports a dedicated `YHWH` WSL2 Ubuntu 24.04 distribution, installs the Windows plugin, governance rules and WSL sandbox/LSP, then runs installation checks. Enabling WSL for the first time may require Windows administrator approval and a restart followed by rerunning the script. Exit code `3010` means this prerequisite step is pending restart, not successful installation. Hardware virtualization must be enabled and organizational policy must permit WSL. WSL setup follows [Microsoft's official commands](https://learn.microsoft.com/en-us/windows/wsl/basic-commands).
 
@@ -90,16 +90,22 @@ An existing Pi installation is protected by default. Once tasks have ended and i
 
 ```powershell
 # Read-only preview: no downloads or host changes
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.1.ps1 -PlanOnly
 # Unattended installation with a fixed workspace (WSL must be ready; login is separate)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
-# Verify and extract only; destination must be a new absolute directory
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.1.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+# Check embedded payload integrity and extract only (Git provenance is not checked); destination must be a new absolute path
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.1.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` to generate the portable ZIP, self-contained PS1, SHA256 file and double-click bundle under `release/`. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.15.0.ps1`.
+Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` from clean source pushed to `origin/main` to generate the portable ZIP, PS1, SHA256 file and double-click bundle under `release/0.15.1/`. Existing output names stop the build to protect older artifacts. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `pwsh -NoProfile -File .\install\Test-OneClick.ps1 -Installer .\release\0.15.1\Install-YHWH-0.15.1.ps1`.
 
 This version has script and package validation, but a full online installation in a fresh Windows VM has not been performed. Windows and WSL Pi use the same dependency lockfile; Ubuntu repositories, WSL system components and the .NET installer remain mutable external dependencies. This is not a completely offline or byte-for-byte reproducible system image.
+
+The installer pins Pi 1.5.1 and LSP 1.4.0 and checks the Windows and WSL dependency trees. On reinstall it reuses a Windows runtime only when the pinned versions and tree digest match. For a standard runtime with an older LSP, it prepares the replacement first and switches only when owner, group and access rules match; activation failure restores the old directory. A permission mismatch, custom dependencies or files, unclassifiable versions and unrecognized trees stop installation so the original files can be reconciled; the prepared directory may need manual cleanup. WSL replaces only a verified older or current tree, and newer Pi or LSP versions are not downgraded. Only a rebuilt installer contains these safeguards; older standalone installers retain their original version. The builder packages files in the Git index and fails if required Pi runtime files are missing.
+
+An existing gateway plugin is reused unchanged only when its files, dependencies, provenance, managed baseline and connection match this release. Other existing plugins stop installation for reconciliation rather than being overwritten. Existing governance instructions, skills, references and Codex configuration also stop installation when they differ from this package. Older or customized environments can therefore require a separate migration; an automatic upgrade is not guaranteed.
+
+This describes the source-supported build and installation flow; the old 0.15.0 installer still contains Pi 0.84.4 and does not update itself. A new formal package must be built under the Git conditions above and validated on the target environment. Public release requires `-PublicRelease` and cannot use `-SkipTests`: the currently pinned LSP 1.4.0 archive contains the complete upstream notice; historical 1.3.0 coverage remains separately unconfirmed.
 
 ### Advanced installation
 
@@ -191,7 +197,7 @@ For the default `claude-code-cli` route, sign in using official Claude Code firs
 
 Optional API route: after installation run `Configure-Claude-API.cmd`, or from source run `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`. Input is hidden; credentials are encrypted with Windows DPAPI CurrentUser and saved in `~/.local/state/pi-kether/anthropic-api-key.json`. `check_claude_auth` checks only this API configuration, not actual balance or model access; live verification requires a separately authorized probe.
 
-Existing users should wait for tasks to finish before upgrading and configure their selected route. The old `pi-claude-code-provider` route and `renew_claude_auth` tool are no longer accepted. `Build-Release.ps1 -PublicRelease` still rejects the pending upstream notice for the pinned LSP version. This public package uses the explicitly disclosed, previously authorized exception; it does not claim that the license gate passed and bundles no third-party dependencies.
+Existing users should wait for tasks to finish before upgrading and configure their selected route. The old `pi-claude-code-provider` route and `renew_claude_auth` tool are no longer accepted. An older public package used an explicitly disclosed, authorized LSP 1.3.0 exception; the current 1.4.0 evidence is checked separately. This does not certify product-wide licensing and no third-party dependencies are bundled.
 
 ### Go and Rust single-file support
 

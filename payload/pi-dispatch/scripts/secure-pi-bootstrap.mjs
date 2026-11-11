@@ -3,7 +3,11 @@ import { readFileSync, closeSync } from 'node:fs';
 import { controlledBootstrap } from './controlled-provider.mjs';
 import { installTransportFence } from './provider-transport.mjs';
 import { anthropicBootstrapAuth } from './anthropic-api-credential.mjs';
-import {isSingleShotArgs,pinnedSdkMatches,runPinnedSingleShot} from './pi-single-shot-lifecycle.mjs';
+import {isSingleShotArgs,pinnedSdkVariant,runPinnedSingleShot,installPi151TerminationHandler} from './pi-single-shot-lifecycle.mjs';
+import {preparePi151Home} from './pi-151-home.mjs';
+// Check before reading FD 3 or importing any Pi SDK code.
+const sdkVariant=pinnedSdkVariant();
+if(!sdkVariant)throw new Error('PI_SDK_INTEGRITY_MISMATCH');
 const data=JSON.parse(readFileSync(3,'utf8'));
 closeSync(3);
 if(Object.keys(data).length!==1)throw new Error('PI_AUTH_INVALID');
@@ -28,6 +32,11 @@ store.modify=async()=>{throw new Error('PI_AUTH_RENEW_HOST_REQUIRED');};
 store.delete=async()=>{throw new Error('PI_AUTH_RENEW_HOST_REQUIRED');};
 AuthStorage.create=()=>store;
 delete process.env.PI_SANDBOX_AUTH_PATH;
+if(sdkVariant==='1.5.1'){
+  preparePi151Home();
+  if(!process.argv.includes('--no-mcp'))process.argv.push('--no-mcp');
+  installPi151TerminationHandler();
+}
 const singleShotArgs=process.argv.slice(2);
-if(data.openaiAccess&&isSingleShotArgs(singleShotArgs)&&pinnedSdkMatches())await runPinnedSingleShot(singleShotArgs);
+if(data.openaiAccess&&isSingleShotArgs(singleShotArgs))await runPinnedSingleShot(singleShotArgs);
 else await import('/opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/dist/cli.js');

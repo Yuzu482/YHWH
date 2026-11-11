@@ -6,10 +6,15 @@ import {vectors,observe,normalizeRoots} from './fixtures/worker-runtime/cases.mj
 const root=fileURLToPath(new URL('../',import.meta.url)),golden=JSON.parse(fs.readFileSync(new URL('./fixtures/worker-runtime/baseline.json',import.meta.url),'utf8'));
 
 test('27 argument vectors preserve exact values after explicit installation-root relocation',t=>{
-  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'runtime-golden-profile-')),lsp=path.join(profile,'.pi/agent/npm/node_modules/pi-lsp-extension/src/index.ts'),previous=process.env.USERPROFILE;
+  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'runtime-golden-profile-')),lsp=path.join(profile,'.pi/agent/npm/node_modules/pi-lsp-extension/dist/index.js'),previous=process.env.USERPROFILE;
   fs.mkdirSync(path.dirname(lsp),{recursive:true});fs.writeFileSync(lsp,'// inert existence fixture\n');process.env.USERPROFILE=profile;
-  t.after(()=>{if(previous===undefined)delete process.env.USERPROFILE;else process.env.USERPROFILE=previous;assert.equal(path.dirname(profile),os.tmpdir());fs.rmSync(profile,{recursive:true,force:true});});
-  for(const [i,v] of vectors.args.entries())assert.deepEqual(normalizeRoots(observe(()=>buildPiArgs(structuredClone(v.request),v.runtime,v.editor,v.structured)),root.replace(/[\\/]$/,''),profile),golden.source.args[i],v.name);
+  t.after(()=>{if(previous===undefined)delete process.env.USERPROFILE;else process.env.USERPROFILE=previous;assert.equal(path.dirname(profile),path.resolve(os.tmpdir()));assert.equal(fs.lstatSync(profile).isSymbolicLink(),false);fs.rmSync(profile,{recursive:true,force:true});});
+  // Keep the old installed golden bytes intact while explicitly adapting the
+  // expected host extension path for the 1.4.0 distribution layout.
+  for(const [i,v] of vectors.args.entries()){
+    const expected=JSON.parse(JSON.stringify(golden.source.args[i]).replaceAll('pi-lsp-extension/src/index.ts','pi-lsp-extension/dist/index.js'));
+    assert.deepEqual(normalizeRoots(observe(()=>buildPiArgs(structuredClone(v.request),v.runtime,v.editor,v.structured)),root.replace(/[\\/]$/,''),profile),expected,v.name);
+  }
 });
 test('35 summary vectors preserve failure precedence, field absence, patch suppression and tool recovery',()=>{
   for(const [i,v] of vectors.summaries.entries())assert.deepEqual(observe(()=>{const result=summarize(structuredClone(v.raw),structuredClone(v.request));if(result.usage?.execution)delete result.usage.execution;return result;}),golden.source.summaries[i],v.name);

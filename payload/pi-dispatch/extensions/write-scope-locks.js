@@ -5,9 +5,13 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 function normalizeScope(cwd, value) {
   const tree = value.endsWith('/**') || value.endsWith('\\**');
   const raw = tree ? value.slice(0, -3) : value;
-  const path = resolve(cwd, raw).toLowerCase();
-  const rel = relative(cwd, path);
-  if (isAbsolute(value) || rel === '..' || rel.startsWith(`..${sep}`)) throw new Error('write lock scope is outside cwd');
+  const absoluteCwd = resolve(cwd);
+  const absolutePath = resolve(absoluteCwd, raw);
+  const rel = relative(absoluteCwd, absolutePath);
+  if (isAbsolute(value) || isAbsolute(rel) || rel === '..' || rel.startsWith(`..${sep}`)) throw new Error('write lock scope is outside cwd');
+  // Windows file paths are case-insensitive; Linux paths are not. Lowercasing
+  // before checking containment incorrectly moves mixed-case Linux workspaces.
+  const path = process.platform === 'win32' ? absolutePath.toLowerCase() : absolutePath;
   return { path, tree };
 }
 

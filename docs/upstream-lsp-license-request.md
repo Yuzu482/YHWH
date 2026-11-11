@@ -1,8 +1,10 @@
 # Submitted upstream license request
 
 Target: https://github.com/samfoy/pi-lsp-extension/issues
-Status: submitted with user authorization on 2026-09-19T05:27:00Z; open when verified.
+Status at submission: submitted with user authorization on 2026-09-19T05:27:00Z; open when verified.
 Issue: https://github.com/samfoy/pi-lsp-extension/issues/14
+
+Follow-up checked 2026-11-11: upstream closed the issue as completed on 2026-09-24 and added a [complete notice at commit a9a9df4](https://github.com/samfoy/pi-lsp-extension/blob/a9a9df4de0d5831fdad3494b338d655491297006/LICENSE). The issue and notice do not explicitly say whether it covers the already published 1.3.0. The public-release gate remains blocked for a 1.3.0 pin until the existing version-coverage requirement is met; closing the issue is not recorded as that explicit statement. Evidence for the separately pinned 1.4.0 package is recorded in [the current remediation note](lsp-license-remediation.en.md).
 
 The title and body below match the submitted issue, verified by reading it back from GitHub. They contain public upstream facts and do not identify the private downstream repository or its implementation.
 

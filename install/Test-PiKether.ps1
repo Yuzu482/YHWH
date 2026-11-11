@@ -16,10 +16,14 @@ function Check([bool]$Ok, [string]$Name) {
   else { Write-Host "[FAIL] $Name" -ForegroundColor Red; $failures.Add($Name) }
 }
 try { $manifest = Get-Content -LiteralPath (Join-Path $packageRoot 'portable.manifest.json') -Raw | ConvertFrom-Json; Check ($manifest.containsCredentials -eq $false) 'portable manifest' } catch { Check $false 'portable manifest' }
+Check ($manifest.components.piCodingAgent -ceq '1.5.1') 'portable Pi version is 1.5.1'
+$piLockMatches = $false
+try { $piLockMatches = (Get-FileHash -LiteralPath (Join-Path $packageRoot 'payload/wsl-package-lock.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ceq '27887b43d9346d533cf0e7c4fde2d0994cb0e5311cd06c7a3ed253bceeb13389' } catch {}
+Check $piLockMatches 'portable Pi dependency lock matches the verified runtime'
 $payloadPlugin = Join-Path $packageRoot 'payload\pi-dispatch'
 Check (Test-Path -LiteralPath (Join-Path $packageRoot 'install\Apply-HindsightWrapper.ps1') -PathType Leaf) 'Hindsight wrapper installer included'
 Check (Test-Path -LiteralPath (Join-Path $packageRoot 'templates\hindsight-coding-agent\SKILL.md') -PathType Leaf) 'Hindsight wrapper template included'
-foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','workflow/headless.example.json','workflow/catalog.json')) {
+foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapters.mjs','scripts/headless-job.ps1','scripts/headless-acceptance.mjs','scripts/worker-enforcement.mjs','scripts/controlled-provider.mjs','scripts/reviewer-route-config.mjs','workflow/headless.example.json','workflow/catalog.json')) {
   Check (Test-Path -LiteralPath (Join-Path $payloadPlugin $headlessFile) -PathType Leaf) ('headless CLI payload: '+$headlessFile)
   if($Installed) {
     $installedFile=Join-Path (Join-Path $TargetHome 'plugins/pi-dispatch') $headlessFile
@@ -38,19 +42,42 @@ function Get-DistributableFiles([string]$Directory) {
   foreach ($item in Get-ChildItem -LiteralPath $Directory -Force) {
     if ($item.PSIsContainer) {
       if ($item.Name -in @('release','.test','.git','node_modules','__pycache__')) { continue }
+      # These top-level local-state directories are not in Build-Release's allowlist.
+      # Nested directories with these names can still be packaged and must be scanned.
+      if ($item.Parent.FullName -ieq $packageRoot -and $item.Name -in @('.local-evidence','.yhwh','review-candidates')) { continue }
       if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing distribution scan through a link: $($item.FullName)" }
       Get-DistributableFiles $item.FullName
     } elseif ($item.FullName -ne $PSCommandPath -and $item.Extension -notin '.zip','.sha256','.pyc') { $item }
   }
 }
 $scanFiles = @(Get-DistributableFiles $packageRoot)
-$hostUserPath = 'C:' + '\Users\' + 'asus'
-$hostRepoPath = 'E:' + '\Projects\' + 'DeepSeekHarness'
+# A source checkout can contain unrelated untracked local-only records. The
+# builder uses the Git index, and separately scans every staged package file.
+# Do not suppress scans in an extracted package or an installed checkout.
+if (-not $Installed -and (Test-Path -LiteralPath (Join-Path $packageRoot '.git'))) {
+  . (Join-Path $PSScriptRoot 'Release-Files.ps1')
+  $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+  foreach ($entry in @(Get-ReleaseSourceFiles -SourceRoot $packageRoot)) { [void]$paths.Add($entry.relative) }
+  $scanFiles = @($scanFiles | Where-Object { $paths.Contains([IO.Path]::GetRelativePath($packageRoot,$_.FullName).Replace('\','/')) })
+}
+$separator = '[\\/]'
+$hostUserPattern = 'C:' + $separator + 'Users' + $separator + 'asus'
+$hostRepoPattern = 'E:' + $separator + 'Projects' + $separator + 'DeepSeekHarness'
 $oldTunnel = 'tunnel_' + '6a9aa889406481918ef6a135c41493c7'
-$forbidden = '(?i)' + [regex]::Escape($hostUserPath) + '|' + [regex]::Escape($hostRepoPath) + '|' + [regex]::Escape($oldTunnel) + '|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk-[A-Za-z0-9_-]{20,}'
-$hits = foreach ($file in $scanFiles) { Select-String -LiteralPath $file.FullName -Pattern $forbidden -ErrorAction SilentlyContinue }
+$sensitive = '(?i)' + [regex]::Escape($oldTunnel) + '|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk-[A-Za-z0-9_-]{20,}'
+$forbidden = '(?i)' + $hostUserPattern + '|' + $hostRepoPattern + '|' + $sensitive
+$localCheckoutInstall = $Installed -and (Test-Path -LiteralPath (Join-Path $packageRoot '.git'))
+$localHistoricalFiles = @('templates/AGENTS.kether.md','install/Upgrade-CodexDirectHost.ps1','VERIFICATION.md','docs/tier-policy-baseline-20261001.md','docs/tier-policy-rollout-20261002.md','docs/worker-runtime-phase1-provenance.md','docs/yhwh-run-check.md','docs/codex-direct-runtime-adoption.md','docs/codex-direct-workflow.md')
+$hits = foreach ($file in $scanFiles) {
+  $relative = [IO.Path]::GetRelativePath($packageRoot,$file.FullName).Replace('\','/')
+  # The local historical admission names its original host and workspace.
+  # Only installed checks of a local checkout permit those paths in the exact
+  # historical files above; secrets remain checked and release scans stay strict.
+  $pattern = if ($localCheckoutInstall -and $relative -cin $localHistoricalFiles) { $sensitive } else { $forbidden }
+  Select-String -LiteralPath $file.FullName -Pattern $pattern -ErrorAction SilentlyContinue
+}
 $hits = @($hits | Where-Object { $_.Line -notmatch 'sk-super-secret-123456789|sk-request-secret-12345678' })
-Check (-not $hits) 'no credentials or host-specific paths in distributable files'
+Check (-not $hits) $(if($localCheckoutInstall){'no credentials or unapproved host paths in local installation source'}else{'no credentials or host-specific paths in distributable files'})
 $backups = $scanFiles | Where-Object { $_.Name -match '\.bak$|\.backup$' }
 Check (-not $backups) 'no backup files in payload'
 
@@ -107,6 +134,9 @@ if ($Installed) {
   Check (Test-Path -LiteralPath (Join-Path $plugin 'node_modules\@modelcontextprotocol\sdk')) 'plugin dependencies installed'
   $piEntry = Join-Path $TargetHome '.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js'
   Check (Test-Path -LiteralPath $piEntry -PathType Leaf) 'host Pi entry installed'
+  $hostPiVersion = $null
+  try { $hostPiVersion = (Get-Content -LiteralPath (Join-Path $TargetHome '.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\package.json') -Raw | ConvertFrom-Json).version } catch {}
+  Check ($hostPiVersion -ceq $manifest.components.piCodingAgent) 'host Pi version matches portable manifest'
   $installedCatalog = Join-Path $plugin 'workflow\catalog.json'
   $sourceCatalog = Join-Path $payloadPlugin 'workflow\catalog.json'
   $catalogParity = (Test-Path -LiteralPath $installedCatalog -PathType Leaf) -and ((Get-FileHash -LiteralPath $sourceCatalog -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $installedCatalog -Algorithm SHA256).Hash)
@@ -192,6 +222,13 @@ if ($Installed) {
     Check (@(Compare-Object @($expectedConnection.enabled_tools | Sort-Object) @($connection.enabled_tools | Sort-Object) -CaseSensitive).Count -eq 0) 'MCP exposes the exact current governed tool list'
   } catch { Check $false 'MCP workspace scope configured' }
   if (-not $SkipWsl) {
+    $wslPiVersion = $null
+    try {
+      $wslPiJson = & wsl.exe -d $WslDistro -u root --exec cat /opt/pi-kether/node_modules/@earendil-works/pi-coding-agent/package.json
+      $wslPiExit = $LASTEXITCODE
+      if ($wslPiExit -eq 0) { $wslPiVersion = (($wslPiJson -join "`n") | ConvertFrom-Json).version }
+    } catch {}
+    Check ($wslPiVersion -ceq $manifest.components.piCodingAgent) 'WSL Pi version matches portable manifest'
     & wsl.exe -d $WslDistro -u root --exec test -f /opt/pi-kether/extensions/role-presets.js
     Check ($LASTEXITCODE -eq 0) 'WSL role presets extension installed'
     & wsl.exe -d $WslDistro -u root --exec test -f /opt/pi-kether/extensions/source-window.js

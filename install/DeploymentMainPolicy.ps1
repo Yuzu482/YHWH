@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 # Shared, read-only installation ancestry and bounded evidence collection.
 function Invoke-DeploymentProcess {
-  param([Parameter(Mandatory)][string]$FilePath,[string[]]$Arguments=@(),[Parameter(Mandatory)][string]$WorkingDirectory,[ValidateRange(1,300000)][int]$TimeoutMs=15000,[ValidateRange(1,524288)][int]$MaxOutputBytes=524288)
+  param([Parameter(Mandatory)][string]$FilePath,[string[]]$Arguments=@(),[Parameter(Mandatory)][string]$WorkingDirectory,[ValidateRange(1,300000)][int]$TimeoutMs=15000,[ValidateRange(1,524288)][int]$MaxOutputBytes=524288,[switch]$IsolatedGit)
   $process=$null;$status=$null;$signal='';$errorText='';$timedOut=$false;$outputLimit=$false
   $stdout=[Text.StringBuilder]::new();$stderr=[Text.StringBuilder]::new();$bytes=0
   $timer=[Diagnostics.Stopwatch]::StartNew()
@@ -12,6 +12,7 @@ function Invoke-DeploymentProcess {
     $info.StandardOutputEncoding=[Text.Encoding]::UTF8;$info.StandardErrorEncoding=[Text.Encoding]::UTF8
     foreach($key in @($info.Environment.Keys)){if($key -match '^GIT_' -or $key -in @('GH_HOST','GH_REPO','GH_PAGER','PAGER')){[void]$info.Environment.Remove($key)}}
     $info.Environment['GIT_TERMINAL_PROMPT']='0';$info.Environment['GH_PROMPT_DISABLED']='1'
+    if($IsolatedGit){$info.Environment['GIT_CONFIG_NOSYSTEM']='1';$info.Environment['GIT_CONFIG_GLOBAL']='NUL'}
     foreach($argument in $Arguments){$info.ArgumentList.Add($argument)}
     $process=[Diagnostics.Process]::Start($info);$process.StandardInput.Close()
     $buffers=@([char[]]::new(4096),[char[]]::new(4096))
@@ -46,27 +47,27 @@ function Test-DeploymentProcessSuccess($Result){
   return ($null -ne $Result -and $Result.status -eq 0 -and -not $Result.signal -and -not $Result.error -and -not $Result.timedOut -and -not $Result.outputLimit)
 }
 function Invoke-DeploymentGit {
-  param([Parameter(Mandatory)][string]$Repository,[Parameter(Mandatory)][string[]]$GitArguments)
+  param([Parameter(Mandatory)][string]$Repository,[Parameter(Mandatory)][string[]]$GitArguments,[switch]$IsolatedGit)
   $executable=(Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
   $arguments=@('-c',"safe.directory=$Repository",'-c','credential.interactive=false','-c','protocol.allow=never','-c','protocol.https.allow=always','-c','protocol.ssh.allow=always','-c','protocol.file.allow=always','-c','protocol.ext.allow=never')+$GitArguments
-  return Invoke-DeploymentProcess -FilePath $executable -Arguments $arguments -WorkingDirectory $Repository
+  return Invoke-DeploymentProcess -FilePath $executable -Arguments $arguments -WorkingDirectory $Repository -IsolatedGit:$IsolatedGit
 }
 function Get-DeploymentMainState {
-  param([Parameter(Mandatory)][string]$Repository,[Parameter(Mandatory)][string]$Commit,[string[]]$AdvertisedHeads)
+  param([Parameter(Mandatory)][string]$Repository,[Parameter(Mandatory)][string]$Commit,[string[]]$AdvertisedHeads,[switch]$IsolatedGit)
   $result=[ordered]@{relation='unknown';sourceCommit=$Commit;mainCommit=$null;verifiedAt=[DateTime]::UtcNow.ToString('o');reason=$null}
   try {
     if($Commit -cnotmatch '^[a-f0-9]{40,64}$' -or -not (Test-Path -LiteralPath (Join-Path $Repository '.git'))){throw 'source-repository-or-commit-unavailable'}
     if(-not $PSBoundParameters.ContainsKey('AdvertisedHeads')){
-      $remote=Invoke-DeploymentGit -Repository $Repository -GitArguments @('ls-remote','--heads','origin')
+      $remote=Invoke-DeploymentGit -Repository $Repository -GitArguments @('ls-remote','--heads','origin') -IsolatedGit:$IsolatedGit
       if(-not (Test-DeploymentProcessSuccess $remote)){throw 'remote-main-query-failed'}
       $AdvertisedHeads=@($remote.stdout -split '\r?\n')
     }
     $main=@($AdvertisedHeads | Where-Object {$_ -cmatch '^[a-f0-9]{40,64}\s+refs/heads/main$'})
     if($main.Count -ne 1){throw 'remote-main-missing-or-ambiguous'}
     $result.mainCommit=($main[0] -split '\s+',2)[0]
-    $object=Invoke-DeploymentGit -Repository $Repository -GitArguments @('cat-file','-e',($result.mainCommit+'^{commit}'))
+    $object=Invoke-DeploymentGit -Repository $Repository -GitArguments @('cat-file','-e',($result.mainCommit+'^{commit}')) -IsolatedGit:$IsolatedGit
     if(-not (Test-DeploymentProcessSuccess $object)){throw 'remote-main-object-unavailable-fetch-required'}
-    $ancestry=Invoke-DeploymentGit -Repository $Repository -GitArguments @('merge-base','--is-ancestor',$Commit,$result.mainCommit)
+    $ancestry=Invoke-DeploymentGit -Repository $Repository -GitArguments @('merge-base','--is-ancestor',$Commit,$result.mainCommit) -IsolatedGit:$IsolatedGit
     if(Test-DeploymentProcessSuccess $ancestry){$result.relation='in-main'}
     elseif($ancestry.status -eq 1 -and -not $ancestry.error -and -not $ancestry.signal -and -not $ancestry.timedOut -and -not $ancestry.outputLimit){$result.relation='not-in-main'}
     else{throw 'main-ancestry-query-failed'}
