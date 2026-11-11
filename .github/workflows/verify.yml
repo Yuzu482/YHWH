@@ -1,33 +1,40 @@
-name: Isolated WSL availability diagnostic
+name: Isolated WSL fixture discovery checks
 on:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  inspect-wsl:
+  fixture-probe:
     runs-on: windows-2025
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22.23.1'
-      - name: Inspect WSL status and fixture requirements
+      - name: Install locked dependencies
+        working-directory: payload/pi-dispatch
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency install failed' }
+      - name: Check absent default and required distro
+        working-directory: payload/pi-dispatch
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $script = Join-Path $env:RUNNER_TEMP 'yhwh-wsl-availability.cjs'
-          @'
-          const {spawnSync}=require('node:child_process');
-          const decode=b=>!b?'':b.includes(0)?b.toString('utf16le').replace(/\0/g,''):b.toString('utf8');
-          for(const [name,args,input] of [
-            ['status',['--status'],undefined],
-            ['list',['--list','--quiet'],undefined],
-            ['distro-node',['-d','Ubuntu-24.04','-u','root','--cd','/','--exec','/opt/node/bin/node','--version'],undefined],
-            ['distro-input',['-d','Ubuntu-24.04','-u','root','--cd','/','--exec','/opt/node/bin/node','--input-type=module'],'console.log("fixture")']
-          ]) {
-            const r=spawnSync('wsl.exe',args,{input:input===undefined?undefined:Buffer.from(input),timeout:10000});
-            console.log(JSON.stringify({name,status:r.status,signal:r.signal,error:r.error&&{code:r.error.code,message:r.error.message},stdout:decode(r.stdout),stderr:decode(r.stderr)}));
-          }
-          '@ | Set-Content -LiteralPath $script -Encoding utf8NoBOM
-          node $script
-          if ($LASTEXITCODE -ne 0) { throw 'WSL diagnostic failed' }
+          $lines = @(& node --test '--test-name-pattern=WSL fixture discovery|production root functions' 'tests/patch-policy.test.mjs' 2>&1)
+          $code = $LASTEXITCODE
+          $text = $lines -join "`n"
+          $lines | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0 -or -not $text.Contains('SKIP WSL test distribution Ubuntu-24.04 is not installed')) { throw 'Absent default distro was not reported as a skip' }
+          $env:PI_TEST_WSL_DISTRO = 'YHWH-intentionally-absent'
+          $lines = @(& node --test '--test-name-pattern=production root functions' 'tests/patch-policy.test.mjs' 2>&1)
+          $code = $LASTEXITCODE
+          Remove-Item Env:PI_TEST_WSL_DISTRO
+          $text = $lines -join "`n"
+          $lines | ForEach-Object { Write-Host $_ }
+          if ($code -ne 1 -or -not $text.Contains('Configured WSL test distribution YHWH-intentionally-absent is not installed')) { throw 'Explicitly requested missing distro was not rejected' }
+          $global:LASTEXITCODE = 0
