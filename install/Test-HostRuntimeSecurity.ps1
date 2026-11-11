@@ -59,6 +59,7 @@ try {
  Check ($unsafeRejected -and (Get-Acl -LiteralPath $state).Sddl -ceq $unsafeBefore) 'additional write permission is rejected without modifying the state directory'
  $installer=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Install-PiKether.ps1') -Raw
  Check ($installer.IndexOf('Protect-PiState.ps1'') -TargetHome $TargetHome -CheckOnly') -lt $installer.IndexOf('New-Item -ItemType Directory -Force -Path $TargetHome')) 'state security preflight runs before target mutation'
+ Check ($installer.IndexOf('assert-existing-plugin.mjs') -lt $installer.IndexOf('New-Item -ItemType Directory -Force -Path $TargetHome')) 'existing plugin preflight runs before target mutation'
  Check ($installer.IndexOf('Assert-HostRuntimeSecurityPreserved $hostPiRoot $preparedPi $TargetHome') -lt $installer.IndexOf('Copy-WithBackup $installationSource $pluginTarget $backupRoot')) 'runtime security preflight runs before plugin replacement'
  Write-Output "PASS: $checks Windows runtime security checks; isolated fixtures only."
 } finally {

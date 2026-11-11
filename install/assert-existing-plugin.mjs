@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {sdkTreeDigest} from '../payload/pi-dispatch/scripts/sdk-tree-integrity.mjs';
 import {inventory as managedInventory} from '../payload/pi-dispatch/scripts/plugin-upgrade.mjs';
 
-export const PLUGIN_DEPENDENCY_TREE_SHA256='30821a2c9ae1df8fe978ea151619c5269185662f4152a40665413fb32e3b2584';
+export const PLUGIN_DEPENDENCY_TREE_SHA256='71287c230ee684ab39dae7440a621d895edd00e4c3fedb730631cab35ab7b8aa';
 const dynamic=new Set(['.mcp.json','.yhwh-managed-files.json','build-provenance.json','node_modules']);
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;

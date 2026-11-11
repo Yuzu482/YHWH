@@ -66,11 +66,13 @@ export function createCandidateCheckConfiguration({candidateSha256,policyPath,tr
 export function trustedCheckConfiguration(candidate){
   if(candidate!==undefined&&!candidateConfigs.has(candidate))throw Error('CHECK_CANDIDATE_CONFIGURATION');
   if(candidate!==undefined)return candidate;
-  // Use the OS account profile, not an environment-selected directory. The
-  // native reader still verifies the owner, ACL, path, links and held handles.
-  const profile=userInfo().homedir;
-  if(!profile||!path.isAbsolute(profile))throw Error('CHECK_HOST_PROFILE_UNAVAILABLE');
-  return Object.freeze({launcher:'/usr/local/libexec/pi-kether-sandbox',trustRoot:'/var/lib/pi-kether-run-check/trust',policyPath:path.join(profile,'.local','state','pi-kether','run-check','check-policy.json'),groupPrefix:'pi-kether-',jobs:'/var/lib/pi-kether/jobs'});
+  // Only Windows admits host checks. Use its OS account profile, not an
+  // environment-selected directory; the native reader still verifies the
+  // owner, ACL, path, links and held handles. Linux sandboxes may have no
+  // account database and do not use the Windows policy file.
+  const profile=process.platform==='win32'?userInfo().homedir:null;
+  if(process.platform==='win32'&&(!profile||!path.isAbsolute(profile)))throw Error('CHECK_HOST_PROFILE_UNAVAILABLE');
+  return Object.freeze({launcher:'/usr/local/libexec/pi-kether-sandbox',trustRoot:'/var/lib/pi-kether-run-check/trust',policyPath:profile?path.join(profile,'.local','state','pi-kether','run-check','check-policy.json'):null,groupPrefix:'pi-kether-',jobs:'/var/lib/pi-kether/jobs'});
 }
 export function parsePolicyReadResult(stdout,expectedPath){
   if(typeof stdout!=='string'||stdout.charCodeAt(0)===0xfeff)throw Error('CHECK_POLICY_RESPONSE');

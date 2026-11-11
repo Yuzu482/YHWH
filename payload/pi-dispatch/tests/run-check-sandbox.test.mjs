@@ -47,6 +47,9 @@ test('host check policy follows the OS account profile, not an injected USERPROF
   assert.equal(child.status,0,child.stderr);
   assert.equal(child.stdout,path.join(os.userInfo().homedir,'.local','state','pi-kether','run-check','check-policy.json'));
 });
+test('non-Windows broker does not load a Windows host policy',{skip:process.platform==='win32'},()=>{
+  assert.equal(trustedCheckConfiguration().policyPath,null);
+});
 test('tool is limited to host-enabled Chesed write launch, absent from default and other roles',()=>{
   const req={provider:'openai-codex',model:'gpt-6-luna',access:'workspace-write',rolePresetId:'Chesed'};
   assert.ok(!buildPiArgs(req,'wsl2',false,true).join(' ').includes('yhwh_run_check'));
