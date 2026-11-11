@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   windows:
-    runs-on: windows-2022
-    timeout-minutes: 30
+    runs-on: windows-2025
+    timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
@@ -26,6 +26,22 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
+      - name: Prepare the pinned PowerShell runtime
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dep = (Get-Content -LiteralPath './install/bootstrap-dependencies.json' -Raw | ConvertFrom-Json).powershell
+          $expectedUrl = 'https://github.com/PowerShell/PowerShell/releases/download/v7.6.5/PowerShell-7.6.5-win-x64.zip'
+          $expectedHash = '32eb8f6cdce08f86e987d625a2733e54ac3e289ae7e1621b14c0b5bcec2434ea'
+          if ($dep.version -cne '7.6.5' -or $dep.url -cne $expectedUrl -or $dep.sha256 -cne $expectedHash) { throw 'Unexpected pinned PowerShell metadata' }
+          $archive = Join-Path $env:RUNNER_TEMP 'yhwh-powershell-7.6.5.zip'
+          $runtime = Join-Path $env:RUNNER_TEMP 'yhwh-powershell-7.6.5'
+          if ((Test-Path -LiteralPath $archive) -or (Test-Path -LiteralPath $runtime)) { throw 'Pinned runtime destination already exists' }
+          Invoke-WebRequest -Uri $expectedUrl -OutFile $archive
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedHash) { throw 'Pinned PowerShell digest mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath $runtime
+          $engine = Join-Path $runtime 'pwsh.exe'
+          $version = (& $engine -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()' | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -cne '7.6.5') { throw 'Pinned PowerShell version mismatch' }
       - name: Verify generated workflow catalog
         run: ./install/Sync-HostWorkflow.ps1 -Check
       - name: Install locked runtime dependencies
@@ -52,9 +68,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Runtime tests failed' }
           node --expose-gc tests/memory-regression.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Memory regression failed' }
-      - name: Package and verify extracted installer
+      - name: Package and verify extracted installer from main
+        if: github.event_name != 'pull_request'
         run: |
-          ./Build-Release.ps1 -SkipTests
+          $engine = Join-Path $env:RUNNER_TEMP 'yhwh-powershell-7.6.5/pwsh.exe'
+          & $engine -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File './Build-Release.ps1' -SkipTests
+          if ($LASTEXITCODE -ne 0) { throw 'Main release package checks failed' }
+      - name: Package and verify pull request in a local Git fixture
+        if: github.event_name == 'pull_request'
+        run: |
+          $engine = Join-Path $env:RUNNER_TEMP 'yhwh-powershell-7.6.5/pwsh.exe'
+          & $engine -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File './install/Invoke-CiReleasePreview.ps1' -FixtureParent $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0) { throw 'Pull request package checks failed' }
       - name: Clean target installation plan
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'yhwh-empty-home'

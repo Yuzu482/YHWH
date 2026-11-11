@@ -13,13 +13,15 @@ $selfTestCommands=@($installerAst.FindAll({param($n) $n -is [Management.Automati
 if($recordCommands.Count -ne 1 -or $selfTestCommands.Count -ne 1 -or $recordCommands[0].Extent.StartOffset -ge $selfTestCommands[0].Extent.StartOffset){throw 'Installation baseline must be recorded before the installed selftest.'}
 $statements=@($installerAst.EndBlock.Statements)
 $recordIndex=-1
-for($i=0;$i -lt $statements.Count;$i++){if($statements[$i].Extent.StartOffset -eq $recordCommands[0].Extent.StartOffset){$recordIndex=$i;break}}
-if($recordIndex -lt 0 -or $statements[$recordIndex+2].Extent.StartOffset -ne $selfTestCommands[0].Extent.StartOffset){throw 'Record and selftest must be consecutive guarded completion steps.'}
-$recordGuard=$statements[$recordIndex+1];$selfTestGuard=$statements[$recordIndex+3]
+for($i=0;$i -lt $statements.Count;$i++){if($statements[$i].Extent.StartOffset -le $recordCommands[0].Extent.StartOffset -and $statements[$i].Extent.EndOffset -ge $recordCommands[0].Extent.EndOffset){$recordIndex=$i;break}}
+if($recordIndex -lt 0 -or $statements[$recordIndex] -isnot [Management.Automation.Language.IfStatementAst] -or $statements[$recordIndex].Clauses.Count -ne 1 -or $statements[$recordIndex].ElseClause -or $statements[$recordIndex].Clauses[0].Item1.Extent.Text -notmatch '^\s*-not\s+\$reusePlugin\s*$' -or $statements[$recordIndex+1].Extent.StartOffset -ne $selfTestCommands[0].Extent.StartOffset){throw 'Record and selftest must be consecutive guarded completion steps.'}
+$recordBlock=$statements[$recordIndex];$recordBody=@($recordBlock.Clauses[0].Item2.Statements)
+if($recordBody.Count -ne 2 -or $recordBody[0].Extent.StartOffset -ne $recordCommands[0].Extent.StartOffset){throw 'New installations must record their managed baseline.'}
+$recordGuard=$recordBody[1];$selfTestGuard=$statements[$recordIndex+2]
 foreach($guard in @($recordGuard,$selfTestGuard)){
   if($guard -isnot [Management.Automation.Language.IfStatementAst] -or $guard.Extent.Text -notmatch '\$LASTEXITCODE\s+-ne\s+0' -or -not @($guard.FindAll({param($n) $n -is [Management.Automation.Language.ThrowStatementAst]},$true)).Count){throw 'Completion command failure must throw before continuing.'}
 }
-$completionSequence=[scriptblock]::Create($installerText.Substring($recordCommands[0].Extent.StartOffset,$selfTestGuard.Extent.EndOffset-$recordCommands[0].Extent.StartOffset))
+$completionSequence=[scriptblock]::Create($installerText.Substring($recordBlock.Extent.StartOffset,$selfTestGuard.Extent.EndOffset-$recordBlock.Extent.StartOffset))
 $selfTestAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'install/Test-PiKether.ps1'),[ref]$null,[ref]$null)
 if(@($selfTestAst.FindAll({param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.Extent.Text -match 'install-integrity\.mjs.*--require-installed'},$true)).Count -ne 1){throw 'The actual installed selftest must require the managed manifest.'}
 function Invoke-FixtureGit([string]$directory, [string[]]$GitArguments) {
@@ -89,6 +91,9 @@ if($LASTEXITCODE -ne 0 -or $result.state -ne 'verified'){throw 'Fixture installe
     if(-not (Test-Path -LiteralPath $selfTestSentinel)){throw 'Ordered completion never reached the verified selftest.'}
     $verified=& $nodePath $checker --plugin-root $target --require-installed | ConvertFrom-Json
     if($LASTEXITCODE -ne 0 -or $verified.state -ne 'verified'){throw 'Recorded installation did not verify.'}
+    $markerBeforeReuse=[Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $target '.yhwh-managed-files.json')))
+    $reusePlugin=$true;& $completionSequence;$reusePlugin=$false
+    if([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $target '.yhwh-managed-files.json'))) -cne $markerBeforeReuse){throw 'Reuse rewrote the existing managed baseline.'}
     $marker=Get-Content -LiteralPath (Join-Path $target '.yhwh-managed-files.json') -Raw | ConvertFrom-Json
     if($marker.files.'build-provenance.json' -cne (Get-FileHash -LiteralPath (Join-Path $target 'build-provenance.json')).Hash.ToLowerInvariant()){throw 'Installed provenance was not included in baseline.'}
     $proof=Get-Content -LiteralPath (Join-Path $target 'build-provenance.json') -Raw | ConvertFrom-Json

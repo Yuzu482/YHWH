@@ -42,9 +42,9 @@
 基线窗口：北京时间 2026-10-01 00:00:00 至 2026-10-02 00:00:00（UTC 2026-09-30 16:00:00 至 2026-10-01 16:00:00）。
 观察窗口：从已验证 deployAt 起连续 48 小时。尚未采集的两天数据不得标为已通过；部署时刻、源码摘要、配置摘要和日志快照已保留。
 
-部署方式为定向替换已验证文件，不运行完整安装。已有回滚备份位于 `C:/Users/asus/.local/state/pi-kether/tier-policy-20261002/pre-deploy-backup`，包含运行文件和旧配置；WSL 审计模块也已备份。待完整宿主检查、Netzach 与事后审查通过后，确认网关空闲、暂停接收、核对进程身份并停止；替换本次文件，合并目录 profile，使用现有静默启动程序重启。验证健康、能力声明、文件摘要和配置后才记录 deployAt。启动验证失败则恢复备份，不开始观察窗口。
+部署方式为定向替换已验证文件，不运行完整安装。已有回滚备份位于 `C:/Users/<local-user>/.local/state/pi-kether/tier-policy-20261002/pre-deploy-backup`，包含运行文件和旧配置；WSL 审计模块也已备份。待完整宿主检查、Netzach 与事后审查通过后，确认网关空闲、暂停接收、核对进程身份并停止；替换本次文件，合并目录 profile，使用现有静默启动程序重启。验证健康、能力声明、文件摘要和配置后才记录 deployAt。启动验证失败则恢复备份，不开始观察窗口。
 
-YHWH 的 critical 配置针对已验证的源码根目录 `E:/Projects/DeepSeekHarness/github-publish/pi-kether-workflow`；其他允许目录默认 standard，没有指定任何 personal 目录。hostExecutionAvailable 保持 true。primary-direct 不启用。
+YHWH 的 critical 配置针对已验证的源码根目录 `E:/path/to/DeepSeekHarness/github-publish/pi-kether-workflow`；其他允许目录默认 standard，没有指定任何 personal 目录。hostExecutionAvailable 保持 true。primary-direct 不启用。
 
 四项指标：
 1. 每个任务平均调用次数：按 parentRunId、工作目录摘要与原任务 anchor 聚合真实模型执行；审查/验证沿用已绑定源任务的 anchor，无 parentRunId 的请求单列。按 requestId 去重，排除 get/status/result、heartbeat、确定性工具、host-verification 记录、零执行队列失败和幂等重放；探针单列。

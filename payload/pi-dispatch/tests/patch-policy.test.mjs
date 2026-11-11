@@ -17,6 +17,38 @@ const issued = 'unit/' + '+sample%81';
 const neutral = Buffer.from('\ufeffdiff --git a/file b/file\r\n--- a/file\r\n+++ b/file\r\n context\r\n+multibyte: café and replacement �\r\n', 'utf8');
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 
+function assessWslFixture(status, list, distro, explicitlyRequested = false) {
+  if (status.error || status.status !== 0) {
+    if (explicitlyRequested) throw new Error('Configured WSL test distribution cannot be checked');
+    return { available: false, reason: 'WSL unavailable on Windows host; real-WSL behavioral harness not executed' };
+  }
+  assert.ok(list && !list.error, 'WSL distribution listing must start successfully');
+  assert.equal(list.status, 0, 'WSL distribution listing must succeed');
+  const bytes = Buffer.from(list.stdout ?? '');
+  const utf16 = bytes.includes(0) || (bytes[0] === 0xff && bytes[1] === 0xfe);
+  if (utf16 && bytes.length % 2 !== 0) throw new Error('Invalid WSL distribution listing encoding');
+  const names = bytes.toString(utf16 ? 'utf16le' : 'utf8').replace(/^\ufeff/, '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (!names.includes(distro)) {
+    if (explicitlyRequested) throw new Error(`Configured WSL test distribution ${distro} is not installed`);
+    return { available: false, reason: `WSL test distribution ${distro} is not installed; real-WSL behavioral harness not executed` };
+  }
+  return { available: true };
+}
+
+test('WSL fixture discovery skips only absent defaults and rejects configured or probe failures', () => {
+  const success = { status: 0 };
+  const list = stdout => ({ status: 0, stdout });
+  const distro = 'Ubuntu-24.04';
+  assert.equal(assessWslFixture(success, list(Buffer.from('\ufeffUbuntu-24.04\r\nDebian\r\n', 'utf16le')), distro).available, true);
+  assert.equal(assessWslFixture(success, list(Buffer.from('Ubuntu-24.04\n')), distro).available, true);
+  assert.equal(assessWslFixture(success, list(Buffer.alloc(0)), distro).available, false);
+  assert.equal(assessWslFixture({ status: 1 }, null, distro).available, false);
+  assert.throws(() => assessWslFixture(success, list(Buffer.alloc(0)), distro, true), /not installed/);
+  assert.throws(() => assessWslFixture({ status: 1 }, null, distro, true), /cannot be checked/);
+  assert.throws(() => assessWslFixture(success, { status: 1 }, distro), /listing must succeed/);
+  assert.throws(() => assessWslFixture(success, list(Buffer.from([0x55, 0x00, 0x62])), distro), /encoding/);
+});
+
 test('preserves exact patch bytes and hashes those bytes', () => {
   const original = Buffer.from(neutral);
   const result = checkPatchBytes(original, issued);
@@ -110,9 +142,13 @@ test('production root functions block issued forms and emit verified bytes under
   }).join('\n').replaceAll('/opt/pi-kether/scripts/patch-policy.mjs', 'POLICY_HELPER_PATH');
   let command;
   if (process.platform === 'win32') {
-    const probe = spawnSync('wsl.exe', ['--status'], { encoding: 'utf8', timeout: 5000 });
-    if (probe.error || probe.status !== 0) return t.skip('WSL unavailable on Windows host; real-WSL behavioral harness not executed');
-    command = ['wsl.exe', ['-d', process.env.PI_TEST_WSL_DISTRO || 'Ubuntu-24.04', '-u', 'root', '--cd', '/', '--exec', '/opt/node/bin/node', '--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', '--input-type=module']];
+    const configuredDistro = process.env.PI_TEST_WSL_DISTRO;
+    const distro = configuredDistro || 'Ubuntu-24.04';
+    const status = spawnSync('wsl.exe', ['--status'], { encoding: 'utf8', timeout: 5000 });
+    const list = !status.error && status.status === 0 ? spawnSync('wsl.exe', ['--list', '--quiet'], { timeout: 5000 }) : null;
+    const availability = assessWslFixture(status, list, distro, Boolean(configuredDistro));
+    if (!availability.available) return t.skip(availability.reason);
+    command = ['wsl.exe', ['-d', distro, '-u', 'root', '--cd', '/', '--exec', '/opt/node/bin/node', '--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', '--input-type=module']];
   } else {
     command = [process.execPath, ['--input-type=module']];
   }

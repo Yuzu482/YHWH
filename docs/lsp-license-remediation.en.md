@@ -4,13 +4,19 @@
 
 ## Current conclusion
 
-Checked on 2026-09-19: package metadata and the README for `pi-lsp-extension@1.3.0` declare MIT, but a complete copyright and permission notice was not located. This record adds provenance evidence; it does not grant rights on behalf of upstream or certify product-wide compliance. The public-release check remains blocked.
+The current source candidate pins `pi-lsp-extension@1.4.0`; its npm archive contains the complete upstream notice, matching the recorded source commit. The [1.4.0 evidence](../licenses/pi-lsp-extension-1.4.0-evidence.json) and original notice are retained. The public license check validates the actual pinned version rather than treating the historical 1.3.0 gap as a 1.4.0 gap. Final release still requires all build and Git checks.
+
+Historical check on 2026-09-19: package metadata and the README for `pi-lsp-extension@1.3.0` declare MIT, but a complete copyright and permission notice was not located. This record adds provenance evidence; it does not grant rights on behalf of upstream or certify product-wide compliance. Public release remains blocked when 1.3.0 is pinned.
+
+Follow-up on 2026-11-11: upstream [added a complete notice](https://github.com/samfoy/pi-lsp-extension/blob/a9a9df4de0d5831fdad3494b338d655491297006/LICENSE) on 2026-09-24 and closed [issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14) as completed. The issue requested an explicit statement about 1.3.0, but the visible closure and notice do not expressly provide one. The closure alone is not treated as explicit coverage. The notice, immutable source and SHA-256 are retained; `-PublicRelease` remains blocked for 1.3.0.
+
+The npm `1.4.0` archive was inspected without executing package code. Its integrity matched registry metadata and its LICENSE matched that upstream notice byte for byte. It contains compiled `dist` files rather than the `src` files targeted by the old 1.3.0 security patches. The candidate patch was adapted for that compiled package; validation evidence and actual deployment status are recorded separately.
 
 ## Evidence checked
 
 - [Pinned package.json](https://github.com/samfoy/pi-lsp-extension/blob/5edc932d325b630483f84f7d7f038e88ceba1eba/package.json) and [README](https://github.com/samfoy/pi-lsp-extension/blob/5edc932d325b630483f84f7d7f038e88ceba1eba/README.md): MIT declarations.
 - Downloaded the original 1.3.0 archive again from the official npm registry: 53 files, no license/copyright notice filenames, and SHA-256 matching the saved evidence. The archive was inspected in memory without installing or executing its contents.
-- Current main is pinned at `f2433d19c3bb1300dfdc5f4505b062f9c9c0a1a6`, with 65 reachable commits; all fetched branches and tags contain 66 reachable commits. Historical paths have no case-insensitive matches for `license|licence|copying|copyright|notice`. Deleted or unfetched refs are outside this scope.
+- Then-current main was pinned at `f2433d19c3bb1300dfdc5f4505b062f9c9c0a1a6`, with 65 reachable commits; all fetched branches and tags contain 66 reachable commits. Historical paths had no case-insensitive matches for `license|licence|copying|copyright|notice`. Deleted or unfetched refs are outside this scope.
 - Content at the pinned version and current main has no matches for `copyright|permission is hereby granted|MIT License`, excluding the lockfile. This is a targeted search, not a line-by-line audit of all historical contents.
 - The 13 open/closed issue and PR titles returned by the GitHub API contain no apparent license request; all comments were not exhaustively checked.
 
@@ -22,7 +28,7 @@ See the [machine-readable evidence](../licenses/pi-lsp-extension-evidence.json) 
 2. Clarify whether it covers the already published 1.3.0 and its pinned source commit. If it covers only a later release, YHWH must update the dependency and revalidate its patches.
 3. Include the license in the next npm release and check the actual archive.
 
-The [English request record](upstream-lsp-license-request.md) was submitted with user authorization as [upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14); its body was read back and verified. It contains only public upstream facts. The notice and version coverage still await upstream confirmation.
+The [English request record](upstream-lsp-license-request.md) was submitted with user authorization as [upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14); its body was read back and verified. It contains only public upstream facts. The notice is now available; explicit coverage of 1.3.0 remains unconfirmed.
 
 ## Integration after upstream confirmation
 

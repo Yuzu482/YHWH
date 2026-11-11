@@ -157,7 +157,9 @@ try {
   $treeCode='const fs=require("node:fs"),cp=require("node:child_process");const c=cp.spawn(process.execPath,["-e","setInterval(()=>{},1000)"],{stdio:"inherit",windowsHide:true});fs.writeFileSync(process.argv[1],String(c.pid));setInterval(()=>{},1000)'
   $treeChild=$null
   try {
-    $child=Invoke-DeploymentProcess -FilePath $node -Arguments @('-e',$treeCode,$childPidFile) -WorkingDirectory $source -TimeoutMs 1000
+    # A cold Windows sandbox can take over a second to launch Node. Give the
+    # fixture time to create its descendant before testing that timeout kills it.
+    $child=Invoke-DeploymentProcess -FilePath $node -Arguments @('-e',$treeCode,$childPidFile) -WorkingDirectory $source -TimeoutMs 10000
     Check (Test-Path -LiteralPath $childPidFile) 'real child-tree fixture launched a descendant'
     $treeChild=[int][IO.File]::ReadAllText($childPidFile)
     Check ($child.timedOut -and -not $child.signal -and -not (Get-Process -Id $treeChild -ErrorAction SilentlyContinue)) 'timeout reaps live parent and real descendant'

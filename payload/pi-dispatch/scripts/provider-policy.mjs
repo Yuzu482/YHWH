@@ -39,7 +39,7 @@ export function resolveControlledExtensions(provider, access, env = process.env,
   }
   if (runtime === 'wsl2' && access !== 'none') paths.push('/opt/pi-kether/extensions/read-scope-guard.js');
   if (runtime === 'wsl2' && access !== 'none') paths.push('/opt/pi-kether/extensions/lsp-proxy.js');
-  if (access !== 'none' && runtime !== 'wsl2') paths.push(joinPath(agentModules, 'pi-lsp-extension', 'src', 'index.ts'));
+  if (access !== 'none' && runtime !== 'wsl2') paths.push(joinPath(agentModules, 'pi-lsp-extension', 'dist', 'index.js'));
   if (access === 'workspace-write') {
     paths.push(runtime === 'wsl2'
       ? '/opt/pi-kether/extensions/write-scope-guard.js'

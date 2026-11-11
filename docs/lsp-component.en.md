@@ -11,9 +11,9 @@ The 0.9.0 development source integrates Microsoft `multilspy@0.0.15`; it has not
 | Methods | Backend | Behavior |
 | --- | --- | --- |
 | diagnostics, hover, definition, references, symbols, completions, code_actions | multilspy 0.0.15 official language adapters or controlled protocol profiles + provisioned servers | Model-free, read-only queries; code actions return suggestions only and server-initiated writes are refused |
-| overview, search | pi-lsp-extension 1.3.0 / Tree-sitter | Preserves structural analysis; this is neither multilspy nor a fallback for failed semantic requests |
+| overview, search | pi-lsp-extension 1.4.0 / Tree-sitter | Preserves structural analysis; this is neither multilspy nor a fallback for failed semantic requests |
 | `yhwh_lsp_*` inside Pi model tasks | First-party YHWH Pi adapter + multilspy | Seven read-only semantic tools using isolated snapshots of current task files; [integration notes](pi-lsp-adapter.en.md) |
-| Legacy tool names inside Pi model tasks | Existing pi-lsp-extension | Retained for compatibility; this does not remove the old dependency or resolve its license gap |
+| Legacy tool names inside Pi model tasks | pi-lsp-extension | Retained for compatibility; historical 1.3.0 license coverage remains separately recorded |
 
 `list_capabilities.lsp` exposes semantic and structural engines. Results include `engine`, version, `adapter`, `adapterVersion`, `backend` and `modelCalls:0`. Missing dependencies, unsupported methods or initialization failures return unavailable/failed without reverting to the legacy semantic backend.
 
@@ -41,7 +41,7 @@ The gateway pins WSL task, cleanup and health-check launches to `--cd /`; explic
 
 YHWH-owned adapters use Apache-2.0. The [Microsoft MIT text](../licenses/multilspy-0.0.15-MIT.txt) and the protocol client's embedded [OLSP MIT notice](../licenses/multilspy-OLSP-MIT.txt) are preserved. [Python dependency notices](../licenses/multilspy-dependency-notices.txt) come from hash-verified official wheels.
 
-The pi-lsp-extension structural backend and model tools remain, so its missing complete upstream notice is still outstanding. [Upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14) and the [remediation record](lsp-license-remediation.en.md) remain applicable; `Build-Release.ps1 -PublicRelease` continues to block. Language servers and dependencies retain their own licenses. This inventory does not certify product-wide compliance.
+The current source pins pi-lsp-extension 1.4.0, whose archive contains the complete upstream MIT notice; [package evidence](../licenses/pi-lsp-extension-1.4.0-evidence.json) records its hashes and provenance. Coverage for historical 1.3.0 remains unconfirmed and the [remediation record](lsp-license-remediation.en.md) is retained. Language servers and dependencies retain their own licenses. This inventory does not certify product-wide compliance.
 
 ## Reproducing verification
 

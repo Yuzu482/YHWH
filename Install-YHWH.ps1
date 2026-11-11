@@ -11,6 +11,7 @@ param(
   [Parameter(ParameterSetName='Install')][string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'YHWH'),
   [Parameter(ParameterSetName='Install')][switch]$NonInteractive,
   [Parameter(ParameterSetName='Install')][switch]$UpgradeExisting,
+  [Parameter(ParameterSetName='Install')][string]$SourceRepository,
   [Parameter(ParameterSetName='Install')][switch]$PlanOnly,
   [Parameter(Mandatory,ParameterSetName='Extract')][switch]$ExtractOnly,
   [Parameter(Mandatory,ParameterSetName='Extract')][string]$Destination
@@ -149,6 +150,11 @@ function Initialize-YhwhDistro([string]$Root, $Dependency, [string]$Cache) {
   if ($LASTEXITCODE -ne 0) { throw 'Could not record ownership of the imported WSL distribution.' }
 }
 
+function Invoke-YhwhWorkflow([string]$Pwsh,[string]$Source,[string]$Config) {
+  & $Pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Source 'Workflow.ps1') -Action Install -ConfigFile $Config
+  if ($LASTEXITCODE -ne 0) { throw "Workflow installation failed (exit $LASTEXITCODE). Inspect the error and backups, then retry with -UpgradeExisting." }
+}
+
 function Invoke-YhwhMain {
   if ($ExtractOnly) {
     $package = Expand-YhwhPayload $Destination
@@ -172,7 +178,6 @@ function Invoke-YhwhMain {
     throw 'This installer supports Windows 11 x64 only. Use 64-bit Windows PowerShell.'
   }
   Assert-YhwhInstallAllowed (Join-Path $HOME 'plugins\pi-dispatch') -Upgrade:$UpgradeExisting
-  if (-not (Initialize-YhwhWsl -Unattended:$NonInteractive)) { exit 3010 }
   if (-not $NonInteractive -and -not $script:PSBoundParameters.ContainsKey('WorkspaceRoots')) {
     $answer = Read-Host "Workspace directory (Enter for $($roots[0]))"
     if ($answer) { $roots = @(Assert-YhwhDestination $answer) }
@@ -201,6 +206,20 @@ function Invoke-YhwhMain {
   $node = Join-Path $nodeBin 'node.exe'
   if ((& $node --version) -ne ('v' + $deps.node.version)) { throw 'Private Node runtime version mismatch.' }
   if ((& $pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()') -ne $deps.powershell.version) { throw 'Private PowerShell runtime version mismatch.' }
+  $installSource=$package
+  if (-not (Test-Path -LiteralPath (Join-Path $package '.git'))) {
+    $checkoutParent=Assert-YhwhDestination (Join-Path $root 'source-checkouts')
+    New-Item -ItemType Directory -Force -Path $checkoutParent | Out-Null
+    $resolveArgs=@('-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',(Join-Path $package 'install\Resolve-PackagedSource.ps1'),'-PackageRoot',$package,'-CheckoutParent',$checkoutParent)
+    if($SourceRepository){$resolveArgs+=@('-SourceRepository',(Assert-YhwhDestination $SourceRepository))}
+    $sourceOutput=@(& $pwsh @resolveArgs)
+    if($LASTEXITCODE -ne 0 -or $sourceOutput.Count -ne 1){throw 'Packaged source verification failed; no workflow installation was started.'}
+    try{$sourceResult=$sourceOutput[0] | ConvertFrom-Json -ErrorAction Stop}catch{throw 'Packaged source verification returned an invalid result.'}
+    $installSource=Assert-YhwhDestination ([string]$sourceResult.sourceRoot)
+  } elseif($SourceRepository -and (Assert-YhwhDestination $SourceRepository) -ine (Assert-YhwhDestination $package)) {
+    throw 'SourceRepository must match the current source checkout when running from source.'
+  }
+  if (-not (Initialize-YhwhWsl -Unattended:$NonInteractive)) { exit 3010 }
   Initialize-YhwhDistro $root $deps.ubuntu $cache
   foreach ($workspace in $roots) { New-Item -ItemType Directory -Force -Path $workspace | Out-Null }
   $configPath = Join-Path $root 'install.config.json'
@@ -209,18 +228,17 @@ function Invoke-YhwhMain {
   $oldPath = $env:PATH
   try {
     $env:PATH = $nodeBin + ';' + $psDir + ';' + $oldPath
-    & $pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $package 'Workflow.ps1') -Action Install -ConfigFile $configPath
-    if ($LASTEXITCODE -ne 0) { throw "Workflow installation failed (exit $LASTEXITCODE). Inspect the error and backups, then retry with -UpgradeExisting." }
+    Invoke-YhwhWorkflow $pwsh $installSource $configPath
   } finally { $env:PATH = $oldPath }
   # Store paths as JSON data; never interpolate user paths into executable command text.
-  @{node=$node;pwsh=$pwsh;package=$package;config=$configPath;home=$HOME} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'installation.json') -Encoding UTF8
-  Copy-Item -LiteralPath (Join-Path $package 'install\Open-YhwhPi.ps1') -Destination (Join-Path $root 'Open-Pi.ps1') -Force
+  @{node=$node;pwsh=$pwsh;package=$installSource;config=$configPath;home=$HOME} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'installation.json') -Encoding UTF8
+  Copy-Item -LiteralPath (Join-Path $installSource 'install\Open-YhwhPi.ps1') -Destination (Join-Path $root 'Open-Pi.ps1') -Force
   foreach ($provider in @('OpenAI','Claude')) {
     $name = if ($provider -eq 'OpenAI') { 'Open-Pi.cmd' } else { 'Configure-Claude-API.cmd' }
     $loginCmd = '@echo off' + "`r`n" + ('powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Open-Pi.ps1" -Provider ' + $provider) + "`r`n" + 'pause' + "`r`n"
     [IO.File]::WriteAllText((Join-Path $root $name), $loginCmd, [Text.Encoding]::ASCII)
   }
-  Copy-Item -LiteralPath (Join-Path $package 'install\Open-YhwhProviders.ps1') -Destination (Join-Path $root 'Open-Providers.ps1') -Force
+  Copy-Item -LiteralPath (Join-Path $installSource 'install\Open-YhwhProviders.ps1') -Destination (Join-Path $root 'Open-Providers.ps1') -Force
   $providerCmd='@echo off'+"`r`n"+'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Open-Providers.ps1"'+"`r`n"+'pause'+"`r`n"
   [IO.File]::WriteAllText((Join-Path $root 'Configure-Providers.cmd'),$providerCmd,[Text.Encoding]::ASCII)
   $migrationCmd=$providerCmd.Replace('Open-Providers.ps1"','Open-Providers.ps1" -Migrate')

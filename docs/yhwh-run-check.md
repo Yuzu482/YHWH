@@ -9,7 +9,7 @@ implementation → artifact application → mandatory host verification workflow
 ## Policy and dependency preparation
 
 The fixed Windows policy is
-`C:/Users/asus/.local/state/pi-kether/run-check/check-policy.json`:
+`C:/Users/<local-user>/.local/state/pi-kether/run-check/check-policy.json`:
 
 ```json
 {"version":1,"projects":[{"workspace":"E:/Example","commands":[{"argv":["node","--test","tests/example.test.mjs"],"cwd":".","runnerId":"node","cacheId":"example"}]}]}

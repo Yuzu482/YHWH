@@ -6,9 +6,26 @@ import { join } from 'node:path';
 import { createWriteScopeLockManager, scopesOverlap } from '../extensions/write-scope-locks.js';
 
 test('scope overlap detects exact files and parent directory trees', () => {
-  assert.equal(scopesOverlap({ path: 'c:\\repo\\a.txt', tree: false }, { path: 'c:\\repo\\a.txt', tree: false }), true);
-  assert.equal(scopesOverlap({ path: 'c:\\repo\\src', tree: true }, { path: 'c:\\repo\\src\\a.ts', tree: false }), true);
-  assert.equal(scopesOverlap({ path: 'c:\\repo\\src', tree: true }, { path: 'c:\\repo\\tests', tree: true }), false);
+  const root=join('fixture','repo');
+  assert.equal(scopesOverlap({ path: join(root,'a.txt'), tree: false }, { path: join(root,'a.txt'), tree: false }), true);
+  assert.equal(scopesOverlap({ path: join(root,'src'), tree: true }, { path: join(root,'src','a.ts'), tree: false }), true);
+  assert.equal(scopesOverlap({ path: join(root,'src'), tree: true }, { path: join(root,'tests'), tree: true }), false);
+});
+
+test('mixed-case workspaces keep containment checks and platform case semantics', () => {
+  const directory=mkdtempSync(join(tmpdir(),'Pi-Mixed-Case-'));
+  try {
+    const locks=createWriteScopeLockManager(join(directory,'locks'));
+    const first=locks.tryAcquire({requestId:'case',cwd:directory,writeScope:['Folder/One.js'],timeoutSeconds:30});
+    assert.ok(first);
+    assert.equal(locks.tryAcquire({requestId:'same',cwd:directory,writeScope:['Folder/One.js'],timeoutSeconds:30}),null);
+    assert.throws(()=>locks.tryAcquire({requestId:'escape',cwd:directory,writeScope:['../outside.js'],timeoutSeconds:30}),/outside cwd/);
+    assert.throws(()=>locks.tryAcquire({requestId:'absolute',cwd:directory,writeScope:[join(directory,'outside.js')],timeoutSeconds:30}),/outside cwd/);
+    const differentCase=locks.tryAcquire({requestId:'case-variant',cwd:directory,writeScope:['Folder/one.js'],timeoutSeconds:30});
+    if(process.platform==='win32')assert.equal(differentCase,null);else assert.ok(differentCase);
+    if(differentCase)locks.release(differentCase);
+    locks.release(first);
+  } finally { rmSync(directory,{recursive:true,force:true}); }
 });
 
 test('persistent write locks reject overlapping scopes and allow disjoint scopes', () => {

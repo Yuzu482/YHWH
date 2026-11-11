@@ -4,13 +4,19 @@
 
 ## 当前结论
 
-2026-09-19 核查：`pi-lsp-extension@1.3.0` 的包元数据和 README 声明 MIT，但未找到完整版权与许可通知。此记录补充来源证据，不代上游授权，也不宣布整个产品完成合规审计。公开发布检查继续阻断。
+当前源码候选固定 `pi-lsp-extension@1.4.0`，其实际 npm 包包含完整上游通知，且与记录的源码提交一致；[1.4.0 证据](../licenses/pi-lsp-extension-1.4.0-evidence.json)和独立通知已保存。公开许可检查按实际固定版本验证，不再把 1.3.0 的未决问题误记为 1.4.0 的缺口。最终发布仍须通过全部构建和 Git 检查。
+
+2026-09-19 历史核查：`pi-lsp-extension@1.3.0` 的包元数据和 README 声明 MIT，但未找到完整版权与许可通知。此记录补充来源证据，不代上游授权，也不宣布整个产品完成合规审计。若固定版仍为 1.3.0，公开发布检查继续阻断。
+
+2026-11-11 复核：上游已于 2026-09-24 [添加完整通知](https://github.com/samfoy/pi-lsp-extension/blob/a9a9df4de0d5831fdad3494b338d655491297006/LICENSE)，并将 [Issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14) 标为完成关闭。该 Issue 正文曾请求明确说明通知是否覆盖 1.3.0，但当前可见的关闭记录与通知没有明确给出该说明，不能仅凭关闭状态认定旧版适用。通知原文及固定来源、SHA-256 已保存；1.3.0 的 `-PublicRelease` 仍阻断。
+
+对 npm `1.4.0` 安装包做了不执行代码的来源检查：其完整性与 registry 元数据一致，包内 LICENSE 与上述上游通知逐字节一致；包只含编译后的 `dist`，没有原 1.3.0 安全补丁依赖的 `src` 文件。候选补丁已针对该编译包重新适配，验证证据与实际部署状态分开记录。
 
 ## 已核查的证据
 
 - [固定版本 package.json](https://github.com/samfoy/pi-lsp-extension/blob/5edc932d325b630483f84f7d7f038e88ceba1eba/package.json) 与 [README](https://github.com/samfoy/pi-lsp-extension/blob/5edc932d325b630483f84f7d7f038e88ceba1eba/README.md)：声明 MIT。
 - 从 npm 官方 registry 重新下载 1.3.0 原始包；53 个文件，无许可/版权通知类文件，SHA-256 与已保存证据一致。仅在内存检查压缩包，未安装或执行包内容。
-- 当前主分支固定在 `f2433d19c3bb1300dfdc5f4505b062f9c9c0a1a6`，含 65 个可达提交；下载的全部分支与标签共有 66 个可达提交。历史路径中未找到 `license|licence|copying|copyright|notice`（不区分大小写）。这不覆盖已删除或未获取的引用。
+- 当时主分支固定在 `f2433d19c3bb1300dfdc5f4505b062f9c9c0a1a6`，含 65 个可达提交；下载的全部分支与标签共有 66 个可达提交。历史路径中未找到 `license|licence|copying|copyright|notice`（不区分大小写）。这不覆盖已删除或未获取的引用。
 - 固定版本和当前主分支内容中未找到 `copyright|permission is hereby granted|MIT License`；排除锁文件。此为定向搜索，不是所有历史文件内容的逐行审计。
 - GitHub API 返回的 13 条开放/关闭 Issue 与 PR 标题未见许可证问题；未穷尽全部评论。
 
@@ -22,7 +28,7 @@
 2. 明确该通知是否覆盖已发布的 1.3.0 及固定源码提交；若只覆盖后续版本，YHWH 需升级依赖并重新验证补丁。
 3. 在下一次 npm 发布中包含许可证文件，并检查实际打包结果。
 
-[英文请求记录](upstream-lsp-license-request.md)已在用户授权后提交为 [上游 Issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14)，并回读验证正文一致。请求只包含公开上游事实；许可证及版本覆盖仍待上游确认。
+[英文请求记录](upstream-lsp-license-request.md)已在用户授权后提交为 [上游 Issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14)，并回读验证正文一致。请求只包含公开上游事实；上游已提供通知，1.3.0 的版本覆盖仍缺明确确认。
 
 ## 收到上游确认后的接入步骤
 

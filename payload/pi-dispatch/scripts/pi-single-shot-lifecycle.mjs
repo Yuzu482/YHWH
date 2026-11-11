@@ -1,6 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
+import {sdkTreeDigest,PI_151_TREE_SHA256} from './sdk-tree-integrity.mjs';
 
 // Fixed source policy, never selected by a task, environment or model output.
 export const EXIT_POLICY = 'bounded-exit';
@@ -18,12 +19,18 @@ const PINS=Object.freeze({
   'dist/core/agent-session.js':'e213e4094a3f176b2491e0470ac8ecd88aeab0030d35aabd9ba289ba7b74b923',
   'dist/core/output-guard.js':'e860db94650c57e07582c300983671737bf9e796682193b498f75e3dd72e9024',
 });
-export function pinnedSdkMatches(read=readFileSync){
-  try{return Object.entries(PINS).every(([p,h])=>createHash('sha256').update(read(SDK_ROOT+p)).digest('hex')===h);}catch{return false;}
+export function pinnedSdkVariant(read=readFileSync){
+  try {
+    if(Object.entries(PINS).every(([p,h])=>createHash('sha256').update(read(SDK_ROOT+p)).digest('hex')===h))return '0.84.4';
+    const version=JSON.parse(read(SDK_ROOT+'package.json','utf8')).version;
+    if(version==='1.5.1' && sdkTreeDigest('/opt/pi-kether/node_modules')===PI_151_TREE_SHA256)return '1.5.1';
+  }catch{}
+  return null;
 }
+export function pinnedSdkMatches(read=readFileSync){return pinnedSdkVariant(read)!==null;}
 const REQUIRED=['--offline','--no-approve','--no-skills','--no-prompt-templates','--no-context-files','--no-themes','--no-extensions','--print','--no-session'];
 const EXTENSIONS=new Set(['role-presets','read-scope-guard','lsp-proxy','write-scope-guard','auth-scrub','source-window','result-submit','run-check-proxy','editor-proxy'].map(n=>'/opt/pi-kether/extensions/'+n+'.js'));
-const MODELS=new Set(['gpt-5.4','gpt-5.4-mini','gpt-5.5','gpt-5.6-luna','gpt-5.6-sol','gpt-5.6-terra','gpt-6-luna','gpt-6-sol']);
+const MODELS=new Set(['gpt-5.4','gpt-5.4-mini','gpt-5.5','gpt-5.6-luna','gpt-5.6-sol','gpt-5.6-terra','gpt-6-luna','gpt-6-sol','gpt-6.1-terra']);
 const ROLES=new Set(['Yesod','Binah','Malkuth','Hod','Chochmah','Chesed','Netzach','Geburah']);
 const TOOLS=new Set(['read','grep','find','ls','edit','write','yhwh_source_window','yhwh_submit_result','yhwh_run_check','pi_editor_execute',...['diagnostics','hover','definition','references','symbols','completions','code_actions'].map(n=>'yhwh_lsp_'+n)]);
 export function isSingleShotArgs(args){
@@ -31,7 +38,7 @@ export function isSingleShotArgs(args){
   const flags=new Set(),extensions=new Set(),values={};
   for(let i=0;i<args.length;i++){
     const a=args[i];
-    if(REQUIRED.includes(a)||a==='--no-tools'){if(flags.has(a))return false;flags.add(a);continue;}
+    if(REQUIRED.includes(a)||a==='--no-tools'||a==='--no-mcp'){if(flags.has(a))return false;flags.add(a);continue;}
     if(!['--mode','--provider','--model','--thinking','--extension','--tools','--yhwh-role-preset','--yhwh-result-role'].includes(a))return false;
     const v=args[++i];if(!v||v.startsWith('--'))return false;
     if(a==='--extension'){if(!EXTENSIONS.has(v)||extensions.has(v))return false;extensions.add(v);continue;}
@@ -44,7 +51,7 @@ export function isSingleShotArgs(args){
   if(values['--tools']){const tools=values['--tools'].split(',');if(new Set(tools).size!==tools.length||tools.some(t=>!TOOLS.has(t)))return false;}
   return true;
 }
-const EVENTS=new Set(['boot','agent_start','agent_end','agent_settled','shutdown','socket_close_requested','socket_closed','main_return','drains_complete','exit_ready','natural_exit','main_failed','drain_failed']);
+const EVENTS=new Set(['boot','agent_start','agent_end','agent_settled','shutdown','socket_close_requested','socket_closed','main_return','drains_complete','exit_ready','natural_exit','main_failed','drain_failed','termination_requested']);
 export function createLifecycle({now=()=>performance.now(),emit=line=>process.stderr.write(line)}={}){
   const origin=now(),tools=new Set();let n=0,valid=true,active=false,settled=false,shutdown=false,started=false;
   const mark=event=>{if(EVENTS.has(event)&&n<32){try{emit(LIFECYCLE_PREFIX+JSON.stringify({v:1,n:++n,event,ms:Math.max(0,now()-origin)})+'\n');}catch{}}};
@@ -80,6 +87,22 @@ export function drainStream(stream,{timeoutMs=2000}={}){
     stream.once('error',onError);
     try{stream.write('',error=>finish(error));}catch(error){finish(error);}
   });
+}
+// Pi 1.5 may keep an unresolved provider request alive after SIGTERM. A
+// cancelled sandbox must report failure even if its provider never cooperates.
+// The outer launcher remains responsible for killing and reaping descendants.
+export function installPi151TerminationHandler(proc=process){
+  let terminating=false;
+  const onTerm=()=>{
+    if(terminating)return;
+    terminating=true;proc.exitCode=143;
+    globalThis[LIFECYCLE_STATE]?.mark('termination_requested');
+    const hardStop=setTimeout(()=>proc.exit(143),1500);
+    Promise.allSettled([drainStream(proc.stdout,{timeoutMs:1000}),drainStream(proc.stderr,{timeoutMs:1000})])
+      .finally(()=>{clearTimeout(hardStop);proc.exit(143);});
+  };
+  proc.on('SIGTERM',onTerm);
+  return ()=>proc.off('SIGTERM',onTerm);
 }
 export async function finishSingleShot(main,state,{policy=EXIT_POLICY,stdout=process.stdout,stderr=process.stderr,exit=code=>process.exit(code),getExitCode=()=>process.exitCode??0,disconnect=()=>{if(process.connected)process.disconnect();}}={}){
   try{await main();}catch{state.mark('main_failed');process.exitCode=2;await Promise.allSettled([drainStream(stdout),drainStream(stderr)]);exit(2);return;}

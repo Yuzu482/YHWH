@@ -26,7 +26,7 @@ YHWH 是面向 Windows 11 + WSL2 的便携式 Kether 治理规则与 Pi 执行�
 
 新增可选特性：Codex、Claude Code、Antigravity 官方 CLI 无头主代理入口，包含版本锁定、统一结果、运行预算和发布/本地文件比对。现有 Pi 路由保持不变，默认不启用客户端。见 [使用说明](docs/headless-cli.md#简体中文)。
 
-v0.15.0 汇总运行时质量与宿主验收改进：只读 fixture、新文件父目录、任务预检警告、hostEvidence 修复、原字节补丁策略、分级治理及 Claude CLI reviewer。发布包由 Git 提交生成插件版本；本地新版已通过零漂移和两条路线探针，此版本不作量化提速声明。沿用此前授权的发布例外，不捆绑第三方依赖，并保留固定版 pi-lsp-extension 1.3.0 的许可缺口说明。详见[发布说明](docs/release-notes-0.15.0.md)。
+v0.15.0 汇总运行时质量与宿主验收改进：只读 fixture、新文件父目录、任务预检警告、hostEvidence 修复、原字节补丁策略、分级治理及 Claude CLI reviewer。发布包由 Git 提交生成插件版本；该版本的本地零漂移和两条路线探针不代表之后的候选已部署，也不作量化提速声明。v0.15.0 当时沿用授权的发布例外并披露 LSP 1.3.0 的许可缺口；当前源码候选的 1.4.0 证据单独检查。详见[历史发布说明](docs/release-notes-0.15.0.md)。
 
 开发背景、架构演进、关键决策及历史验证边界见 [架构开发历史](docs/architecture-history.md)；对应的脱敏记录见 [历史证据索引](docs/history-evidence.json)。
 
@@ -72,15 +72,15 @@ v0.15.0 汇总运行时质量与宿主验收改进：只读 fixture、新文件�
 
 ### 一键安装（Windows 11 x64）
 
-构建后的 `YHWH-OneClick-0.15.0.zip` 包含自包含脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
+构建后的 `YHWH-OneClick-0.15.1.zip` 包含内嵌安装包的脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.1.ps1
 ```
 
 默认导出通用 MCP 接入配置，不修改 Codex 全局设置。用 `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"` 选择宿主；包含 `codex` 时才执行原有 Codex 集成。接入文件还需按宿主提示导入，并加载主代理规则；已有配置不会被导出器覆盖。
 
-安装器在 `%LOCALAPPDATA%\YHWH` 准备固定版本的 PowerShell 7 和 Node，无需预装它们或 Git，也不要求登录 GitHub。工作流源码已嵌入脚本；运行环境和依赖仍需联网下载。Windows 端运行包和 Ubuntu 镜像使用构建时记录的 SHA256 校验，下载内容变化会停止安装，不会自动接受新校验值。
+安装器在 `%LOCALAPPDATA%\YHWH` 准备固定版本的 PowerShell 7 和 Node。安装电脑需要预装 Git 并能访问远端：内嵌包会取得官方仓库的源码，验证包中记录的提交已推送且属于主分支，并逐项核对包内文件后才运行源码安装器。也可用 `-SourceRepository D:\path\to\checkout` 指定另一个干净的本地 Git 工作区；它仍须通过该工作区 `origin` 的推送和主分支检查。Windows 端运行包和 Ubuntu 镜像使用构建时记录的 SHA256 校验，下载内容变化会停止安装，不会自动接受新校验值。
 
 它会导入专用 `YHWH` WSL2 Ubuntu 24.04 环境，安装 Windows 插件、治理规则和 WSL 沙箱/LSP，再运行安装检查。首次启用 WSL 可能出现 Windows 管理员授权，并需要重启后重新运行脚本；脚本以 `3010` 表示这一步尚待重启，不会声称安装完成。需要启用硬件虚拟化，且组织策略允许 WSL。WSL 安装方式依据 [Microsoft 官方说明](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)。
 
@@ -90,16 +90,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps
 
 ```powershell
 # 只读预览，不下载、不改宿主
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.1.ps1 -PlanOnly
 # 固定目录，免交互安装（WSL 必须已经就绪；账号登录另行完成）
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
-# 仅校验并解包，目标必须是尚不存在的绝对路径
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.0.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.1.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+# 只校验内嵌包完整性并解包（不验证 Git 来源）；目标须为尚不存在的绝对路径
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.1.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-维护者运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/` 同时生成便携 ZIP、自包含 PS1、SHA256 和双击安装包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Test-OneClick.ps1 -Installer .\release\Install-YHWH-0.15.0.ps1`。
+维护者在干净、已推送且属于 `origin/main` 的源码上运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/0.15.1/` 生成便携 ZIP、PS1、SHA256 和双击安装包；已有同名输出会阻止构建，避免覆盖旧包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`pwsh -NoProfile -File .\install\Test-OneClick.ps1 -Installer .\release\0.15.1\Install-YHWH-0.15.1.ps1`。
 
 本版本已做脚本和包级验证，尚未在全新 Windows 虚拟机完成联网全量安装。Windows 与 WSL 的 Pi 使用同一依赖锁文件，但 Ubuntu 软件源、WSL 系统组件和 .NET 安装脚本仍是外部可变依赖；这不是完全离线或逐字节可复现的系统镜像。
+
+安装器固定 Pi 1.5.1 和 LSP 1.4.0，并检查 Windows 和 WSL 的运行时依赖树。重新安装时，仅复用摘要匹配的 Windows 同版本环境；旧 LSP 标准环境先准备新依赖，确认所有者、用户组与访问规则一致后再备份和切换，切换失败时恢复原目录。权限不匹配、自定义依赖或文件、版本不明确、或依赖树无法识别时会停止，保留原文件等待处理；新准备目录可能需要人工清理。WSL 只允许替换已验证的旧树或新树；Pi 或 LSP 比固定版更新时拒绝降级。重新构建的安装包才会包含这些保护；旧的独立安装包仍使用其原有版本。构建器只打包 Git 索引中的文件，缺少必需的 Pi 运行文件时会报错。
+
+现有网关插件只有在文件、依赖、来源、受管文件基线和连接配置均与当前发布一致时才原样复用；其他已有插件会停止安装并等待协调，不会被本包覆盖。现有治理说明、技能、引用和 Codex 配置若与本包不同也会停止，避免重装改写个人规则。因此，旧版或自定义环境可能需要另行迁移，不能假定一键升级一定成功。
+
+此处描述的是源码支持的构建与安装流程，旧的 0.15.0 安装包仍包含 Pi 0.84.4，不会自动更新。新正式包需要在上述 Git 条件满足后构建，并在目标环境验证。公开发布需使用 `-PublicRelease`，且不能同时指定 `-SkipTests`：当前固定的 LSP 1.4.0 包内包含完整上游通知，历史 1.3.0 的覆盖范围仍单独保留为未确认。
 
 ### 高级配置安装
 
@@ -191,7 +197,7 @@ YHWH 自有代码、文档与配置采用 [Apache-2.0](LICENSE)，版权说明�
 
 可选 API 路线：安装后运行 `Configure-Claude-API.cmd`，或在源码目录运行 `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`。输入隐藏，凭据按 Windows DPAPI CurrentUser 加密，保存在 `~/.local/state/pi-kether/anthropic-api-key.json`。`check_claude_auth` 只检查这份 API 配置，不证明实际余额或模型访问；实际验证需另行授权探针。
 
-旧版用户应等待任务结束后升级，再配置所选路线。旧 `pi-claude-code-provider` 路由和 `renew_claude_auth` 工具不再接受。`Build-Release.ps1 -PublicRelease` 仍因固定 LSP 版本的上游通知待确认而拒绝；本次公开包沿用已授权且明确披露的例外，不代表许可门禁通过，也不捆绑第三方依赖。
+旧版用户应等待任务结束后升级，再配置所选路线。旧 `pi-claude-code-provider` 路由和 `renew_claude_auth` 工具不再接受。旧公开包沿用当时已授权且明确披露的 LSP 1.3.0 例外；当前 1.4.0 的许可证据单独检查，不代表完成产品整体许可审计，也不捆绑第三方依赖。
 
 ### Go 与 Rust 单文件适配
 

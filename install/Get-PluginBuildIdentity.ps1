@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$PackageRoot)
+param([Parameter(Mandatory)][string]$PackageRoot,[switch]$IsolatedGit)
 $ErrorActionPreference = 'Stop'
 $source = [IO.Path]::GetFullPath($PackageRoot)
 $plugin = Get-Content -LiteralPath (Join-Path $source 'payload/pi-dispatch/.codex-plugin/plugin.json') -Raw | ConvertFrom-Json
@@ -11,6 +11,10 @@ if (Test-Path -LiteralPath (Join-Path $source '.git')) {
     $info = [Diagnostics.ProcessStartInfo]::new((Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source)
     $info.WorkingDirectory = $source; $info.UseShellExecute = $false; $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    if($IsolatedGit){
+      foreach($key in @($info.Environment.Keys)){if($key -match '^(GIT_|GH_)'){[void]$info.Environment.Remove($key)}}
+      $info.Environment['GIT_TERMINAL_PROMPT']='0';$info.Environment['GIT_CONFIG_NOSYSTEM']='1';$info.Environment['GIT_CONFIG_GLOBAL']='NUL'
+    }
     $info.ArgumentList.Add('-c'); $info.ArgumentList.Add("safe.directory=$source")
     foreach ($argument in $GitArguments) { $info.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::Start($info)

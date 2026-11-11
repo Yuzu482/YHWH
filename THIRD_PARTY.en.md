@@ -8,10 +8,11 @@ Original YHWH code, documentation and configuration use [Apache-2.0](LICENSE). T
 
 | Component | Pinned version | License and evidence |
 | --- | --- | --- |
-| Pi Coding Agent / Pi components from the same repository | 0.84.4 | MIT; [full upstream text](licenses/pi-0.84.4-MIT.txt), Copyright 2025 Mario Zechner |
+| Pi Coding Agent / Pi components from the same repository | 1.5.1 | MIT; [full upstream text](licenses/pi-1.5.1-MIT.txt), Copyright 2025 Mario Zechner |
 | pi-claude-code-provider (historical, removed in 0.6) | 0.1.4 | MIT; [full upstream text](licenses/pi-claude-code-provider-0.1.4-MIT.txt), Copyright 2026 chem |
 | multilspy (0.9 development direct semantic probe) | 0.0.15 | [Microsoft MIT](licenses/multilspy-0.0.15-MIT.txt), [OLSP MIT](licenses/multilspy-OLSP-MIT.txt); [Python dependencies and hashes](licenses/multilspy-dependencies.json) |
-| pi-lsp-extension | 1.3.0 | Package declares MIT; [original metadata](licenses/pi-lsp-extension-1.3.0.package.json); [missing full text record](licenses/pi-lsp-extension-NOTICE.txt) |
+| pi-lsp-extension (current source pin) | 1.4.0 | MIT; [full upstream notice](licenses/pi-lsp-extension-upstream-20260924-LICENSE.txt); [package evidence](licenses/pi-lsp-extension-1.4.0-evidence.json) |
+| pi-lsp-extension (historical) | 1.3.0 | Package declares MIT; [original metadata](licenses/pi-lsp-extension-1.3.0.package.json); [historical notice record](licenses/pi-lsp-extension-NOTICE.txt) |
 | Claude Code (historical, no longer downloaded in 0.6) | 2.1.250 | [Original notice](licenses/claude-code-2.1.250-NOTICE.txt); governed by Anthropic agreements, not MIT/Apache-2.0 |
 
 Pi's MIT license can coexist with Apache-2.0 for YHWH's original work; retain third-party copyright and license notices. The bridge's MIT license does not grant rights to use Claude services or subscription credentials.
@@ -22,7 +23,7 @@ Source and installation archives contain YHWH scripts, documentation, configurat
 
 The [dependency declaration inventory](licenses/dependency-inventory.json) is generated from the Windows gateway and WSL npm lockfiles, including transitive and optional dependencies, versions, declared licenses, distribution URLs and integrity values. It is a metadata inventory, not a full license-text audit. It excludes system/separately downloaded components such as Ubuntu, PowerShell, Node, Java, .NET, JDT LS, csharp-ls, clangd and Bubblewrap. Their versions and sources remain recorded in installation scripts and bootstrap dependency metadata. Bundling them in future requires the corresponding redistribution materials.
 
-`install/patch-pi-lsp.mjs` contains upstream source matching excerpts and modifies the installed LSP extension. Those excerpts and the dependency retain upstream licensing. This work did not complete a file-by-file provenance audit. The missing complete LSP upstream notice remains outstanding; this inventory does not certify compliance of the entire product.
+`install/patch-pi-lsp.mjs` contains upstream source matching excerpts and modifies the installed LSP extension. Those excerpts and the dependency retain upstream licensing. This work did not complete a file-by-file provenance audit. Upstream has since supplied a notice, but explicit coverage of 1.3.0 remains unconfirmed; this inventory does not certify compliance of the entire product.
 
 ## Maintenance and checks
 
@@ -32,9 +33,9 @@ See the [Claude Code feasibility report](docs/claude-code-feasibility.en.md). Ve
 
 ## LSP notice and publication status
 
-The [verified package evidence](licenses/pi-lsp-extension-evidence.json) pins the original npm integrity and source commit. [Standard MIT text](licenses/MIT-standard-reference.txt) is supplied as a reference, with no invented upstream copyright holder. The upstream attribution gap remains pending. `Build-Release.ps1 -PublicRelease` enforces this hold; the default builds local previews. The [upstream request record](docs/upstream-lsp-license-request.md) includes submission status and the issue URL.
+The [1.4.0 package evidence](licenses/pi-lsp-extension-1.4.0-evidence.json) pins npm integrity, source commit and the full MIT notice included in that archive. The public-release check validates the current version, lockfile and notice digest. Historical [1.3.0 evidence](licenses/pi-lsp-extension-evidence.json) and the [upstream request record](docs/upstream-lsp-license-request.md) remain intact: explicit coverage for 1.3.0 is unconfirmed and its release hold is unchanged.
 
-The follow-up audit covers the pinned version, current main and fetched historical refs. See the [LSP license remediation record](docs/lsp-license-remediation.en.md) for scope, required upstream materials and integration steps. The request was submitted as [upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14); improved local records do not establish receipt of a complete upstream notice.
+The follow-up audit covers the pinned version, then-current main and fetched historical refs. See the [LSP license remediation record](docs/lsp-license-remediation.en.md) for scope, outstanding coverage evidence and integration steps. [Upstream issue #14](https://github.com/samfoy/pi-lsp-extension/issues/14) was closed with the notice commit, without an explicit statement of coverage for 1.3.0.
 
 See the [LSP component notes](docs/lsp-component.en.md) for functionality, installation dependencies and release boundaries.
 

@@ -14,7 +14,7 @@
 
 授权来自同一 chat 中用户的“可以在这个工作区启用”及“可以进行第一阶段的执行”。工作区 AGENTS.md 指向已批准的 `.yhwh/workflow-maintenance.md` v2；本机 `workspace-enable-record.json` 明确 `primaryHostImplementationAllowedForThisScope=true`。该例外仅适用本工作区的 YHWH 自身维护，不是普通项目或全局 primary-direct 授权。所有宿主修正、测试和整合记录为 host-maintenance，没有伪造 Chesed 成功、宿主验证记录或任务接受事件。
 
-原始证据位于本机 `C:/Users/asus/.local/state/pi-kether/workflow-self-maintenance-20261007/worker-runtime-phase1-20261008/`：`normalizer-task.json`、`normalizer-worker-failed-result.json`、`worker-candidate-import.json`、`scope.json`。失败补丁哈希为 `ea5576736ae5701323865d61a66394c1f88e74a11c4dffcaabf8d1b67b52fbb0`；脱敏失败结果哈希为 `b84c100b0c50bda08a13de81baf43e0f7ca0db3fadf5b191c6c4e88748c96fc0`。
+原始证据位于本机 `C:/Users/<local-user>/.local/state/pi-kether/workflow-self-maintenance-20261007/worker-runtime-phase1-20261008/`：`normalizer-task.json`、`normalizer-worker-failed-result.json`、`worker-candidate-import.json`、`scope.json`。失败补丁哈希为 `ea5576736ae5701323865d61a66394c1f88e74a11c4dffcaabf8d1b67b52fbb0`；脱敏失败结果哈希为 `b84c100b0c50bda08a13de81baf43e0f7ca0db3fadf5b191c6c4e88748c96fc0`。
 
 原黄金样本不是从 b285036 生成。它从修改前本地源码/已安装快照生成；源码名义 HEAD 为 `8f16c51f533b4e77ba7309f0d73c67655a4170b6`，快照含此前未提交维护修改，HEAD 不能代表全部字节。样本由合成边界输入产生，不是真实模型日志。原 baseline.json SHA-256 为 `9174a4dcc6a8522fc2fe77f8a599b366aac3d1e4281398e4e0eb37b8c93d4429`，cases.mjs 为 `4833a712cee4f071c7c9480f51dc472d4da6c1f5b6dc06d54b8982d3190eccd2`。b285036 对照将在补充验收中独立生成，并保留差异，不能倒签原样本来源。
 

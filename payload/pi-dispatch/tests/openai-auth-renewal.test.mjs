@@ -4,7 +4,7 @@ import {mkdtempSync,readFileSync,writeFileSync,existsSync,rmSync,readdirSync,mkd
 import {join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
-import {spawn} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {maintainOpenAIAuth,atomicAuthWrite} from '../scripts/openai-auth-store.mjs';
 import {openAIAuthEnvironment,ensureOpenAIAuth,piCompatibleAuthLock} from '../scripts/openai-auth-renewal.mjs';
 
@@ -13,22 +13,38 @@ const fixtureCredential={type:'oauth',access:'fixture-access-original',refresh:'
 const renewed=()=>({...fixtureCredential,access:'fixture-access-new',refresh:'fixture-refresh-new',expires:Date.now()+86400000});
 async function fixture(work){
   const root=mkdtempSync(join(tmpdir(),'pi-openai-persist-'));
-  const authPath=join(root,'auth.json'),stateDir=join(root,'state');
-  writeFileSync(authPath,JSON.stringify({'openai-codex':fixtureCredential,other:{type:'api_key',key:'fixture-unrelated'}}),{mode:0o600});
-  const f={root,authPath,stateDir,withAuthLock:async work=>work(),refresh:async()=>renewed(),minimumValidityMs:360000};
-  try{await work(f);}finally{rmSync(root,{recursive:true,force:true});}
+  const authPath=join(root,'.pi','agent','auth.json'),stateDir=join(root,'state');
+  try{
+    mkdirSync(dirname(authPath),{recursive:true});
+    writeFileSync(authPath,JSON.stringify({'openai-codex':fixtureCredential,other:{type:'api_key',key:'fixture-unrelated'}}),{mode:0o600});
+    if(process.platform==='win32'){
+      // Match the installer's protected Pi state, independent of the runner's
+      // inherited temporary-directory ACL. Only this synthetic fixture is changed.
+      const result=spawnSync(windowsPowerShell(),['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',join(here,'..','..','..','install','Protect-PiState.ps1'),'-TargetHome',root],{encoding:'utf8',windowsHide:true,timeout:15000});
+      assert.equal(result.status,0,result.stderr||result.error?.message);
+    }
+    const f={root,authPath,stateDir,withAuthLock:async work=>work(),refresh:async()=>renewed(),minimumValidityMs:360000};
+    await work(f);
+  }finally{rmSync(root,{recursive:true,force:true});}
+}
+function windowsPowerShell(){return join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');}
+function authSecurity(path){
+  const result=spawnSync(windowsPowerShell(),['-NoProfile','-NonInteractive','-File',join(here,'fixtures','read-auth-security.ps1'),'-Path',path],{encoding:'utf8',windowsHide:true,timeout:15000});
+  assert.equal(result.status,0,result.stderr||result.error?.message);return result.stdout.trim();
 }
 const read=path=>JSON.parse(readFileSync(path,'utf8'));
 const expectCode=(promise,code)=>assert.rejects(promise,error=>error.code===code&&error.message===code);
 
 test('rotated credentials persist atomically, preserve other providers and survive a fresh invocation',()=>fixture(async f=>{
+  const securityBefore=process.platform==='win32'?authSecurity(f.authPath):null;
   const result=await maintainOpenAIAuth(f);
   assert.equal(result.status,'renewed');assert.equal(result.persisted,true);
   assert.equal(read(f.authPath)['openai-codex'].refresh,'fixture-refresh-new');
   assert.equal(read(f.authPath).other.key,'fixture-unrelated');
   assert.equal((await maintainOpenAIAuth({...f,refresh:()=>assert.fail('must use persisted credentials')})).status,'valid');
   assert.ok(!JSON.stringify(result).includes('fixture-'));
-  assert.deepEqual(readdirSync(f.root).filter(name=>name.endsWith('.tmp')),[]);
+  assert.deepEqual(readdirSync(dirname(f.authPath)).filter(name=>name.endsWith('.tmp')),[]);
+  if(securityBefore!==null)assert.equal(authSecurity(f.authPath),securityBefore,'owner, group and DACL must survive the replacement');
 }));
 
 test('four independent processes refresh once; a fifth process reuses persisted state',()=>fixture(async f=>{

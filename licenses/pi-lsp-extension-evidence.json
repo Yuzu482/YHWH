@@ -103,5 +103,18 @@
     "submittedAt": "2026-09-19T05:27:00Z",
     "verifiedState": "OPEN",
     "bodyVerifiedAgainstLocalRecord": true
+  },
+  "upstreamFollowup20261111": {
+    "issueState": "closed-completed",
+    "issueUrl": "https://github.com/samfoy/pi-lsp-extension/issues/14",
+    "noticeCommit": "a9a9df4de0d5831fdad3494b338d655491297006",
+    "noticeFile": "licenses/pi-lsp-extension-upstream-20260924-LICENSE.txt",
+    "noticeSource": "https://raw.githubusercontent.com/samfoy/pi-lsp-extension/a9a9df4de0d5831fdad3494b338d655491297006/LICENSE",
+    "noticeSha256": "65966b294b74544c0fbd282e30d64a736956110370a20d3f86dc2b7358cda3ba",
+    "pinned130Coverage": "not explicitly confirmed in the issue or notice; public gate remains blocked",
+    "npm140ArchiveIntegrity": "sha512-FOwGIivoZt5YfVY/LGqQZf4+wPXT+73loKOQ3Lu6zeG2UAPCxelHT21zXG/qCVD32epq8FymH9dJ8EnotXkv4Q==",
+    "npm140NoticeMatches": true,
+    "npm140Layout": "compiled dist only; existing 1.3.0 source patches are not directly applicable",
+    "npm140Executed": false
   }
 }

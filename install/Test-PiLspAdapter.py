@@ -124,7 +124,7 @@ console.log(JSON.stringify({fixture:'java-readonly-security-empty-proc-no-networ
     for row in rows:assert row['passed'] and row['modelCalls']==0;print(json.dumps(row),flush=True)
     assert not list(job.glob('lsp-probe-*')),'Probe snapshots were not removed'
   finally:os.close(3)
-  print('PASS: real Pi 0.84.4 SDK, IPC broker, seven multilspy tools, current edits, cancellation and isolation; zero model calls.',flush=True)
+  print('PASS: installed Pi SDK, IPC broker, seven multilspy tools, current edits, cancellation and isolation; zero model calls.',flush=True)
  finally:
   assert job.parent==pathlib.Path('/var/lib/pi-kether/jobs') and job.name.count('-')==4
   if group.exists():
