@@ -47,6 +47,10 @@ function Get-DistributableFiles([string]$Directory) {
       if ($item.Parent.FullName -ieq $packageRoot -and $item.Name -in @('.local-evidence','.yhwh','review-candidates')) { continue }
       if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing distribution scan through a link: $($item.FullName)" }
       Get-DistributableFiles $item.FullName
+    } elseif ($item.Name -ieq '.git' -and $item.Parent.FullName -ieq $packageRoot) {
+      # A linked Git worktree uses a root .git pointer file, not a directory.
+      # It is local Git administration metadata, never a release input.
+      continue
     } elseif ($item.FullName -ne $PSCommandPath -and $item.Extension -notin '.zip','.sha256','.pyc') { $item }
   }
 }

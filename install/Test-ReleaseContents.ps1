@@ -11,7 +11,7 @@ function Get-SafeReleaseFiles([string]$Directory) {
       if ($item.Name -in @('node_modules','.git','.runtime','diagnostics','release')) { throw 'Release stage contains runtime or Git state.' }
       Get-SafeReleaseFiles $item.FullName
     } else {
-      if ($item.Name -match '(?i)^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|^\.env|\.local\.|\.(log|bak|backup|pyc|zip)$|^(?:.*token|.*key).*\.txt$') { throw 'Release stage contains a prohibited local-state file.' }
+      if ($item.Name -match '(?i)^\.git$|^auth\.json$|^(anthropic-api-key|provider-config|provider-credentials)\.json$|^\.env|\.local\.|\.(log|bak|backup|pyc|zip)$|^(?:.*token|.*key).*\.txt$') { throw 'Release stage contains a prohibited local-state file.' }
       $item
     }
   }

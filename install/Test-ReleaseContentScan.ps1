@@ -31,6 +31,9 @@ try{
  $prohibited=Join-Path $fixture 'payload/.env.local';[IO.File]::WriteAllText($prohibited,'fixture')
  Reject {& $scan -PackageRoot $fixture} 'prohibited local-state file'
  Remove-Item -LiteralPath $prohibited
+ $gitPointer=Join-Path $fixture 'payload/.git';[IO.File]::WriteAllText($gitPointer,'gitdir: fixture')
+ Reject {& $scan -PackageRoot $fixture} 'prohibited local-state file'
+ Remove-Item -LiteralPath $gitPointer
  $archive=Join-Path $fixture 'payload/hidden.zip';[IO.File]::WriteAllText($archive,'fixture')
  Reject {& $scan -PackageRoot $fixture} 'prohibited local-state file'
  Write-Output "PASS: $checks release-content checks; no external files or network."
