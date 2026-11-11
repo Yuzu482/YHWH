@@ -25,7 +25,7 @@ jobs:
             ['distro-node',['-d','Ubuntu-24.04','-u','root','--cd','/','--exec','/opt/node/bin/node','--version'],undefined],
             ['distro-input',['-d','Ubuntu-24.04','-u','root','--cd','/','--exec','/opt/node/bin/node','--input-type=module'],'console.log("fixture")']
           ]) {
-            const r=spawnSync('wsl.exe',args,{input,encoding:'buffer',timeout:10000});
+            const r=spawnSync('wsl.exe',args,{input:input===undefined?undefined:Buffer.from(input),timeout:10000});
             console.log(JSON.stringify({name,status:r.status,signal:r.signal,error:r.error&&{code:r.error.code,message:r.error.message},stdout:decode(r.stdout),stderr:decode(r.stderr)}));
           }
           '@ | Set-Content -LiteralPath $script -Encoding utf8NoBOM
