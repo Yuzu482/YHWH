@@ -23,6 +23,7 @@
         "render_subagent_monitor",
         "probe_model",
         "lsp_request",
+        "lsp_confirmed_request",
         "get_subagent_result",
         "check_claude_auth"
       ],

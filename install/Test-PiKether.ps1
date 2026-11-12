@@ -30,6 +30,14 @@ foreach($headlessFile in @('scripts/headless-host.mjs','scripts/headless-adapter
     Check ((Test-Path -LiteralPath $installedFile -PathType Leaf) -and ((Get-FileHash -LiteralPath $installedFile).Hash -eq (Get-FileHash -LiteralPath (Join-Path $payloadPlugin $headlessFile)).Hash)) ('headless CLI installed parity: '+$headlessFile)
   }
 }
+foreach($approvalFile in @('scripts/stdio-proxy.mjs','scripts/lsp-approval-runner.mjs','scripts/lsp-approval-state.mjs','scripts/lsp-approval-worker.mjs','scripts/lsp-change-detector.mjs')) {
+  $sourceFile=Join-Path $payloadPlugin $approvalFile
+  Check (Test-Path -LiteralPath $sourceFile -PathType Leaf) ('LSP confirmation payload: '+$approvalFile)
+  if($Installed) {
+    $installedFile=Join-Path (Join-Path $TargetHome 'plugins/pi-dispatch') $approvalFile
+    Check ((Test-Path -LiteralPath $installedFile -PathType Leaf) -and ((Get-FileHash -LiteralPath $installedFile).Hash -eq (Get-FileHash -LiteralPath $sourceFile).Hash)) ('LSP confirmation installed parity: '+$approvalFile)
+  }
+}
 try { $pluginManifestPath = Join-Path $payloadPlugin '.codex-plugin\plugin.json'; $pluginManifest = Get-Content -LiteralPath $pluginManifestPath -Raw | ConvertFrom-Json; Check ($pluginManifest.name -eq 'pi-dispatch' -and $pluginManifest.version -eq $manifest.components.piDispatch) 'Codex plugin manifest and portable version parity' } catch { Check $false 'Codex plugin manifest and portable version parity' }
 
 $policy = Get-Content -LiteralPath (Join-Path $packageRoot 'templates\AGENTS.kether.md') -Raw

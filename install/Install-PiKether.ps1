@@ -51,7 +51,7 @@ function Assert-PiRuntimeContract([string]$Root, $PortableManifest) {
   if ($versions.Count -ne 1 -or $versions[0].Groups[1].Value -cne $version) { throw 'WSL provisioning version differs from the portable manifest.' }
   $lspVersions = [regex]::Matches($script, '(?m)^LSP_VERSION="([^"\r\n]+)"\r?$')
   if ($lspVersions.Count -ne 1 -or $lspVersions[0].Groups[1].Value -cne '1.4.0') { throw 'WSL LSP provisioning version differs from the verified runtime.' }
-  foreach ($name in @('sdk-tree-integrity.mjs','check-pi-runtime-tree.mjs','pi-151-home.mjs')) {
+  foreach ($name in @('sdk-tree-integrity.mjs','check-pi-runtime-tree.mjs','pi-151-home.mjs','stdio-proxy.mjs','lsp-approval-runner.mjs','lsp-approval-state.mjs','lsp-approval-worker.mjs','lsp-change-detector.mjs')) {
     if (-not (Test-Path -LiteralPath (Join-Path $Root ('payload/pi-dispatch/scripts/'+$name)) -PathType Leaf)) { throw "Missing Pi runtime file: $name" }
   }
   if (-not (Test-Path -LiteralPath (Join-Path $Root 'install/check-pi-downgrade.py') -PathType Leaf) -or -not $script.Contains('python3 /tmp/pi-kether-install/check-pi-downgrade.py /opt/pi-kether "$PI_VERSION"')) { throw 'WSL Pi downgrade guard is missing.' }

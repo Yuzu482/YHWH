@@ -5,7 +5,7 @@ import {checkClaudeAuth,CLAUDE_API_POLICY} from './claude-api-auth.mjs';
 import {OPENAI_AUTH_POLICY} from './openai-auth-store.mjs';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -23,6 +23,7 @@ import {runtimePreflight} from './runtime-preflight.mjs';
 import {TASK_PLANNING_POLICY} from './task-planning.mjs';
 import { PROVIDER_POLICY, publicCapabilities } from './provider-policy.mjs';
 import {LSP_METHODS,lspParameters,runDirectLsp} from './direct-lsp.mjs';
+import {createLspApprovalRunner} from './lsp-approval-runner.mjs';
 import { probeWslSandbox } from './wsl-sandbox.mjs';
 import { applyArtifact, relativePatchFiles } from './artifact-apply.mjs';
 import { buildAuditRecord, createAuditLogger, ensureRequestId, redactSensitiveText } from '../extensions/audit-log.js';
@@ -297,6 +298,7 @@ export function createGatewayRuntime(options) {
   const gatewayInstanceId = options.gatewayInstanceId ?? randomUUID();
   const workflowReceipts=createWorkflowReceipts(options.workflowReceiptOptions);
   const roots = options.roots.map(root => realpathSync(resolve(root)));
+  const lspApproval=options.lspApprovalRoot?createLspApprovalRunner({roots,stateDir:options.lspApprovalRoot}):null;
   const riskProfiles = validateRiskProfiles(options.riskProfiles ?? [], roots);
   const riskProfileFor = createRiskProfileResolver(riskProfiles);
   const sandbox = options.sandboxStatus ?? probeWslSandbox();
@@ -386,6 +388,7 @@ export function createGatewayRuntime(options) {
     editors: EDITOR_POLICY,
     projectMemory: PROJECT_MEMORY_POLICY,
     codeGraph: CODE_GRAPH_POLICY,
+    lspApproval:{enabled:!!lspApproval,policyVersion:1,files:50,lines:2000,scope:'repository',fallback:'one-call confirmation when inspection is unavailable'},
     authentication: {
       openaiRenewal:{enabled:true,hostOnly:true,piSdk:true,automaticBeforeDispatch:true,atomicPersistence:true,sharedPiFileLock:true,sandboxRefresh:false,sandboxCredential:"access-token-only",validity:"execution budget plus 360 seconds",policy:OPENAI_AUTH_POLICY,clearsCircuit:false},
       claudeApi:{enabled:true,hostOnly:true,automaticBeforeDispatch:true,tool:"check_claude_auth",policy:CLAUDE_API_POLICY,clearsCircuit:false}
@@ -1419,18 +1422,34 @@ export function createGatewayRuntime(options) {
         return textResult({ ok: false, requestId: error.requestId ?? input.requestId, heartbeat: 'failed', error: error.message, providerCircuit: error.providerCircuit }, true);
       }
     }));
-    server.registerTool('lsp_request', {
+    const lspTool={
       description: 'Directly execute one read-only LSP tool inside the resource-limited sandbox. No model or credentials. Query is an exact symbol or structural pattern. Positions are 1-based.',
       inputSchema: { ...routeSchema, provider:routeSchema.provider.optional(),model:routeSchema.model.optional(), ...traceSchema,
         method:z.enum(Object.keys(LSP_METHODS)), file:z.string().min(1).max(1024),query:z.string().min(1).max(4000).optional(),
         line:z.number().int().min(1).max(10000000).optional(),character:z.number().int().min(1).max(10000000).optional(),
-        language:z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/).optional() },
-    }, admitted(async (input, extra) => {
+        language:z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/).optional(), confirmationNonce:z.string().regex(/^[a-f0-9]{64}$/).optional() },
+    };
+    const runLsp=admitted(async (input, extra) => {
       const requestId=ensureRequestId(input.requestId), started=Date.now(), requestedTool=LSP_METHODS[input.method];
       let timings={queueWaitMs:0,executionMs:0};
       try {
         const cwd=resolveAllowedCwd(input.cwd,roots);
         const file=relative(cwd,resolveAllowedFile(input.file,cwd)).split(sep).join('/');
+        if(lspApproval){
+          const approvalInput={...input,requestId};let permitted=false,decision;
+          if(input.confirmationNonce)permitted=(await lspApproval.consumeOneTime(approvalInput,{nonce:input.confirmationNonce},extra.signal)).ok===true;
+          if(!permitted){
+            try{decision=await lspApproval.assess(approvalInput,extra.signal)}catch(error){
+              const allowedFallback=new Set(['repository_file_limit','repository_bytes_limit','repository_file_unsupported','repository_line_limit','repository_record_limit','repository_listing_unavailable','repository_directory_limit','line_comparison_failed']);
+              if(!allowedFallback.has(error.message))throw error;
+              decision={allowed:false,reason:'inspection-unavailable',errorCode:error.message,nonce:randomUUID().replaceAll('-','')+randomUUID().replaceAll('-',''),expiresAt:Date.now()+240000};
+            }
+            if(!decision.allowed){
+              audit?.record(buildAuditRecord({requestId,operation:'lsp_request',input:{access:'read'},task:null,result:{timings},durationMs:Date.now()-started,failure:'confirmation_required'}));
+              return structuredResult({ok:false,status:'blocked',requestId,code:'PI_LSP_CONFIRMATION_REQUIRED',challenge:decision},true);
+            }
+          }
+        }
         const params=lspParameters(input,file);
         if(!resourceLimitsEnforced)throw new Error('Direct LSP requires a verified resource-limited WSL sandbox');
         const resourceLimits=resolveResourceLimits(input.resourceProfile,input.timeoutSeconds);
@@ -1447,7 +1466,9 @@ export function createGatewayRuntime(options) {
         audit?.record(buildAuditRecord({requestId,operation:'lsp_request',input:{access:'read'},task:null,result:{timings},durationMs:Date.now()-started,failure:error.message}));
         return textResult({ok:false,status:'failed',requestId,requestedTool,error:error.message,code:error.code,waitReasons:error.waitReasons,timings,executionMode:'direct',modelCalls:0},true);
       }
-    }));
+    });
+    server.registerTool('lsp_request',lspTool,runLsp);
+    if(lspApproval)server.registerTool('lsp_confirmation_enforced_v1',lspTool,runLsp);
     return server;
   }
   function replaceAdapter(id, candidate) {
@@ -1662,6 +1683,7 @@ export function loadGatewayOptions(env = process.env) {
     auditFile,
     providerCircuitFile,
     requestLedgerDir,
+    lspApprovalRoot:resolve(dirname(configPath),'lsp-approval'),
     riskProfiles: config.riskProfiles ?? [],
     reviewQuotaExceptions,
     hostExecutionAvailable: config.hostExecutionAvailable === undefined ? true : config.hostExecutionAvailable,

@@ -1,5 +1,5 @@
 import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createGatewayRuntime } from './gateway.mjs';
 import {startStdioProxy} from './stdio-proxy.mjs';
@@ -23,7 +23,7 @@ try {
   if (!providerCircuitFile) throw new Error('PI_GATEWAY_PROVIDER_CIRCUIT_FILE is required');
   const requestLedgerDir = process.env.PI_GATEWAY_REQUEST_LEDGER_DIR;
   if (!requestLedgerDir) throw new Error('PI_GATEWAY_REQUEST_LEDGER_DIR is required');
-  const runtime = createGatewayRuntime({ host: 'stdio', port: 0, bind: 'stdio', protocol: 'MCP stdio', roots: roots(), maxConcurrency: 4, maxQueue: 16, auditFile, providerCircuitFile, requestLedgerDir });
+  const runtime = createGatewayRuntime({ host: 'stdio', port: 0, bind: 'stdio', protocol: 'MCP stdio', roots: roots(), maxConcurrency: 4, maxQueue: 16, auditFile, providerCircuitFile, requestLedgerDir, lspApprovalRoot:resolve(dirname(requestLedgerDir),'lsp-approval') });
   const server = runtime.makeServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
