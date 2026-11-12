@@ -17,7 +17,7 @@ test.after(()=>{
   fs.rmSync(actual,{recursive:true,force:false});
 });
 const token='fixture-only-token-0123456789-0123456789';
-async function setup({supported=true,answer='accept',injectedError=null,hold=false}={}){
+async function setup({supported=true,answer='accept',injectedError=null,hold=false,outsideFile=false}={}){
   const root=fs.mkdtempSync(path.join(base,'failure-fixture-'));
   const repo=path.join(root,'repo'),state=path.join(root,'lsp-approval'),file=path.join(repo,'sample.js');
   fs.mkdirSync(repo);execFileSync('git',['init','-q',repo],{stdio:'pipe'});fs.writeFileSync(file,'export const testSymbol=1;\n');execFileSync('git',['-C',repo,'add','sample.js'],{stdio:'pipe'});
@@ -32,11 +32,19 @@ async function setup({supported=true,answer='accept',injectedError=null,hold=fal
   if(supported)host.setRequestHandler(ElicitRequestSchema,async()=>{prompts++;notifyPrompt();if(hold)return await new Promise(resolve=>{releasePrompt=()=>resolve({action:'cancel',content:null})});return {action:answer,content:answer==='accept'?{}:null}});
   const [a,b]=InMemoryTransport.createLinkedPair(),bridge=await startStdioProxy({configPath:config,transport:b});await host.connect(a);
   if(injectedError)bridge.server.elicitInput=async(_params,options)=>{timeoutOption=options.timeout;throw injectedError};
-  const invoke=signal=>host.callTool({name:'lsp_confirmed_request',arguments:{cwd:repo,file,method:'symbols',resourceProfile:'small',timeoutSeconds:5,queueTimeoutSeconds:2}},undefined,{timeout:15000,...(signal?{signal}:{})});
+  const requestedFile=outsideFile?path.join(root,'outside.js'):file;if(outsideFile)fs.writeFileSync(requestedFile,'outside\n');
+  const invoke=signal=>host.callTool({name:'lsp_confirmed_request',arguments:{cwd:repo,file:requestedFile,method:'symbols',resourceProfile:'small',timeoutSeconds:5,queueTimeoutSeconds:2}},undefined,{timeout:15000,...(signal?{signal}:{})});
   const close=async()=>{releasePrompt?.();await host.close();await bridge.close();await new Promise(resolve=>http.close(resolve));await fixture.runtime.shutdown({graceMs:0,abortWaitMs:0})};
   return {invoke,close,promptReady,calls:()=>calls,prompts:()=>prompts,timeout:()=>timeoutOption,state};
 }
 const value=result=>result.structuredContent??JSON.parse(result.content[0].text);
+async function promptOrCompletion(prompt,pending){
+ let timer;try{return await Promise.race([
+   prompt.then(()=>({kind:'prompt'})),
+   pending.then(result=>({kind:'returned',result}),error=>({kind:'rejected',error:error.message})),
+   new Promise(resolve=>{timer=setTimeout(()=>resolve({kind:'timeout'}),10000)})
+ ])}finally{clearTimeout(timer)}
+}
 for(const scenario of [
   {name:'unsupported form remains blocked',options:{supported:false},reason:'form_unsupported'},
   {name:'timeout remains blocked and is explained',options:{injectedError:new McpError(ErrorCode.RequestTimeout,'private timeout detail')},reason:'confirmation_timeout'},
@@ -48,12 +56,17 @@ for(const scenario of [
 test('declined confirmation never runs a query or records a baseline',async()=>{
   const f=await setup({answer:'decline'});try{const r=await f.invoke();assert.equal(value(r).error,'confirmation_declined');assert.equal(f.calls(),0);assert.equal(f.prompts(),1);assert(!fs.existsSync(f.state)||!fs.readdirSync(f.state).some(name=>/^[a-f0-9]{64}\.json$/.test(name)));}finally{await f.close()}
 });
+test('a request that fails before prompting does not leave the fixture waiting',async()=>{
+  const f=await setup({hold:true,outsideFile:true});try{const first=await promptOrCompletion(f.promptReady,f.invoke());assert.equal(first.kind,'returned');assert.equal(first.result.isError,true);assert.equal(f.calls(),0);}finally{await f.close()}
+});
 test('cancelled request does not turn a pending prompt into permission',async()=>{
-  const f=await setup({hold:true}),controller=new AbortController();try{
-    const pending=f.invoke(controller.signal);await f.promptReady;controller.abort();await assert.rejects(pending);
+  const f=await setup({hold:true}),controller=new AbortController();let pending;try{
+    pending=f.invoke(controller.signal);
+    const first=await promptOrCompletion(f.promptReady,pending);
+    assert.equal(first.kind,'prompt',JSON.stringify(first));controller.abort();await assert.rejects(pending);
     await new Promise(resolve=>setTimeout(resolve,100));assert.equal(f.calls(),0);
     assert(!fs.existsSync(f.state)||!fs.readdirSync(f.state).some(name=>/^[a-f0-9]{64}\.json$/.test(name)));
-  }finally{await f.close()}
+  }finally{controller.abort();await pending?.catch(()=>{});await f.close()}
 });
 test('accepted confirmation runs once and subsequent query needs no prompt',async()=>{
   const f=await setup();try{assert.equal(value(await f.invoke()).ok,true);assert.equal(value(await f.invoke()).ok,true);assert.equal(f.calls(),2);assert.equal(f.prompts(),1);}finally{await f.close()}

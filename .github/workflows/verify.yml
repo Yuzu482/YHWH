@@ -61,6 +61,11 @@ jobs:
         run: |
           node tests/windows-acl-diagnostic.mjs
           if ($LASTEXITCODE -ne 0) { throw 'ACL diagnostic failed' }
+      - name: Verify LSP approval admission
+        working-directory: payload/pi-dispatch
+        run: |
+          node --test --test-concurrency=1 tests/lsp-approval-git-path.test.mjs tests/lsp-approval-state.test.mjs tests/lsp-confirmation-failure.test.mjs tests/lsp-approval-proxy.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'LSP approval admission failed' }
       - name: Credential-free runtime checks
         working-directory: payload/pi-dispatch
         run: |
