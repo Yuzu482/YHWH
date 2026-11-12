@@ -27,6 +27,6 @@ T2 uses v2 links; never forge upstream or disguise dependencies. Upgraded known-
 
 Choose the lowest justified whole-goal tier; explain escalation with TIER_REASON=. Authorized host-diagnosed repairs need no renewed permission and never reset reviews. Validate complete material/bytes before launch; no truncation/path-only review. Corrections need current artifact evidence; label reused coverage.
 
-LSP uses direct `lsp_request`, not model delegation; inspect status/backend/raw result. Degraded is reduced evidence; unavailable/failed fail acceptance; see `pi-lsp`.
+LSP: prefer local `lsp_confirmed_request`; online shares approval. No model delegation. Check status/backend/result: degraded is limited; unavailable/failed fail. See `pi-lsp`.
 
 Optional transports require operator config; digest changes fail closed. No auto-switch, lowered thinking or credential fallback; authorized probes only. Full credential rules: `pi-auth`.

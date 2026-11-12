@@ -162,6 +162,14 @@ if($Installer) {
   foreach($requiredPiFile in @('payload/pi-dispatch/scripts/sdk-tree-integrity.mjs','payload/pi-dispatch/scripts/pi-151-home.mjs','payload/pi-dispatch/extensions/data-capacity.js','licenses/pi-1.5.1-MIT.txt','install/check-pi-downgrade.py','install/HostPolicyPreservation.ps1','install/assert-existing-plugin.mjs','install/Release-Files.ps1','install/Resolve-PackagedSource.ps1','install/Test-ReleaseContents.ps1')) {
     Check (Test-Path -LiteralPath (Join-Path $package $requiredPiFile) -PathType Leaf) "Release contains $requiredPiFile"
   }
+  foreach($approvalFile in @('payload/pi-dispatch/scripts/stdio-proxy.mjs','payload/pi-dispatch/scripts/lsp-approval-runner.mjs','payload/pi-dispatch/scripts/lsp-approval-state.mjs','payload/pi-dispatch/scripts/lsp-approval-worker.mjs','payload/pi-dispatch/scripts/lsp-change-detector.mjs')) {
+    $packed=Join-Path $package $approvalFile
+    Check ((Test-Path -LiteralPath $packed -PathType Leaf) -and ((Get-FileHash -LiteralPath $packed -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo $approvalFile) -Algorithm SHA256).Hash)) "Release preserves LSP confirmation: $approvalFile"
+  }
+  $proxy=Get-Content -LiteralPath (Join-Path $package 'payload/pi-dispatch/scripts/stdio-proxy.mjs') -Raw
+  Check ($proxy.Contains('LSP_CONFIRMATION_TIMEOUT_MS=180000') -and $proxy.Contains('confirmation_unavailable')) 'Packaged LSP confirmation retains the timeout and fail-closed response'
+  $shared=Get-Content -LiteralPath (Join-Path $package 'install/Get-SharedGatewayConnection.ps1') -Raw
+  Check ($shared.Contains("'lsp_confirmed_request'")) 'Packaged shared connection exposes the confirmed LSP entry'
   foreach($required in @('Workflow.ps1','payload/pi-dispatch/.codex-plugin/plugin.json','payload/wsl-package-lock.json','templates/agent-references/pi-routing.md','README.md','README.en.md','.readme-assets/en.svg','install/bootstrap-dependencies.json','templates/host-primary.md','payload/pi-dispatch/workflow/catalog.json','payload/pi-dispatch/scripts/host-profiles.mjs','payload/pi-dispatch/scripts/check-host-connection.mjs','payload/pi-dispatch/scripts/reviewer-route-config.mjs','install/Export-HostProfiles.ps1','docs/host-integration.md','docs/host-integration.en.md','payload/pi-dispatch/scripts/common-client-profiles.mjs','docs/common-clients.md','docs/common-clients.en.md','install/Apply-HindsightWrapper.ps1','templates/hindsight-coding-agent/SKILL.md')) {
     Check (Test-Path -LiteralPath (Join-Path $package $required)) "Release contains $required"
   }

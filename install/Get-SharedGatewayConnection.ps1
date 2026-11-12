@@ -53,6 +53,6 @@ return [pscustomobject][ordered]@{
     PI_GATEWAY_CONFIG=$gatewayConfig
   }
   enabled=$true
-  enabled_tools=@('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','wait_subagent','get_task_handoff','wait_task_handoff','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','check_claude_auth','diagnose_milestone_failure','abandon_artifact','reconcile_milestone')
+  enabled_tools=@('get_workflow','list_capabilities','dispatch_subagent','submit_subagent','get_subagent_status','wait_subagent','get_task_handoff','wait_task_handoff','get_subagent_result','list_subagents','cancel_subagent','render_subagent_monitor','probe_model','lsp_request','lsp_confirmed_request','check_claude_auth','diagnose_milestone_failure','abandon_artifact','reconcile_milestone')
   startup_timeout_sec=30
 }
