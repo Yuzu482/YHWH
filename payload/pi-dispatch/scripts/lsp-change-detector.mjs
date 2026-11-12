@@ -11,16 +11,19 @@ const gitEnv={};for(const k of ['PATH','PATHEXT','SystemRoot','SYSTEMROOT','WIND
 Object.assign(gitEnv,{GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:process.platform==='win32'?'NUL':'/dev/null',GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'});
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const inRoot=(file,root)=>{const r=path.relative(root,file);return r===''||(!path.isAbsolute(r)&&r!=='..'&&!r.startsWith('..'+path.sep))};
+// Native resolution expands Windows 8.3 names as well as links. Git may return
+// the long spelling even when the configured root was supplied in short form.
+const realPath=fs.realpathSync.native;
 function omit(relative){const parts=relative.split('/');const name=parts.at(-1);return parts.some(p=>omitDirs.has(p.toLowerCase()))||/^\.env(?:\.|$)/i.test(name)||/\.(?:pem|key|pfx|p12)$/i.test(name)||/(?:^|[._-])(?:auth|credentials?|token|secrets?|api[-_]?key)(?:[._-]|$).*\.(?:json|ya?ml|toml)$/i.test(name)}
 function sourceLike(name){return /\.(?:[cm]?[jt]sx?|py|pyi|c|cc|cpp|h|hpp|cs|rs|go|java|kt|swift|sh|ps1|psm1|json|ya?ml|toml|md|html?|css|scss|xml|sql|proto|gradle|properties)$/i.test(name)||/^(?:Dockerfile|Makefile|CMakeLists\.txt|\.gitignore)$/i.test(name)}
 function git(cwd,args,maxBuffer=16*1024*1024){return execFileSync('git',['--no-pager','-C',cwd,'-c','core.fsmonitor=false',...args],{env:gitEnv,timeout:12000,maxBuffer,windowsHide:true,stdio:['ignore','pipe','pipe']})}
 export function resolveRepository(cwd,allowedRoots,file=null){
  if(!path.isAbsolute(cwd)||!Array.isArray(allowedRoots)||!allowedRoots.length)throw Error('invalid_workspace');
- const canonical=fs.realpathSync(cwd),roots=allowedRoots.map(x=>fs.realpathSync(x));
+ const canonical=realPath(cwd),roots=allowedRoots.map(x=>realPath(x));
  if(!roots.some(r=>inRoot(canonical,r)))throw Error('outside_allowed_root');
  let anchor=canonical;
- if(file!==null){if(typeof file!=='string'||!file.trim())throw Error('invalid_file');const actual=fs.realpathSync(path.isAbsolute(file)?file:path.resolve(canonical,file));if(!inRoot(actual,canonical))throw Error('file_outside_workspace');anchor=path.dirname(actual)}
- let repo;try{repo=fs.realpathSync(git(anchor,['rev-parse','--show-toplevel']).toString('utf8').trim())}catch{
+ if(file!==null){if(typeof file!=='string'||!file.trim())throw Error('invalid_file');const actual=realPath(path.isAbsolute(file)?file:path.resolve(canonical,file));if(!inRoot(actual,canonical))throw Error('file_outside_workspace');anchor=path.dirname(actual)}
+ let repo;try{repo=realPath(git(anchor,['rev-parse','--show-toplevel']).toString('utf8').trim())}catch{
    let cursor=anchor;while(roots.some(r=>inRoot(cursor,r))){if(fs.existsSync(path.join(cursor,'.git')))throw Error('repository_listing_unavailable');const parent=path.dirname(cursor);if(parent===cursor)break;cursor=parent}
    repo=canonical;
  }
@@ -57,7 +60,7 @@ export function inspectRepository(cwd,allowedRoots,previous=null,file=null){
    if(before.size>LIMIT.fileBytes)throw Error('repository_file_unsupported');
    bytes+=before.size;if(bytes>LIMIT.bytes)throw Error('repository_bytes_limit');
    let fd;try{
-     if(!inRoot(fs.realpathSync(absolute),repo))throw Error('repository_link_outside');
+     if(!inRoot(realPath(absolute),repo))throw Error('repository_link_outside');
      fd=fs.openSync(absolute,'r');const opened=fs.fstatSync(fd);
      if(!opened.isFile()||opened.dev!==before.dev||opened.ino!==before.ino||opened.size!==before.size)throw Error('repository_changed_during_scan');
      const content=fs.readFileSync(fd),after=fs.fstatSync(fd);
