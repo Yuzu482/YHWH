@@ -21,6 +21,12 @@ $manifest = Get-Content -LiteralPath (Join-Path $packageRoot 'portable.manifest.
 . (Join-Path $PSScriptRoot 'HostPolicyPreservation.ps1')
 
 function Say([string]$Text) { Write-Host "[Pi Kether] $Text" }
+function Write-HostPackage([string]$Path, $Package) {
+  # npm uses package.json's line endings for its generated hidden lockfile.
+  # Keep them stable so the reviewed Windows runtime tree digest is portable.
+  $json = ($Package | ConvertTo-Json -Depth 5).Replace("`r`n", "`n")
+  [IO.File]::WriteAllText($Path, $json + "`n", [Text.UTF8Encoding]::new($false))
+}
 function Assert-Under([string]$Path, [string]$Root) {
   $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
   $base = [IO.Path]::GetFullPath($Root).TrimEnd('\')
@@ -259,7 +265,7 @@ if($hostPiMode -ne 'reuse'){
     'typescript-lsp' = "npm:typescript@$($manifest.components.typescriptLsp)"
     'vscode-languageserver-protocol' = '3.17.5'
   }}
-  $hostPackage | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $preparedPi 'package.json') -Encoding utf8NoBOM
+  Write-HostPackage (Join-Path $preparedPi 'package.json') $hostPackage
   Copy-Item -LiteralPath (Join-Path $payload 'wsl-package-lock.json') -Destination (Join-Path $preparedPi 'package-lock.json')
   Push-Location $preparedPi
   try {

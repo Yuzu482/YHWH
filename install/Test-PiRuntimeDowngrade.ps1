@@ -8,7 +8,7 @@ New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 $errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'Install-PiKether.ps1'),[ref]$null,[ref]$errors)
 if($errors){throw 'Installer did not parse.'}
 foreach($fn in $ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst]},$false)){
- if($fn.Name -in @('Assert-Under','Assert-NoReparse','Compare-ToPinnedRuntimeVersion','Compare-ToPinnedPiVersion','Compare-ToPinnedLspVersion','Get-HostPiMode')){. ([scriptblock]::Create($fn.Extent.Text))}
+ if($fn.Name -in @('Write-HostPackage','Assert-Under','Assert-NoReparse','Compare-ToPinnedRuntimeVersion','Compare-ToPinnedPiVersion','Compare-ToPinnedLspVersion','Get-HostPiMode')){. ([scriptblock]::Create($fn.Extent.Text))}
 }
 $checks=0
 function Check([bool]$Ok,[string]$Name){if(-not $Ok){throw "FAIL: $Name"};$script:checks++;Write-Output "PASS: $Name"}
@@ -28,6 +28,11 @@ function MakeHost([string]$Name,[string]$Declared,[string]$Installed,[string]$Ls
  return @{home=$fixtureHome;root=$root}
 }
 try{
+ $hostPackage=Join-Path $fixture 'package.json'
+ Write-HostPackage $hostPackage ([ordered]@{private=$true;dependencies=[ordered]@{'pi-lsp-extension'='1.4.0'}})
+ $packageBytes=[IO.File]::ReadAllBytes($hostPackage)
+ $packageText=[Text.Encoding]::UTF8.GetString($packageBytes)
+ Check (-not $packageText.Contains("`r") -and $packageText.EndsWith("`n") -and $packageBytes[0] -ne 0xEF -and ($packageText|ConvertFrom-Json).dependencies.'pi-lsp-extension' -ceq '1.4.0') 'host package uses BOM-free LF JSON for the pinned npm tree'
  $old=MakeHost 'old' '0.84.4' '0.84.4'
  Check ((Get-HostPiMode $old.root 'unused-node' 'unused-module' $old.home) -ceq 'replace') 'older standard Pi may be upgraded with backup'
  foreach($version in @('1.5.2','1.6.0-beta.1','2.0.0')){
