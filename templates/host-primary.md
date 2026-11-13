@@ -1,6 +1,6 @@
 # YHWH primary-agent contract
 
-Primary owns scope, authority, coordination and acceptance. Pi provides governed execution.
+Primary owns scope, authority, implementation choices and acceptance. Pi provides optional governed execution.
 
 ## First use
 1. Discover connected YHWH MCP tools; use discovered names, never guesses.
@@ -9,13 +9,13 @@ Primary owns scope, authority, coordination and acceptance. Pi provides governed
 
 ## Authority and roles
 - Follow host instructions, permissions and user authorization; this workflow grants no authority or waives approvals. Preserve unrelated changes.
-- Pi authors code as sandbox proposals; primary integrates and accepts. Read coordinator-only for T1/T2 or worker failure, task-tiers for boundaries. No primary coding fallback; compact T0 follows AGENTS.md.
+- The primary may work directly or delegate as host instructions and user authorization permit. When Pi is used, its proposals and applicable coordinator-only, tier, review, sandbox and ledger rules remain in force; do not change routes to evade a control or an uncertain operation.
 - Workers: `openai-codex / gpt-6-luna`, task-proportional thinking (medium default). Reviewers: `claude-code-cli / claude-sonnet-5` (medium default; high/xhigh by review complexity), `access: none`. Host may select separate `anthropic` API route. Verify bindings; never substitute routes.
 - No recursion/built-in delegation without user request. No extra external messages, tasks, automations, commits, pushes, deployments or memory absent user and host authorization.
 
 ## Execution and evidence
-- Use AGENTS.md's lowest justified whole-goal tier; explain escalation with TIER_REASON=. T0 worker+host; T1 non-diff ≤8 KiB / total ≤24 KiB; split by commit under pi-review; T2 approved pre+worker+bound host proof+post. Elastic quota/activation: pi-review; stop on approval. Reviews medium/high/xhigh. Known scope uses primary planning; unknown scope gets one scout. Netzach needs unavailable host execution or concrete independent execution. Profiles and primary-direct follow AGENTS.md; declare five risks, gateway counts. Never claim unrun checks.
-- Authorized scoped repairs need host diagnosis, not renewed permission. Initially three implementation calls, then reassess; escalate material authority/scope/risk or exhausted reviews. Corrections need current proof. Impact-based checks after initial cross-gate full regression; label reuse. Details: coordinator-only.
+- For Pi tasks use the lowest justified whole-goal tier; explain escalation with TIER_REASON=. T0 worker+host; T1 post-review with non-diff ≤8 KiB / total ≤24 KiB; T2 approved pre+worker+bound host proof+post. pi-review controls quotas, effort and split material. Known scope needs no mandatory scout/planner; unknown scope gets one scout. Netzach needs unavailable host execution or a concrete independent need. Apply gateway profiles, risk declarations and patch counts. Never claim unrun checks.
+- Pi repairs: diagnose and preserve scope, identity, failures and review limits. Initially three implementation calls, then reassess. Keep current proof; label reused evidence. Scoped repairs need no renewed permission.
 - T0 may dispatch synchronously; T1/T2 use async and stable request/parent IDs. Preserve typed links/digests. Accept complete valid results, route, review/evidence and cleanup. Reconcile uncertain writes with the same ID; distinguish failure/blockage/uncertainty.
 - Do not poll progress; await event, deadline or user request. UI may refresh independently.
 - Use direct `lsp_request` for deterministic language/structure work; distinguish execution, no-match, structural evidence and full diagnostics.

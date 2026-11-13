@@ -3,13 +3,15 @@ import {createHash} from 'node:crypto';
 import {z} from 'zod';
 const catalog=JSON.parse(readFileSync(new URL('../workflow/catalog.json',import.meta.url),'utf8'));
 export const primaryPolicy=Object.freeze({
-  mode:'coordinator-only',
-  implementationOwner:'pi-subagents',
+  mode:'host-selected',
+  implementationOwner:'primary-or-delegate',
   directCoding:false,
-  unavailableWorkerAction:'blocked',
+  directCodingScope:'legacy Pi coordinator-only channel; not a statement of primary host permissions',
+  hostDirectCoding:'determined by current host instructions and user authorization',
+  unavailableWorkerAction:'continue-authorized-work',
   enforcement:'host-instructions',
 });
-export const workflowInstructions='YHWH provides governed Pi execution for the primary agent in this host. The primary is coordinator-only: it owns thinking, scheduling and integration, while implementation must be delegated to Pi subagents using the existing role bindings. Do not code directly or fall back to direct coding when a worker is unavailable; block instead. Read primary only if the host has not injected it. Before Pi model selection, read pi-routing and list_capabilities. Topic-gated tools require a fresh workflowReceipt from get_workflow for that topic. Fetching a topic proves retrieval only, not compliance. Preserve host permissions and role bindings; use discovered tool names.';
+export const workflowInstructions='The primary owns implementation and may work directly or delegate as allowed by current host instructions and user authorization. Pi is optional for work outside Pi. Pi calls remain subject to their advertised role, tier, review and ledger checks. Preserve existing task identity, history and explicit limits. Before Pi model selection, read pi-routing and list_capabilities. Topic-gated tools require a fresh workflowReceipt; retrieval is not compliance or authority.';
 export function workflowTopic(topic='primary'){
   if(!Object.hasOwn(catalog.topics,topic))throw new Error('Unknown workflow topic');
   const content=catalog.topics[topic];

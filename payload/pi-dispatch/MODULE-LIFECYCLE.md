@@ -104,3 +104,11 @@ for lifecycle and loopback MCP fixtures. The fixtures use local fake adapters;
 they do not prove a live provider migration, external editor operation or
 replacement of the already-running installed gateway. Deploying updated source
 to an installed runtime and restarting it are separate operations.
+
+## Task-selected context components
+
+Pi model tasks do not automatically create optional context components. The primary may put exactly one `TASK_COMPONENTS_JSON={"version":1,"components":["gitContext","projectMemory"]}` item in `task.context`, selecting either or both built-in components. Omit the item or pass an empty array to use neither. Unknown, duplicate or malformed selections stop before model execution. The control entry is removed before the worker receives task context.
+
+Each selected component instance is created only for that task and disposed in reverse order after its context has been prepared, including on initialization failure, cancellation and errors. Project-memory cache leases are released at that boundary; shared state remains available while another task owns a lease. This is task-scoped instance and effect cleanup, not unloading JavaScript module code or deleting persistent knowledge.
+
+The primary selects existing LSP, worker and reviewer tools separately as needed. Component selection cannot register arbitrary code, widen scopes or bypass the existing host permissions, tier/review checks, sandbox, LSP confirmation, audit, request ledger or historical quotas. Stateful gateway services and the existing idle-only adapter replacement boundary remain unchanged.

@@ -72,10 +72,10 @@ v0.15.0 汇总运行时质量与宿主验收改进：只读 fixture、新文件�
 
 ### 一键安装（Windows 11 x64）
 
-构建后的 `YHWH-OneClick-0.15.2.zip` 包含内嵌安装包的脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
+构建后的 `YHWH-OneClick-0.15.3.zip` 包含内嵌安装包的脚本、校验文件和双击入口。解压后双击 `Install-YHWH.cmd`，按提示选择允许代理访问的工作目录；直接回车会创建 `~/YHWH-Workspace`。也可以只复制单个脚本到目标电脑运行：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1
 ```
 
 默认导出通用 MCP 接入配置，不修改 Codex 全局设置。用 `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"` 选择宿主；包含 `codex` 时才执行原有 Codex 集成。接入文件还需按宿主提示导入，并加载主代理规则；已有配置不会被导出器覆盖。
@@ -90,14 +90,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps
 
 ```powershell
 # 只读预览，不下载、不改宿主
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -PlanOnly
 # 固定目录，免交互安装（WSL 必须已经就绪；账号登录另行完成）
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
 # 只校验内嵌包完整性并解包（不验证 Git 来源）；目标须为尚不存在的绝对路径
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-维护者在干净、已推送且属于 `origin/main` 的源码上运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/0.15.2/` 生成便携 ZIP、PS1、SHA256 和双击安装包；已有同名输出会阻止构建，避免覆盖旧包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`pwsh -NoProfile -File .\install\Test-OneClick.ps1 -Installer .\release\0.15.2\Install-YHWH-0.15.2.ps1`。
+维护者在干净、已推送且属于 `origin/main` 的源码上运行 `pwsh -NoProfile -File .\Build-Release.ps1`，会在 `release/0.15.3/` 生成便携 ZIP、PS1、SHA256 和双击安装包；已有同名输出会阻止构建，避免覆盖旧包。仓库中的 `Install-YHWH.ps1` 也能直接从完整源码目录运行；带版本号的生成脚本才是可单独复制的版本。`-SkipTests` 仅跳过网关测试，不会让本机 `node_modules` 进入发布包。安全解包测试：`pwsh -NoProfile -File .\install\Test-OneClick.ps1 -Installer .\release\0.15.3\Install-YHWH-0.15.3.ps1`。
 
 本版本已做脚本和包级验证，尚未在全新 Windows 虚拟机完成联网全量安装。Windows 与 WSL 的 Pi 使用同一依赖锁文件，但 Ubuntu 软件源、WSL 系统组件和 .NET 安装脚本仍是外部可变依赖；这不是完全离线或逐字节可复现的系统镜像。
 

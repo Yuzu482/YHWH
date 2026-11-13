@@ -166,6 +166,10 @@ if($Installer) {
     $packed=Join-Path $package $approvalFile
     Check ((Test-Path -LiteralPath $packed -PathType Leaf) -and ((Get-FileHash -LiteralPath $packed -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo $approvalFile) -Algorithm SHA256).Hash)) "Release preserves LSP confirmation: $approvalFile"
   }
+  foreach($componentFile in @('install/Test-CloudInstall.ps1','payload/pi-dispatch/scripts/task-components.mjs','payload/pi-dispatch/scripts/project-memory-context.mjs','payload/pi-dispatch/scripts/gateway.mjs','payload/pi-dispatch/scripts/host-workflow.mjs','payload/pi-dispatch/tests/task-components.test.mjs','payload/pi-dispatch/tests/gateway-memory.test.mjs','payload/pi-dispatch/tests/host-workflow.test.mjs','payload/pi-dispatch/workflow/catalog.json','payload/workflow-skills/kether-governance/SKILL.md','templates/AGENTS.kether.md','templates/host-primary.md','templates/agent-references/pi-routing.md','templates/agent-references/coordinator-only.md','templates/agent-references/task-tiers.md','templates/agent-references/delegation.md')) {
+    $packed=Join-Path $package $componentFile
+    Check ((Test-Path -LiteralPath $packed -PathType Leaf) -and ((Get-FileHash -LiteralPath $packed -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo $componentFile) -Algorithm SHA256).Hash)) "Release preserves task component support: $componentFile"
+  }
   $proxy=Get-Content -LiteralPath (Join-Path $package 'payload/pi-dispatch/scripts/stdio-proxy.mjs') -Raw
   Check ($proxy.Contains('LSP_CONFIRMATION_TIMEOUT_MS=180000') -and $proxy.Contains('confirmation_unavailable')) 'Packaged LSP confirmation retains the timeout and fail-closed response'
   $shared=Get-Content -LiteralPath (Join-Path $package 'install/Get-SharedGatewayConnection.ps1') -Raw

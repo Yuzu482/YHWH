@@ -385,6 +385,7 @@ export function createGatewayRuntime(options) {
     installationIntegrity,
     ...(installationIntegrity.code ? {code:installationIntegrity.code} : {}),
     lifecycle: { ...modules.snapshot(), phase, inFlight, pendingTasks:pendingTasks(), responseSessions:responseSessions.stats, replacement:'trusted-host-idle-only', replaceableAdapters:['dispatch','lsp'] },
+    taskComponents:{version:1,selection:'One TASK_COMPONENTS_JSON= entry in task.context; omit to activate no optional context components',example:'TASK_COMPONENTS_JSON={"version":1,"components":["gitContext"]}',default:[],available:['gitContext','projectMemory'],lifetime:'per-task',coreSecurity:'persistent'},
     editors: EDITOR_POLICY,
     projectMemory: PROJECT_MEMORY_POLICY,
     codeGraph: CODE_GRAPH_POLICY,

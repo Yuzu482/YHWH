@@ -5,14 +5,14 @@ description: Apply the user's Kether governance workflow to T2 or disputed ChatG
 
 # Kether governance
 
-This skill is the detailed governance reference for the user's Kether workflow. `AGENTS.md` is the sole always-on index; its current tier/profile rules select the required stages. The table below describes role outputs, not mandatory calls for every task. Dispatch model-backed work only through the installed Pi bridge using the live role-bound provider: OpenAI Luna for workers and Claude Sonnet for reviewers, with the exact transport in pi-routing. Do not enter another orchestration runtime or substitute a provider to evade a binding.
+This skill is a governance reference for the user's Kether workflow. The primary may implement directly or delegate as the host and user authorize. Pi-specific tier, role and stage requirements below apply when actually using Pi or an explicitly scoped legacy Pi contract; they do not grant or remove ordinary host permissions. For Pi dispatch use the live role-bound provider and actual gateway policy. Do not switch a backend or substitute a provider to evade a binding or uncertain operation.
 
 ## Choose the execution path
 
 1. Identify the actual host capabilities and active authorization. Higher-priority instructions and explicit user intent govern. Loading this skill does not switch the host into Plan mode or grant permissions.
-2. Use compact primary mode for non-coding work. All coding, including small fixes, tests and implementation scripts, is authored by bounded Pi workers under the coordinator-only policy. The primary plans, inspects, mechanically integrates accepted patches and verifies; it does not take over failed implementation.
-3. Classify the whole goal at the lowest justified tier; explain deliberate escalation with meaningful TIER_REASON= context and read task-tiers only for boundaries. T0 uses Chesed and host checks, without Netzach/Geburah. T1 adds one complexity-selected post-review ≤10 KB; nonblocking findings mean conditional approval without re-review. T2 keeps approved pre-review before writes and independent post-review, medium/high/xhigh by complexity, evidence-gated elastic quotas and aggregate count/time ceilings under pi-review before user escalation. The upgraded known-scope path uses primary planning and complete artifact-bound host verification, without mandatory scout/planner/Netzach calls. Netzach is for unavailable host execution or a concrete independent execution need. Unknown scope still gets one Malkuth scout; tests/config alone do not upgrade. Before runtime upgrade, follow its actual admitted chain. Workers use Pi `openai-codex`; built-in subagents need explicit user request. Primary owns integration and acceptance; workers are actual calls.
-4. If mandatory worker capacity is unavailable, coding stays blocked; continue only primary reasoning/diagnosis. Distinguish local review from independent verification. A prompt or role name alone never establishes independent execution; require actual Pi dispatch and accepted worker artifacts. Primary-authored coding needs an explicit subsequent user exception.
+2. The primary may implement and test directly when authorized, or select bounded Pi work when useful. For Pi-governed implementation follow the coordinator-only contract and preserve its actual worker results, failures and uncertain attempts.
+3. For Pi tasks classify the whole goal at the lowest justified tier; explain deliberate escalation with meaningful TIER_REASON= context and read task-tiers for boundaries. T0 uses Chesed and host checks, without Netzach/Geburah. T1 adds the required post-review; T2 keeps approved pre-review before writes and independent post-review, with the actual gateway's quotas and aggregate limits under pi-review. Known scope uses primary planning and artifact-bound host verification; scout/planner/Netzach calls are conditional as the protocol allows. Before runtime upgrade, follow its actual admitted chain. Primary owns integration and acceptance; workers are actual calls.
+4. If required Pi capacity is unavailable, do not claim a Pi stage succeeded or bypass an uncertain operation; diagnose and reconcile it under its original identity. Unrelated authorized host work may continue. Distinguish local review from independent verification; a prompt or role name alone never establishes independent execution.
 
 ## Derive a task agreement
 
@@ -20,7 +20,7 @@ Record goal, original requirements, explicit versus inferred constraints, allowe
 
 In explicit Plan mode, produce the concrete plan without mutation and wait for authorized transition to execution. In Execute mode, honor authorization already present in the user's request/session; internal pre-review is not another request for user approval. Scope changes require a revised agreement; seek user input only for a material missing decision or authorization. Never treat an answer to a clarification as approval of a separate external action.
 
-## Stages and deliverables
+## Pi stages and deliverables
 
 | Stage | Owner | Required output |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ In explicit Plan mode, produce the concrete plan without mutation and wait for a
 | post-review (T1/T2 only) | Geburah | Compare actual artifacts/diff and verification with the agreement; approve or return concrete findings. |
 | final synthesis | Kether / primary | Evidence-backed result and remaining limits, without claiming skipped or failed stages passed. |
 
-The required order follows the canonical `task-tiers` trigger table, not an ad hoc interpretation of "substantive". Scout/planner and model verification are conditional, including known-scope T2 with trusted host evidence on the upgraded protocol. State why a conditional stage is not needed. Read-only tasks gain no write authority. T2 pre-review precedes writes; T1/T2 post-review follows actual verification. Independent review remains required; primary self-review is not independent evidence.
+For Pi tasks the required order follows the canonical `task-tiers` trigger table. Scout/planner and model verification are conditional where the actual protocol allows. Read-only tasks gain no write authority. Pi T2 pre-review precedes writes; Pi T1/T2 post-review follows actual verification. Required independent review remains required; primary self-review is not independent evidence.
 
 ## Bounded delegation
 
@@ -48,7 +48,7 @@ Use one writer by default. Parallel scouting and review should have non-overlapp
 
 ## Model and capability handling
 
-Preserve explicit user choices and the live role bindings. Native workers use gpt-6-luna with task-proportional thinking (medium by default) through Pi when supported; reviewers keep their explicit separate route. If a required route is unavailable, report the blocker rather than substitute. No built-in fallback or primary coding takeover: continue only local reasoning/diagnosis. Da'at is a focused capability bridge when configured; return observations and limitations to the owner without expanding authority.
+Preserve explicit user choices and the live Pi role bindings. Pi workers use the configured route and task-proportional thinking; reviewers keep their explicit separate route. If a required Pi route is unavailable, report the blocker rather than substitute within that governed task. Unrelated authorized host work may continue. Da'at is a focused capability bridge when configured; return observations and limitations to the owner without expanding authority.
 
 Bound implementation repairs under coordinator-only and keep the original task scope. Repairs, reassessment, new request IDs and tier changes never reset review budgets: apply pi-review's evidence-gated elastic quotas and aggregate count/time ceilings, with legacy runtime caps until upgraded; escalate if still failing. T1 nonblocking findings are conditional approval without re-review. Security/authority or scope disputes escalate immediately. Repeated tool errors require diagnosis, not an identical retry loop. A missing Pi model or capability is a capability limit. Only an actual Pi run may claim a provider, model, or tool result.
 
