@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$FixtureParent)
+param([Parameter(Mandatory)][string]$FixtureParent,[switch]$InstallSmoke)
 $ErrorActionPreference = 'Stop'
 $source = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'DeploymentMainPolicy.ps1')
@@ -37,4 +37,8 @@ if ($previewCommit -cnotmatch '^[a-f0-9]{40,64}$') { throw 'Cannot create the te
 if ((Git $checkout @('rev-parse','--verify','HEAD')) -cne $previewCommit -or (Git $checkout @('rev-parse','--verify','HEAD^{tree}')) -cne $sourceTree -or (Git $checkout @('status','--porcelain','--untracked-files=all'))) { throw 'CI preview does not match the clean source tree.' }
 if ((Git $source @('rev-parse','--verify','HEAD^{tree}')) -cne $sourceTree -or (Git $source @('status','--porcelain','--untracked-files=all'))) { throw 'CI source changed during preview setup.' }
 & (Join-Path $checkout 'Build-Release.ps1') -SkipTests -OutputDirectory $output
+if($InstallSmoke){
+  $version=[string](Get-Content -LiteralPath (Join-Path $checkout 'portable.manifest.json') -Raw | ConvertFrom-Json).version
+  & (Join-Path $checkout 'install/Test-CloudInstall.ps1') -PackageZip (Join-Path $output ("pi-kether-portable-$version.zip"))
+}
 Write-Host 'CI preview completed; no preview artifact is published by this workflow.'

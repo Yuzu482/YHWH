@@ -67,6 +67,7 @@ jobs:
           node --test --test-concurrency=1 tests/lsp-approval-git-path.test.mjs tests/lsp-approval-state.test.mjs tests/lsp-confirmation-failure.test.mjs tests/lsp-approval-proxy.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'LSP approval admission failed' }
       - name: Credential-free runtime checks
+        if: github.event_name == 'pull_request'
         working-directory: payload/pi-dispatch
         run: |
           node --test --test-concurrency=1 tests/*.test.mjs
@@ -77,14 +78,25 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           $engine = Join-Path $env:RUNNER_TEMP 'yhwh-powershell-7.6.5/pwsh.exe'
-          & $engine -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File './Build-Release.ps1' -SkipTests
+          & $engine -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File './Build-Release.ps1' -PublicRelease
           if ($LASTEXITCODE -ne 0) { throw 'Main release package checks failed' }
+          $version = [string](Get-Content -LiteralPath './portable.manifest.json' -Raw | ConvertFrom-Json).version
+          & $engine -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File './install/Test-CloudInstall.ps1' -PackageZip (Join-Path (Join-Path './release' $version) ("pi-kether-portable-$version.zip"))
+          if ($LASTEXITCODE -ne 0) { throw 'Cloud install and reinstall checks failed' }
       - name: Package and verify pull request in a local Git fixture
         if: github.event_name == 'pull_request'
         run: |
           $engine = Join-Path $env:RUNNER_TEMP 'yhwh-powershell-7.6.5/pwsh.exe'
-          & $engine -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File './install/Invoke-CiReleasePreview.ps1' -FixtureParent $env:RUNNER_TEMP
+          & $engine -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File './install/Invoke-CiReleasePreview.ps1' -FixtureParent $env:RUNNER_TEMP -InstallSmoke
           if ($LASTEXITCODE -ne 0) { throw 'Pull request package checks failed' }
+      - name: Preserve verified main release bundle
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: yhwh-main-release-${{ github.sha }}
+          path: release/*/*
+          if-no-files-found: error
+          retention-days: 7
       - name: Clean target installation plan
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'yhwh-empty-home'
