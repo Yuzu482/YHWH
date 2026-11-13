@@ -17,6 +17,7 @@ import {roleValue} from './contract-fixtures.mjs';
 
 const token='gateway-memory-fixture-0123456789';
 const parse=r=>JSON.parse(r.content[0].text);
+const components=ids=>'TASK_COMPONENTS_JSON='+JSON.stringify({version:1,components:ids});
 function fixture(t,{memory=true}={}){
  const root=mkdtempSync(join(tmpdir(),'yhwh-gateway-memory-'));t.after(()=>{closeProjectMemoryIndexCache();rmSync(root,{recursive:true,force:true});});
  const git=(...args)=>execFileSync('git',['-c',`safe.directory=${root}`,...args],{cwd:root,encoding:'utf8'});
@@ -33,7 +34,7 @@ async function knowledge(root,id,title,body='Verified architecture reference',pa
 test('actual MCP worker dispatch injects fresh scoped memory into a clone only',async t=>{
  const {root,git}=fixture(t);await knowledge(root,'architecture','Architecture 架构','Architecture decisions are documented.');
  writeFileSync(join(root,'git-reference.md'),'baseline evidence');git('add','git-reference.md');git('commit','-qm','add Git reference');writeFileSync(join(root,'git-reference.md'),'changed evidence');
- const incoming={role:'worker',objective:'请解释架构 architecture',context:['original context'],readScope:['source.md','git-reference.md'],acceptance:['Report']};
+ const incoming={role:'worker',objective:'请解释架构 architecture',context:['original context',components(['gitContext','projectMemory'])],readScope:['source.md','git-reference.md'],acceptance:['Report']};
  const original=structuredClone(incoming),captured=[];
  const options={host:'127.0.0.1',port:0,roots:[root],token,requestLedgerDir:join(root,'.ledger'),sandboxStatus:{ok:true,backend:'fixture',resourceLimits:true},schedulerOptions:{availableMemoryBytes:()=>Number.MAX_SAFE_INTEGER,pollIntervalMs:5},dispatchFn:async(request,_signal,task)=>{captured.push(task);return {ok:true,provider:request.provider,model:request.model,text:`KETHER_RESULT_JSON=${JSON.stringify(roleValue(task.role))}`};}};
  const {app,runtime}=createGatewayApp(options),server=await listenHttpFixture(app),client=new Client({name:'gateway-memory-test',version:'1'});
@@ -47,9 +48,44 @@ test('actual MCP worker dispatch injects fresh scoped memory into a clone only',
  }finally{await client.close();await runtime.shutdown({graceMs:50,abortWaitMs:50}).catch(()=>{});await new Promise(resolve=>server.close(resolve));}
 });
 
+test('MCP caller selects optional context per task while admission remains enforced',async t=>{
+ const {root,git}=fixture(t);await knowledge(root,'architecture','Architecture','Architecture decisions are documented.');
+ writeFileSync(join(root,'git-reference.md'),'baseline');git('add','git-reference.md');git('commit','-qm','git reference');writeFileSync(join(root,'git-reference.md'),'changed evidence');
+ const captured=[];
+ const options={host:'127.0.0.1',port:0,roots:[root],token,requestLedgerDir:join(root,'.ledger'),sandboxStatus:{ok:true,backend:'fixture',resourceLimits:true},schedulerOptions:{availableMemoryBytes:()=>Number.MAX_SAFE_INTEGER,pollIntervalMs:5},dispatchFn:async(request,_signal,task)=>{captured.push(task);return {ok:true,provider:request.provider,model:request.model,text:`KETHER_RESULT_JSON=${JSON.stringify(roleValue(task.role))}`};}};
+ const {app,runtime}=createGatewayApp(options),server=await listenHttpFixture(app),client=new Client({name:'task-component-test',version:'1'});
+ try{
+  await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${server.address().port}/mcp`),{requestInit:{headers:{Authorization:`Bearer ${token}`}}}));
+  const base={cwd:root,provider:'openai-codex',model:'gpt-6-luna',access:'read',resourceProfile:'small',task:{role:'worker',objective:'architecture',context:['caller'],readScope:['source.md','git-reference.md'],acceptance:['Report']}};
+  assert.equal(parse(await client.callTool({name:'dispatch_subagent',arguments:base})).ok,true);
+  assert.deepEqual(captured[0].context,['caller']);
+  assert.equal(existsSync(join(root,'.yhwh','memory-index','index.json')),false);
+  const withComponents=ids=>({...base,task:{...base.task,context:['caller',components(ids)]}});
+  assert.equal(parse(await client.callTool({name:'dispatch_subagent',arguments:withComponents(['gitContext'])})).ok,true);
+  assert.ok(captured[1].context.some(x=>x.startsWith('UNTRUSTED GIT REFERENCE DATA;')));
+  assert.ok(!captured[1].context.some(x=>x.startsWith('UNTRUSTED PROJECT MEMORY REFERENCE DATA;')));
+  assert.equal(existsSync(join(root,'.yhwh','memory-index','index.json')),false);
+  assert.equal(parse(await client.callTool({name:'dispatch_subagent',arguments:withComponents(['projectMemory'])})).ok,true);
+  assert.ok(captured[2].context.some(x=>x.startsWith('UNTRUSTED PROJECT MEMORY REFERENCE DATA;')));
+  assert.ok(!captured[2].context.some(x=>x.startsWith('UNTRUSTED GIT REFERENCE DATA;')));
+  assert.ok(captured.every(task=>task.context.every(x=>!x.startsWith('TASK_COMPONENTS_JSON='))));
+  const unknown=parse(await client.callTool({name:'dispatch_subagent',arguments:withComponents(['audit'])}));
+  assert.equal(unknown.ok,false);assert.equal(unknown.code,'PI_TASK_COMPONENTS_INVALID');
+  assert.equal(captured.length,3);
+  const badRoute=parse(await client.callTool({name:'dispatch_subagent',arguments:{...withComponents([]),model:'not-approved'}}));
+  assert.equal(badRoute.ok,false);assert.equal(captured.length,3);
+  const risky={...withComponents([]),requestId:'component-tier-fixture',access:'workspace-write',model:'gpt-6.1-terra',tier:'T2',tierDeclaration:{publicApiOrProtocol:true,dependencyOrLockfile:false,securityAuthOrCredentials:false,migration:false,irreversibleOrNoRollback:false},task:{...withComponents([]).task,role:'Chesed',writeScope:['source.md']}};
+  const blocked=parse(await client.callTool({name:'dispatch_subagent',arguments:risky}));
+  assert.equal(blocked.ok,false);assert.equal(blocked.code,'WORKFLOW_TIER_PRE_REVIEW_REQUIRED');assert.equal(captured.length,3);
+  const caps=parse(await client.callTool({name:'list_capabilities',arguments:{}}));
+  assert.deepEqual(caps.taskComponents.available,['gitContext','projectMemory']);
+  assert.equal(caps.taskComponents.coreSecurity,'persistent');
+ }finally{await client.close();await runtime.shutdown({graceMs:50,abortWaitMs:50}).catch(()=>{});await new Promise(resolve=>server.close(resolve));}
+});
+
 test('injects scoped Git evidence without a memory directory and preserves original context',async t=>{
  const {root}=fixture(t,{memory:false});writeFileSync(join(root,'source.md'),'changed evidence');
- const memory=createProjectMemoryContext({roots:[root]}),original=['original context','entry two'],task={role:'worker',objective:'Inspect this change',context:original,readScope:['source.md'],writeScope:[]};
+ const memory=createProjectMemoryContext({roots:[root]}),original=['original context','entry two'],task={role:'worker',objective:'Inspect this change',context:[...original,components(['gitContext'])],readScope:['source.md'],writeScope:[]};
  try{const injected=await memory.inject({cwd:root,task,access:'workspace-write',operation:'dispatch_subagent'});assert.deepEqual(injected.context.slice(0,2),original);assert.ok(injected.context.slice(2).join('\n').includes('UNTRUSTED GIT REFERENCE DATA'));assert.ok(!existsSync(join(root,'.yhwh','memory')));assert.ok(Buffer.byteLength(injected.context.join('\n'),'utf8')<=8192);assert.ok(injected.context.every(entry=>entry.length<=4000));
   const full={...task,context:Array.from({length:64},(_,i)=>`original ${i}`)};assert.equal(await memory.inject({cwd:root,task:full,access:'read'}),full);
  }finally{memory.close();}
@@ -62,8 +98,8 @@ test('injection propagates prompt abort and reserves Git budget alongside memory
  const memory=createProjectMemoryContext({roots:[root]}),controller=new AbortController();
  try{
   controller.abort();await assert.rejects(memory.inject({cwd:root,task:{role:'worker',objective:'architecture',context:[]},access:'read',signal:controller.signal}),{name:'AbortError'});
-  const context=Array.from({length:10},(_,i)=>`caller ${i} ${'x'.repeat(300)}`),task={role:'worker',objective:'architecture',context,readScope:['source.md','dirty-a.md','dirty-b.md']};
-  const pendingController=new AbortController();const pending=memory.inject({cwd:root,task:{...task,context:[]},access:'read',signal:pendingController.signal});pendingController.abort();await assert.rejects(pending,{name:'AbortError'});
+  const context=Array.from({length:10},(_,i)=>`caller ${i} ${'x'.repeat(300)}`),task={role:'worker',objective:'architecture',context:[...context,components(['gitContext','projectMemory'])],readScope:['source.md','dirty-a.md','dirty-b.md']};
+  const pendingController=new AbortController();const pending=memory.inject({cwd:root,task:{...task,context:[components(['gitContext'])]},access:'read',signal:pendingController.signal});pendingController.abort();await assert.rejects(pending,{name:'AbortError'});
   const result=await memory.inject({cwd:root,task,access:'read'});assert.deepEqual(result.context.slice(0,context.length),context);
   assert.ok(result.context.some(x=>x.startsWith('UNTRUSTED PROJECT MEMORY REFERENCE DATA;')&&x.includes('"freshness":"fresh"')));
   const gitEvidence=result.context.filter(x=>x.startsWith('UNTRUSTED GIT REFERENCE DATA;'));
@@ -80,8 +116,8 @@ test('injection gates reviewer/probe/none, authorizes every source, handles Chin
  const memory=createProjectMemoryContext({roots:[root]}),base={objective:'架构设计 architecture',context:[],readScope:['source.md','source.md'],writeScope:[]};
  try{
   for(const input of [{task:{...base,role:'Geburah'},access:'read'},{task:{...base,role:'worker'},access:'none'},{task:{...base,role:'worker'},access:'read',operation:'probe_model'}])assert.equal(await memory.inject({cwd:root,...input}),input.task);
-  const task={...base,role:'worker'};const result=await memory.inject({cwd:root,task,access:'read',operation:'dispatch_subagent'});
-  assert.equal(task.context.length,0);assert.ok(result.context.length<=5);assert.ok(result.context.every(text=>!text.includes('unauthorized')));
+  const task={...base,role:'worker',context:[components(['gitContext','projectMemory'])]};const result=await memory.inject({cwd:root,task,access:'read',operation:'dispatch_subagent'});
+  assert.equal(task.context.length,1);assert.ok(result.context.length<=5);assert.ok(result.context.every(text=>!text.includes('unauthorized')));
   assert.ok(Buffer.byteLength(result.context.join('\n'),'utf8')<=8192);assert.ok(result.context.join('\n').includes('freshness'));
   const denied=await memory.inject({cwd:root,task:{...task,readScope:['elsewhere/**']},access:'read'});assert.ok(denied.context.every(text=>!text.includes('elsewhere')&&!text.includes('source.md')&&!text.includes('architecture-')));assert.ok(!denied.context.some(text=>text.includes('UNTRUSTED PROJECT MEMORY REFERENCE DATA')));
  }finally{memory.close();}

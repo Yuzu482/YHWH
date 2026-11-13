@@ -38,6 +38,14 @@ foreach($approvalFile in @('scripts/stdio-proxy.mjs','scripts/lsp-approval-runne
     Check ((Test-Path -LiteralPath $installedFile -PathType Leaf) -and ((Get-FileHash -LiteralPath $installedFile).Hash -eq (Get-FileHash -LiteralPath $sourceFile).Hash)) ('LSP confirmation installed parity: '+$approvalFile)
   }
 }
+foreach($componentFile in @('scripts/task-components.mjs','scripts/project-memory-context.mjs','scripts/gateway.mjs')) {
+  $sourceFile=Join-Path $payloadPlugin $componentFile
+  Check (Test-Path -LiteralPath $sourceFile -PathType Leaf) ('task component payload: '+$componentFile)
+  if($Installed) {
+    $installedFile=Join-Path (Join-Path $TargetHome 'plugins/pi-dispatch') $componentFile
+    Check ((Test-Path -LiteralPath $installedFile -PathType Leaf) -and ((Get-FileHash -LiteralPath $installedFile).Hash -eq (Get-FileHash -LiteralPath $sourceFile).Hash)) ('task component installed parity: '+$componentFile)
+  }
+}
 try { $pluginManifestPath = Join-Path $payloadPlugin '.codex-plugin\plugin.json'; $pluginManifest = Get-Content -LiteralPath $pluginManifestPath -Raw | ConvertFrom-Json; Check ($pluginManifest.name -eq 'pi-dispatch' -and $pluginManifest.version -eq $manifest.components.piDispatch) 'Codex plugin manifest and portable version parity' } catch { Check $false 'Codex plugin manifest and portable version parity' }
 
 $policy = Get-Content -LiteralPath (Join-Path $packageRoot 'templates\AGENTS.kether.md') -Raw

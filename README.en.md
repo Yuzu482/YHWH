@@ -72,10 +72,10 @@ It provides:
 
 ### One-click installation (Windows 11 x64)
 
-The generated `YHWH-OneClick-0.15.2.zip` contains a script with an embedded package, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
+The generated `YHWH-OneClick-0.15.3.zip` contains a script with an embedded package, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1
 ```
 
 The default exports generic MCP configuration without changing Codex global settings. Select hosts with `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"`; including `codex` enables the original Codex integration. Import the generated connection profile and load the primary instructions in each host. The exporter never overwrites existing host configuration.
@@ -90,14 +90,14 @@ An existing Pi installation is protected by default. Once tasks have ended and i
 
 ```powershell
 # Read-only preview: no downloads or host changes
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps1 -PlanOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -PlanOnly
 # Unattended installation with a fixed workspace (WSL must be ready; login is separate)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
 # Check embedded payload integrity and extract only (Git provenance is not checked); destination must be a new absolute path
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.2.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
 ```
 
-Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` from clean source pushed to `origin/main` to generate the portable ZIP, PS1, SHA256 file and double-click bundle under `release/0.15.2/`. Existing output names stop the build to protect older artifacts. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `pwsh -NoProfile -File .\install\Test-OneClick.ps1 -Installer .\release\0.15.2\Install-YHWH-0.15.2.ps1`.
+Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` from clean source pushed to `origin/main` to generate the portable ZIP, PS1, SHA256 file and double-click bundle under `release/0.15.3/`. Existing output names stop the build to protect older artifacts. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `pwsh -NoProfile -File .\install\Test-OneClick.ps1 -Installer .\release\0.15.3\Install-YHWH-0.15.3.ps1`.
 
 This version has script and package validation, but a full online installation in a fresh Windows VM has not been performed. Windows and WSL Pi use the same dependency lockfile; Ubuntu repositories, WSL system components and the .NET installer remain mutable external dependencies. This is not a completely offline or byte-for-byte reproducible system image.
 
