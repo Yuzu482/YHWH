@@ -38,7 +38,7 @@ foreach($approvalFile in @('scripts/stdio-proxy.mjs','scripts/lsp-approval-runne
     Check ((Test-Path -LiteralPath $installedFile -PathType Leaf) -and ((Get-FileHash -LiteralPath $installedFile).Hash -eq (Get-FileHash -LiteralPath $sourceFile).Hash)) ('LSP confirmation installed parity: '+$approvalFile)
   }
 }
-foreach($componentFile in @('scripts/task-components.mjs','scripts/project-memory-context.mjs','scripts/gateway.mjs')) {
+foreach($componentFile in @('scripts/task-components.mjs','scripts/project-memory-context.mjs','scripts/gateway.mjs','scripts/host-workflow.mjs')) {
   $sourceFile=Join-Path $payloadPlugin $componentFile
   Check (Test-Path -LiteralPath $sourceFile -PathType Leaf) ('task component payload: '+$componentFile)
   if($Installed) {

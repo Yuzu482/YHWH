@@ -11,18 +11,31 @@ import {
 
 const catalog=JSON.parse(readFileSync(new URL('../workflow/catalog.json',import.meta.url),'utf8'));
 
-test('returns the frozen coordinator-only primary policy',()=>{
+test('returns host-selected primary policy without changing Pi admission',()=>{
   assert.equal(Object.isFrozen(primaryPolicy),true);
   assert.deepEqual(primaryPolicy,{
-    mode:'coordinator-only',
-    implementationOwner:'pi-subagents',
+    mode:'host-selected',
+    implementationOwner:'primary-or-delegate',
     directCoding:false,
-    unavailableWorkerAction:'blocked',
+    directCodingScope:'legacy Pi coordinator-only channel; not a statement of primary host permissions',
+    hostDirectCoding:'determined by current host instructions and user authorization',
+    unavailableWorkerAction:'continue-authorized-work',
     enforcement:'host-instructions',
   });
   assert.deepEqual(workflowTopic('primary').primaryPolicy,primaryPolicy);
-  assert.match(workflowInstructions,/delegate.*Pi subagents/i);
-  assert.match(workflowInstructions,/block instead/i);
+  assert.match(workflowInstructions,/may work directly or delegate/i);
+  assert.match(workflowInstructions,/Pi calls remain subject to their advertised role, tier, review and ledger checks/i);
+  assert.match(workflowInstructions,/Preserve existing task identity, history and explicit limits/i);
+});
+
+test('packaged primary and Pi references preserve optional routing and Pi safety',()=>{
+  assert.match(catalog.topics.primary,/Pi provides optional governed execution/i);
+  assert.match(catalog.topics.primary,/primary may work directly or delegate/i);
+  assert.match(catalog.topics.primary,/T2 approved pre\+worker\+bound host proof\+post/i);
+  assert.match(catalog.topics['coordinator-only'],/does not prohibit ordinary primary-host work/i);
+  assert.match(catalog.topics['task-tiers'],/actual Pi-governed tasks/i);
+  assert.match(catalog.topics['delegation'],/do not change backend to evade/i);
+  assert.match(catalog.topics['skill:kether-governance'],/Pi T2 pre-review precedes writes/i);
 });
 
 test('exposes only the governance skill as a skill topic',()=>{

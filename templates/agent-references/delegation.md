@@ -1,20 +1,20 @@
 ## Global Adaptive Subagent Router
 
-Apply this policy to every task and every agent operating under this Codex home.
+Apply these Pi routing rules when using Pi. The primary may instead perform work directly or select another authorized route under the host and user instructions. Do not change backend to evade an actual Pi control or uncertain operation.
 
 ### Routing
 
 - For T1/T2 or a proposed multi-worker task, first assess scope, uncertainty, dependencies, and whether delegation creates real parallel or specialist value. Use `task-tiers` for the write-path decision; do not reinterpret an undefined "non-trivial" threshold.
-- Keep simple non-coding work with the primary. Coding always goes to a bounded Pi worker; tightly coupled edits go to one worker. The primary owns integration and acceptance.
+- The primary may implement directly when authorized. When choosing a Pi worker, bound the work; tightly coupled edits go to one worker. The primary owns integration and acceptance.
 - Delegate only bounded, independently reviewable subtasks. Never delegate merely to add ceremony.
-- Route model-backed lower-agent work through the installed Pi gateway using the current role binding. Do not use the built-in multi-agent runtime unless explicitly requested. If Pi is unavailable, keep coding blocked and continue only primary reasoning/diagnosis; do not silently fall back to primary coding or built-in subagents.
+- Route Pi lower-agent work through the installed gateway using its current role binding. Other agents follow host and user instructions. If a Pi operation is uncertain, reconcile its identity and history before further dependent work; do not silently bypass an actual control.
 
 ### Primary-agent ownership
 
 - The primary agent owns task decomposition, delegation prompts, acceptance criteria, integration, user-facing decisions, and the final result.
 - Give each worker one clear objective, relevant context, explicit deliverables, constraints, and verification requirements.
 - Review every worker result against the acceptance criteria and source evidence.
-- If a result is incomplete or wrong, request a focused worker revision. The primary reviews and mechanically applies accepted patches; it does not author implementation repairs.
+- If a Pi result is incomplete or wrong, diagnose it under the applicable contract; preserve its actual status and evidence. The primary integrates accepted changes and may perform other authorized work without resetting a Pi task's history.
 
 ### Default delegated model
 

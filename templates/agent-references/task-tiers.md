@@ -1,6 +1,6 @@
 # Workspace-write task tiers
 
-Effective 2026-10-02. This policy supersedes older tier, review-thinking and verification-stage wording in skills/references. Classify the whole requested change; do not split related work to evade a tier. Read this document for boundary cases; ordinary classification uses the six core lines in AGENTS.md.
+Effective 2026-10-02 for actual Pi-governed tasks and explicitly scoped Pi contracts. This policy supersedes older Pi tier, review-thinking and verification-stage wording in skills/references; it does not impose Pi-only execution on unrelated authorized host work. Classify the whole requested Pi change; do not split related work to evade a tier. Read this document for boundary cases; ordinary Pi classification uses the core lines in AGENTS.md.
 
 | Tier | Observable trigger | Required stages |
 | --- | --- | --- |
@@ -38,4 +38,4 @@ A T2 direct host path retains linked approved pre-review, same workspace/parent/
 
 T1 reviewers do not edit. Blocking findings leave the work incomplete; repair requires new host evidence, and an additional T1 review needs the evidence-gated extension defined in pi-review. Nonblocking findings are recorded as conditional approval with the outstanding conditions, not as a failure that causes another review. T2 review attempt limits survive repairs and request-ID changes; do not reset them by splitting a task.
 
-The proposed primary-direct channel is not enabled. Coding remains worker-authored until the user separately decides on that proposal. Policy/document work may remain with the primary under coordinator-only.
+The proposed primary-direct channel for this Pi contract is not enabled. Pi-governed coding remains worker-authored under coordinator-only; this does not define permissions for unrelated primary-host work.
