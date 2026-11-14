@@ -111,6 +111,75 @@ export function inspectHostCompletionCapacity(stored, pending) {
     completedProjectionComputable:projections[1].computable,projections};
 }
 
+
+// Pure planning: never construct the ledger (its constructor prunes).
+export function previewRequestLedgerRetention(directory, {retention = {}, now = Date.now(), inFlight = new Set()} = {}) {
+  const root = resolve(directory), outcomesRoot = join(root,'outcomes'), hostRoot = join(root,'host-verification'), resultCacheRoot = join(root,'result-cache');
+  const retentionPolicy = {...REQUEST_LEDGER_RETENTION_POLICY, ...retention};
+  let inspected = 0;
+  const inspect = path => {
+    if (++inspected > 100000) throw Error('retention_preview_limit');
+    const info = lstatSync(path);
+    if (info.isSymbolicLink() || (!info.isDirectory() && (!info.isFile() || info.nlink !== 1))) throw Error('unsafe_retention_path');
+    return info;
+  };
+  const list = path => { try { if (!inspect(path).isDirectory()) throw Error('unsafe_retention_directory'); return readdirSync(path,{withFileTypes:true}); } catch(e) { if(e.code==='ENOENT') return []; throw e; } };
+  const fileSize = path => inspect(path).size;
+  const readState = path => {const info=inspect(path);if(!info.isFile()||info.size>16*1024*1024)throw Error('retention_metadata_invalid');return readJson(path);};
+  const directorySize = path => list(path).reduce((sum, entry) => {
+    const child = join(path,entry.name), info = inspect(child);
+    return sum + (info.isDirectory() ? directorySize(child) : info.size);
+  }, 0);
+    const entries = [];
+    for (const entry of list(root)) {
+      if (!entry.isDirectory() || !/^[a-f0-9]{64}$/.test(entry.name)) continue;
+      const path = join(root, entry.name);
+      const startPath = join(path, 'started.json');
+      const finalPath = join(path, 'final.json');
+      let record = null;
+      try { record = readState(existsSync(finalPath) ? finalPath : startPath); } catch { /* retain unreadable state as critical. */ }
+      const critical = !existsSync(finalPath) || record?.state !== 'completed' || record?.result?.response?.ok === false;
+      const timestamp = Date.parse(record?.completedAt || record?.startedAt || '') || statSync(path).mtimeMs;
+      const outcomePath=join(outcomesRoot,`${entry.name}.json`);
+      const linked=existsSync(join(hostRoot,entry.name)) || (()=>{try{return !!readState(outcomePath).contract;}catch{return existsSync(outcomePath);}})();
+      entries.push({ kind: 'directory', path, critical:critical||linked||inFlight.has(entry.name), timestamp, bytes: directorySize(path) });
+    }
+    for (const entry of list(hostRoot)) {
+      if (!entry.isDirectory() || !/^[a-f0-9]{64}$/.test(entry.name)) continue;
+      const path=join(hostRoot,entry.name);
+      entries.push({kind:'protected-directory',path,critical:true,timestamp:0,bytes:directorySize(path)});
+    }
+    for (const entry of list(outcomesRoot)) {
+      if (!entry.isFile() || !/^[a-f0-9]{64}\.json$/.test(entry.name)) continue;
+      const path = join(outcomesRoot, entry.name);
+      let record = null;
+      try { record = readState(path); } catch { /* retain unreadable state as critical. */ }
+      entries.push({ kind: 'file', path, critical: record?.state !== 'completed' || !!record?.contract, timestamp: Date.parse(record?.completedAt || '') || statSync(path).mtimeMs, bytes: fileSize(path) });
+    }
+    for (const entry of list(resultCacheRoot)) {
+      if (!entry.isFile() || !/^[a-f0-9]{64}\.json$/.test(entry.name)) continue;
+      const path=join(resultCacheRoot,entry.name); let record=null;
+      try { record=readState(path); } catch {}
+      const ledgerKey=entry.name.slice(0,-5), hostDir=join(hostRoot,ledgerKey);
+      let linked=existsSync(hostDir);
+      const outcomePath=join(outcomesRoot,entry.name);
+      try { const outcome=readState(outcomePath); linked ||= outcome.contract?.mode==='linked'; } catch {linked ||= existsSync(outcomePath);}
+      let ordinary=record?.state==='completed';
+      if(record?.state==='failed'||record?.state==='cancelled'||record?.state==='blocked') ordinary=true;
+      entries.push({kind:'cache',path,state:record?.state,critical:!ordinary||linked||inFlight.has(ledgerKey),timestamp:Date.parse(record?.completedAt||'')||statSync(path).mtimeMs,bytes:fileSize(path)});
+    }
+
+  const selected = new Map();
+  for (const item of entries) if (!item.critical && (now-item.timestamp)/86400000 >= (item.kind==='cache'&&item.state!=='completed'?retentionPolicy.criticalDays:retentionPolicy.completedDays)) selected.set(item.path,{...item,reason:'age'});
+  let retainedBytes = entries.filter(item=>!selected.has(item.path)).reduce((n,item)=>n+item.bytes,0);
+  for (const item of entries.filter(item=>!item.critical&&!selected.has(item.path)).sort((a,b)=>a.timestamp-b.timestamp)) {
+    if(retainedBytes<=retentionPolicy.totalBytes) break;
+    selected.set(item.path,{...item,reason:'capacity'}); retainedBytes-=item.bytes;
+  }
+  const candidates=[...selected.values()];
+  return {candidates,deletedEntries:candidates.length,deletedBytes:candidates.reduce((n,item)=>n+item.bytes,0),retainedEntries:entries.length-candidates.length,retainedBytes,capacityExceededByProtectedRecords:Math.max(0,retainedBytes-retentionPolicy.totalBytes)};
+}
+
 export function createRequestLedger(directory, options = {}) {
   if (typeof directory !== 'string' || !directory.trim()) throw new Error('requestLedgerDir must be a non-empty path');
   const root = resolve(directory);
@@ -134,74 +203,14 @@ export function createRequestLedger(directory, options = {}) {
   };
   const retentionPolicy = { ...REQUEST_LEDGER_RETENTION_POLICY, ...(options.retention || {}) };
 
-  const fileSize = path => { try { const info=statSync(path); return info.isFile()?info.size:0; } catch { return 0; } };
-  const directorySize = path => readdirSync(path, { withFileTypes: true }).reduce((sum, entry) => {
-    const child = join(path, entry.name);
-    return sum + (entry.isDirectory() ? directorySize(child) : entry.isFile() ? fileSize(child) : 0);
-  }, 0);
-  const safeRemoveDirectory = path => {
-    const absolute = resolve(path);
-    if (!absolute.startsWith(`${root}${sep}`) || absolute === outcomesRoot) throw new Error('refusing to prune outside request ledger root');
-    rmSync(absolute, { recursive: true, force: true });
-  };
-
   function prune(now = Date.now()) {
-    const entries = [];
-    for (const entry of readdirSync(root, { withFileTypes: true })) {
-      if (!entry.isDirectory() || !/^[a-f0-9]{64}$/.test(entry.name)) continue;
-      const path = join(root, entry.name);
-      const startPath = join(path, 'started.json');
-      const finalPath = join(path, 'final.json');
-      let record = null;
-      try { record = readJson(existsSync(finalPath) ? finalPath : startPath); } catch { /* retain unreadable state as critical. */ }
-      const critical = !existsSync(finalPath) || record?.state !== 'completed' || record?.result?.response?.ok === false;
-      const timestamp = Date.parse(record?.completedAt || record?.startedAt || '') || statSync(path).mtimeMs;
-      const linked=existsSync(join(hostRoot,entry.name)) || (()=>{try{return !!readJson(join(outcomesRoot,`${entry.name}.json`)).contract;}catch{return false;}})();
-      entries.push({ kind: 'directory', path, critical:critical||linked||inFlight.has(entry.name), timestamp, bytes: directorySize(path) });
+    const {candidates, ...summary} = previewRequestLedgerRetention(root, {retention:retentionPolicy, now, inFlight});
+    for (const item of candidates) {
+      const absolute = resolve(item.path);
+      if (!absolute.startsWith(root + sep) || absolute === outcomesRoot || absolute === hostRoot) throw Error('refusing to prune outside request ledger root');
+      if (item.kind === 'directory') rmSync(absolute,{recursive:true,force:true}); else unlinkSync(absolute);
     }
-    for (const entry of readdirSync(hostRoot, {withFileTypes:true})) {
-      if (!entry.isDirectory() || !/^[a-f0-9]{64}$/.test(entry.name)) continue;
-      const path=join(hostRoot,entry.name);
-      entries.push({kind:'protected-directory',path,critical:true,timestamp:0,bytes:directorySize(path)});
-    }
-    for (const entry of readdirSync(outcomesRoot, { withFileTypes: true })) {
-      if (!entry.isFile() || !/^[a-f0-9]{64}\.json$/.test(entry.name)) continue;
-      const path = join(outcomesRoot, entry.name);
-      let record = null;
-      try { record = readJson(path); } catch { /* retain unreadable state as critical. */ }
-      entries.push({ kind: 'file', path, critical: record?.state !== 'completed' || !!record?.contract, timestamp: Date.parse(record?.completedAt || '') || statSync(path).mtimeMs, bytes: fileSize(path) });
-    }
-    for (const entry of readdirSync(resultCacheRoot,{withFileTypes:true})) {
-      if (!entry.isFile() || !/^[a-f0-9]{64}\.json$/.test(entry.name)) continue;
-      const path=join(resultCacheRoot,entry.name); let record=null;
-      try { record=readJson(path); } catch {}
-      const ledgerKey=entry.name.slice(0,-5), hostDir=join(hostRoot,ledgerKey);
-      let linked=existsSync(hostDir);
-      try { const outcome=readJson(join(outcomesRoot,entry.name)); linked ||= outcome.contract?.mode==='linked'; } catch {}
-      let ordinary=record?.state==='completed';
-      if(record?.state==='failed'||record?.state==='cancelled'||record?.state==='blocked') ordinary=true;
-      entries.push({kind:'cache',path,state:record?.state,critical:!ordinary||linked||inFlight.has(ledgerKey),timestamp:Date.parse(record?.completedAt||'')||statSync(path).mtimeMs,bytes:fileSize(path)});
-    }
-    let deletedEntries = 0, deletedBytes = 0;
-    const remove = item => {
-      if (!existsSync(item.path)) return;
-      if (item.critical || item.kind === 'protected-directory') return;
-      if (item.kind === 'directory') safeRemoveDirectory(item.path); else unlinkSync(item.path);
-      deletedEntries += 1; deletedBytes += item.bytes;
-    };
-    for (const item of entries) {
-      const ageDays = (now - item.timestamp) / 86_400_000;
-      if (!item.critical && ageDays >= (item.kind==='cache'&&item.state!=='completed'?retentionPolicy.criticalDays:retentionPolicy.completedDays)) remove(item);
-    }
-    let retained = entries.filter(item => existsSync(item.path));
-    let retainedBytes = retained.reduce((sum, item) => sum + item.bytes, 0);
-    for (const item of retained.filter(item => !item.critical).sort((a, b) => a.timestamp - b.timestamp)) {
-      if (retainedBytes <= retentionPolicy.totalBytes) break;
-      remove(item); retainedBytes -= item.bytes;
-    }
-    retained = entries.filter(item => existsSync(item.path));
-    retainedBytes = retained.reduce((sum, item) => sum + item.bytes, 0);
-    return { deletedEntries, deletedBytes, retainedEntries: retained.length, retainedBytes, capacityExceededByProtectedRecords: Math.max(0, retainedBytes - retentionPolicy.totalBytes) };
+    return summary;
   }
 
   const startupRetention = prune();

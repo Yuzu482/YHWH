@@ -208,7 +208,13 @@ if ($installTunnel) {
     if (-not [IO.Path]::IsPathFullyQualified($config.$key) -or -not (Test-Path -LiteralPath $config.$key -PathType Leaf)) { throw "Tunnel $key must reference an existing absolute file path." }
   }
 }
-if ($PlanOnly) { Say 'Plan validated; no changes made.'; exit 0 }
+$stateRoot = Join-Path $TargetHome '.local\state\pi-kether'
+$evidenceScript = Join-Path $pluginSource 'scripts/deployment-evidence.mjs'
+if ($PlanOnly) {
+  & $nodePath $evidenceScript --state-root ([IO.Path]::GetFullPath($stateRoot)) --preview
+  if ($LASTEXITCODE -ne 0) { throw 'Evidence cleanup preview failed; no installation changes made.' }
+  Say 'Plan validated; no changes made.'; exit 0
+}
 
 $hostPiRoot = Join-Path $TargetHome '.pi\agent\npm'
 $hostPiMode = Get-HostPiMode $hostPiRoot $nodePath (Join-Path $pluginSource 'scripts/sdk-tree-integrity.mjs') $TargetHome
@@ -283,6 +289,11 @@ $stateRoot = Join-Path $TargetHome '.local\state\pi-kether'
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $backupRoot = Join-Path $stateRoot "installer-backups\$timestamp"
 New-Item -ItemType Directory -Force -Path $backupRoot, $stateRoot | Out-Null
+
+# Capture retention-sensitive evidence before any installed file replacement.
+# For a manually stopped runtime, also run the documented snapshot before stop.
+& $nodePath $evidenceScript --state-root ([IO.Path]::GetFullPath($stateRoot)) --snapshot --backup-root (Join-Path $backupRoot 'evidence')
+if ($LASTEXITCODE -ne 0) { throw 'Evidence backup failed; installed files were not replaced.' }
 
 $pluginTarget = Join-Path $TargetHome 'plugins\pi-dispatch'
 $installationSource=$null
