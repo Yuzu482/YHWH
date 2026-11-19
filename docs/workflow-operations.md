@@ -165,3 +165,24 @@ Preserve the original directory status and change fingerprints first. After a pa
 `.github/workflows/verify.yml` defines locked dependencies, Node/heap tests, installer and credential fixtures, catalog/license checks, packaging and an empty-target installation plan on Windows 2022. Actions are pinned to verified commits with repository read permission only; no model credentials, asset uploads or publication are configured. Only a successful actual GitHub run is CI evidence. An empty-directory plan is not Windows/WSL installation, live login or reboot testing.
 
 For development packaging, use `./Build-Release.ps1 -SkipTests -OutputDirectory .test/development-build` to preserve existing `release/` assets. `-SkipTests` requires prior Node/heap validation of the same sources; other package checks still run. Actual outcomes are recorded in repository `VERIFICATION.md`.
+
+# 部署前证据与 Git 检查故障隔离
+
+部署计划包含只读清理预览：请求账本与审计日志分别列出候选路径、字节数和原因（保留期或容量）。预览复用实际清理选择规则，不实例化会在启动时清理的账本或日志写入器。运行中预览无法读取内存中的 in-flight 状态，仅作提示；正式备份在网关空闲、暂停接收新请求后进行。保留期和关键证据保护规则不变。
+
+受管升级依次执行：旧程序文件备份、暂停接收请求、证据备份与校验、记录证据清单指纹、停服、替换、启动并检查健康。结果尚未落盘时拒绝暂停并保持运行，待落盘完成后再重试；暂停不会关闭结果监视器。证据备份失败会在停服前退出并恢复接收请求；恢复失败保留恢复锁和日志。程序回滚继续使用原有文件备份，不自动把旧账本覆盖回运行状态。
+
+完整安装器的 `-PlanOnly` 也显示预览；正式安装在替换已安装文件前创建证据备份。完整安装器本身不执行停服，因此人工停服前必须先运行独立备份命令，再执行安装。安装器内部备份只是替换前的第二道检查，无法挽回更早停服已清理的数据。例如（路径须为绝对路径，备份目录必须不存在）：
+
+```powershell
+node payload/pi-dispatch/scripts/deployment-evidence.mjs --state-root C:/Users/asus/.local/state/pi-kether --preview
+node payload/pi-dispatch/scripts/deployment-evidence.mjs --state-root C:/Users/asus/.local/state/pi-kether --snapshot --backup-root C:/Users/asus/.local/state/pi-kether/installer-backups/pre-stop-UNIQUE/evidence
+```
+
+使用其他配置文件名时，以重复的 `--config-file ABS_JSON` 明确列出状态目录内的运行设置与网关配置，最多四个额外文件；只记录哈希。受管升级自动传入它实际使用的两个配置文件。配置所指的账本和审计路径仍须在已覆盖的默认位置，否则停服前退出。
+
+快照包含整个 `request-ledger`、当前及轮转的普通/关键审计日志、`installation-records`。网关与运行配置仅记录哈希，不复制令牌或配置内容；不会递归复制维护档案、以前的备份或修改任何任务状态。使用非标准账本/审计路径的配置会阻止部署，须先明确覆盖范围。每次最多 50000 个文件、单文件 16 MiB、合计 512 MiB；拒绝链接、硬链接、路径越界和与证据源重叠的输出。逐文件校验后重新核对源清单，新增、移除或变化都会使备份失败；失败副本与 `failure.json` 保留，不能作为完整快照使用。备份包含敏感工作内容，应存放在用户私有目录。跨文件快照仍要求暂停/停服期间无其他写入者，不能对抗同用户的恶意并发篡改。
+
+网关写请求的 Git 身份检查在独立工作线程中执行，固定只读 Git 参数、共享 3 秒检查预算和 1 MiB 输出上限保留；队列最多 32 个请求，总等待有界。读请求完全跳过 Git。critical 仓库的身份在该实例内固定并逐次复查；线程异常不自动重建或重新认定身份。网关退出会回收线程及等待请求。
+
+候选仓库身份损坏只拒绝该候选写请求。critical 映射损坏或被替换时，相关写请求仍拒绝；无法证明与其无关的 Git 仓库按 critical 下限处理。无关的普通目录继续按其路径配置处理。正常注册的同仓库工作树仍继承 critical，显式降低配置不能覆盖它；独立克隆不因路径相似而继承。检查故障不会同步卡住健康检查和能力查询，也不会降级放行身份不明的写请求。

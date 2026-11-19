@@ -4,16 +4,23 @@ import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { planUpgrade, applyUpgrade } from './plugin-upgrade.mjs';
+import {previewDeploymentEvidence,captureDeploymentEvidence} from './deployment-evidence.mjs';
 
 async function main() {
   const [sourceRoot, targetRoot, settingsFile, baseline, mode] = process.argv.slice(2);
   if (mode && mode !== '--apply') throw Error('invalid_option');
   const plan = planUpgrade({ sourceRoot, targetRoot, ...(baseline && baseline !== '-' ? { baselineRoot: baseline } : {}) });
-  if (mode !== '--apply') { console.log(JSON.stringify(plan, null, 2)); return; }
   const s = JSON.parse(fs.readFileSync(settingsFile, 'utf8').replace(/^\uFEFF/, ''));
   const uri = new URL(s.gatewayUrl);
   if (uri.protocol !== 'http:' || uri.hostname !== '127.0.0.1' || uri.pathname !== '/' || uri.username || uri.password || uri.search || uri.hash ||
       fs.realpathSync(s.gatewayScript) !== fs.realpathSync(path.join(targetRoot, 'scripts/gateway.mjs')) || !path.isAbsolute(s.nodePath)) throw Error('invalid_runtime_settings');
+  const stateRoot=path.dirname(path.resolve(settingsFile));
+  const configurationPaths=[path.resolve(settingsFile),s.gatewayConfig];
+  for(const [name,expected]of [['PI_GATEWAY_REQUEST_LEDGER_DIR',path.join(stateRoot,'request-ledger')],['PI_GATEWAY_AUDIT_FILE',path.join(stateRoot,'audit.jsonl')]]) {
+    if(process.env[name]&&path.resolve(process.env[name])!==expected)throw Error('evidence_uncovered_environment');
+  }
+  const deploymentEvidence=previewDeploymentEvidence({stateRoot,configurationPaths});
+  if (mode !== '--apply') { console.log(JSON.stringify({...plan,deploymentEvidence}, null, 2)); return; }
   const token = fs.readFileSync(s.tokenFile, 'utf8').trim();
   let pid = null, child = null, ownsPause = false;
   async function request(route, method = 'GET') {
@@ -22,6 +29,9 @@ async function main() {
     return r.json();
   }
   const runtime = {
+    evidenceStateRoot:stateRoot,
+    evidenceConfigurationPaths:configurationPaths,
+    captureEvidence:async({backupRoot})=>captureDeploymentEvidence({stateRoot,configurationPaths,backupRoot}),
     pause: async () => {
       try {
         const r = await request('/admin/upgrade/pause', 'POST');

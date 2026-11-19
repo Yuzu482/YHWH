@@ -14,7 +14,7 @@ export function normalizeUsage(value) {
 
 
 import { createHash, randomUUID } from 'node:crypto';
-import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
+import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, lstatSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 const AUDIT_VERSION = 1;
@@ -364,6 +364,30 @@ export const AUDIT_RETENTION_POLICY = Object.freeze({
   criticalTotalBytes: 256 * 1024 * 1024,
 });
 
+
+// Read-only, shared selection; current streams are retained even over capacity.
+export function previewAuditRetention(filePath, {now = Date.now(), ...options} = {}) {
+  const absolute = resolve(filePath), policy = {...AUDIT_RETENTION_POLICY, ...options};
+  function stream(path, maxAgeDays, maxBytes) {
+    const check = file => { const info=lstatSync(file); if(!info.isFile()||info.isSymbolicLink()||info.nlink!==1)throw Error('unsafe_audit_path'); return info; };
+    const prefix = basename(path)+'.';
+    let names=[];
+    try { const parent=lstatSync(dirname(path)); if(parent.isSymbolicLink()||!parent.isDirectory())throw Error('unsafe_audit_directory'); names=readdirSync(dirname(path)); } catch(e) {if(e.code!=='ENOENT')throw e;}
+    if(names.length>100000)throw Error('audit_preview_limit');
+    const files=names.filter(name=>name.startsWith(prefix)&&/^\d{13}-\d+\.jsonl$/.test(name.slice(prefix.length))).map(name=>{const full=join(dirname(path),name);return {path:full,stat:check(full)};}).sort((a,b)=>a.stat.mtimeMs-b.stat.mtimeMs);
+    let current=0; try{current=check(path).size;}catch(e){if(e.code!=='ENOENT')throw e;}
+    let total=current+files.reduce((n,item)=>n+item.stat.size,0);
+    const candidates=[];
+    for(const item of files) {
+      const aged=now-item.stat.mtimeMs>=maxAgeDays*86400000;
+      if(!aged&&total<=maxBytes)continue;
+      candidates.push({path:item.path,bytes:item.stat.size,reason:aged?'age':'capacity'});total-=item.stat.size;
+    }
+    return {candidates,deletedFiles:candidates.length,deletedBytes:candidates.reduce((n,item)=>n+item.bytes,0),retainedBytes:total};
+  }
+  return {completed:stream(absolute,policy.completedDays,policy.totalBytes),protectedRecords:stream(absolute+'.critical',policy.criticalDays,policy.criticalTotalBytes)};
+}
+
 export function createAuditLogger(filePath, options = {}) {
   if (typeof filePath !== 'string' || !filePath.trim()) throw new Error('auditFile must be a non-empty path');
   const absolute = resolve(filePath);
@@ -379,29 +403,12 @@ export function createAuditLogger(filePath, options = {}) {
   let general = openStream(absolute);
   let critical = openStream(criticalPath);
 
-  const rotatedFiles = path => {
-    const prefix = `${basename(path)}.`;
-    return readdirSync(dirname(path), { withFileTypes: true })
-      .filter(entry => entry.isFile() && entry.name.startsWith(prefix) && /^\d{13}-\d+\.jsonl$/.test(entry.name.slice(prefix.length)))
-      .map(entry => join(dirname(path), entry.name));
-  };
-  const pruneStream = (stream, maxAgeDays, maxBytes, now = Date.now()) => {
-    const files = rotatedFiles(stream.path).map(path => ({ path, stat: statSync(path) })).sort((a, b) => a.stat.mtimeMs - b.stat.mtimeMs);
-    let total = stream.bytes + files.reduce((sum, item) => sum + item.stat.size, 0);
-    let deletedFiles = 0, deletedBytes = 0;
-    for (const item of files) {
-      if (now - item.stat.mtimeMs < maxAgeDays * 86_400_000 && total <= maxBytes) continue;
-      unlinkSync(item.path);
-      total -= item.stat.size;
-      deletedFiles += 1;
-      deletedBytes += item.stat.size;
-    }
-    return { deletedFiles, deletedBytes, retainedBytes: total };
-  };
   const prune = () => {
-    const completed = pruneStream(general, policy.completedDays, policy.totalBytes);
-    const protectedRecords = pruneStream(critical, policy.criticalDays, policy.criticalTotalBytes);
-    return { completed, protectedRecords };
+    const preview=previewAuditRetention(absolute,policy);
+    return Object.fromEntries(Object.entries(preview).map(([name,{candidates,...summary}])=>{
+      for(const item of candidates)unlinkSync(item.path);
+      return [name,summary];
+    }));
   };
   const rotate = stream => {
     closeSync(stream.fd);

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
-import { createRequestLedger, requestDigest, RequestLedgerError } from '../extensions/request-ledger.js';
+import { createRequestLedger, previewRequestLedgerRetention, requestDigest, RequestLedgerError } from '../extensions/request-ledger.js';
 import { hostRecordDigest } from '../extensions/host-verification.js';
 import { resultDigest } from '../extensions/role-contract.js';
 import { roleValue } from './contract-fixtures.mjs';
@@ -21,6 +21,20 @@ test('request digest is canonical and excludes requestId', () => {
   const left = requestDigest('dispatch_subagent', { requestId: 'one', access: 'workspace-write', task: { objective: 'x', role: 'worker' } });
   const right = requestDigest('dispatch_subagent', { task: { role: 'worker', objective: 'x' }, access: 'workspace-write', requestId: 'two' });
   assert.equal(left, right);
+});
+
+test('read-only retention preview preserves in-flight and unreadable linked evidence',async()=>{
+  await withLedgerDir(async directory=>{
+    const ledger=createRequestLedger(directory),now=Date.now();
+    const input={access:'workspace-write',task:{role:'Chesed',objective:'fixture'}};
+    await ledger.execute({requestId:'preview-inflight',operation:'dispatch_subagent',input},async()=>({ok:true}));
+    const key=createHash('sha256').update('preview-inflight').digest('hex');
+    const preview=previewRequestLedgerRetention(directory,{now:now+100*86400000,inFlight:new Set([key])});
+    assert.equal(preview.deletedEntries,0);
+    writeFileSync(join(directory,'outcomes',key+'.json'),'malformed immutable reference');
+    assert.equal(previewRequestLedgerRetention(directory,{now:now+100*86400000}).deletedEntries,0);
+    assert.equal(ledger.prune(now+100*86400000).deletedEntries,0);ledger.close();
+  });
 });
 
 test('completed write result replays across ledger instances without executing again', async () => withLedgerDir(async directory => {

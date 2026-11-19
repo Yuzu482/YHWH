@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { recordInstallation, planUpgrade, applyUpgrade } from '../scripts/plugin-upgrade.mjs';
+import {captureDeploymentEvidence} from '../scripts/deployment-evidence.mjs';
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yhwh-upgrade-test-'));
@@ -20,6 +21,8 @@ function fixture(t) {
   put(targetRoot, '.mcp.json', 'local auth'); put(targetRoot, 'workflow/headless.local.json', 'local config');
   put(sourceRoot, 'scripts/main.mjs', 'new'); put(sourceRoot, 'added.txt', 'added'); fs.unlinkSync(path.join(sourceRoot, 'removed.txt'));
   const calls = [], runtime = Object.fromEntries(['pause', 'resume', 'stop', 'start', 'health'].map(n => [n, async () => { calls.push(n); return true; }]));
+  runtime.evidenceStateRoot=path.join(root,'state');fs.mkdirSync(runtime.evidenceStateRoot);
+  runtime.captureEvidence=async({backupRoot})=>{calls.push('capture');return captureDeploymentEvidence({stateRoot:runtime.evidenceStateRoot,backupRoot});};
   return { root, sourceRoot, targetRoot, put, runtime, calls, plan: () => planUpgrade({ sourceRoot, targetRoot }) };
 }
 
@@ -27,7 +30,7 @@ test('upgrade verifies managed bytes, adds/deletes files and preserves local aut
   const f = fixture(t), p = f.plan();
   assert.equal(p.admissible, true); assert.equal(p.actions.length, 3);
   const r = await applyUpgrade(p, f.runtime);
-  assert.equal(r.status, 'completed'); assert.deepEqual(f.calls, ['pause', 'stop', 'start', 'health']);
+  assert.equal(r.status, 'completed'); assert.deepEqual(f.calls, ['pause', 'capture', 'stop', 'start', 'health']);
   assert.equal(fs.readFileSync(path.join(f.targetRoot, 'scripts/main.mjs'), 'utf8'), 'new');
   assert.equal(fs.existsSync(path.join(f.targetRoot, 'removed.txt')), false);
   assert.equal(fs.readFileSync(path.join(f.targetRoot, '.mcp.json'), 'utf8'), 'local auth');
@@ -86,7 +89,7 @@ test('backup and journal exist before stop; failed resume retains recovery evide
   const f=fixture(t);
   f.runtime.stop=async()=>{
     const name=fs.readdirSync(f.root).find(p=>p.startsWith('.yhwh-upgrade-'));
-    assert.equal(JSON.parse(fs.readFileSync(path.join(f.root,name,'journal.json'))).state,'prepared');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(f.root,name,'journal.json'))).state,'evidence-verified');
     assert.equal(fs.readFileSync(path.join(f.root,name,'files/scripts/main.mjs'),'utf8'),'old');
     return false;
   };
@@ -95,4 +98,22 @@ test('backup and journal exist before stop; failed resume retains recovery evide
   assert.equal(result.status,'recovery-required');assert.equal(result.reason,'runtime_resume_failed');
   assert(fs.existsSync(path.join(f.root,'.yhwh-upgrade.lock')));
   assert.equal(JSON.parse(fs.readFileSync(path.join(result.backup,'journal.json'))).state,'recovery-required');
+});
+
+test('failed or assertion-only evidence cannot stop runtime; admission resumes with retained failure journal',async t=>{
+  for(const mode of ['failure','missing','tamper','source-change']) {
+    const f=fixture(t),capture=f.runtime.captureEvidence;
+    f.runtime.captureEvidence=async options=>{
+      if(mode==='failure')throw Error('backup_disk_failure');
+      if(mode==='missing')return {status:'complete',backupRoot:options.backupRoot,manifestSha256:'a'.repeat(64)};
+      const r=await capture(options);
+      if(mode==='tamper')fs.writeFileSync(path.join(options.backupRoot,'manifest.json'),'{}');
+      else f.put(f.runtime.evidenceStateRoot,'installation-records/new.json','{"status":"failed"}');
+      return r;
+    };
+    const result=await applyUpgrade(f.plan(),f.runtime);
+    assert.equal(result.status,'blocked');assert(f.calls.includes('resume'));assert(!f.calls.includes('stop'));
+    assert.equal(fs.readFileSync(path.join(f.targetRoot,'scripts/main.mjs'),'utf8'),'old');
+    const journal=JSON.parse(fs.readFileSync(path.join(result.backup,'journal.json')));assert.equal(journal.state,'blocked');assert(journal.failureReason);
+  }
 });
