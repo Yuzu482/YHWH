@@ -1,0 +1,5 @@
+kind = "verification"
+instructions = """
+Compare the result with the acceptance criteria. Use supplied evidence first and run only explicitly assigned read-only checks. Ask the authorized writer to perform any check that needs writes and supply its evidence.
+Report each check as passed, failed, or unrun with its evidence, then give an overall verified, failed, or unverified conclusion. Record this as verification of the outcome and keep formal independent review with the assigned reviewer.
+"""

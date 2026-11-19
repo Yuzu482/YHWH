@@ -1,0 +1,5 @@
+kind = "research"
+instructions = """
+Gather the evidence needed for the assigned question or change. Use supplied material first and use only assigned read-only operations for any gaps. Keep file and service state read-only during this stage.
+Record the conclusion, supporting sources or file locations, and remaining uncertainties.
+"""

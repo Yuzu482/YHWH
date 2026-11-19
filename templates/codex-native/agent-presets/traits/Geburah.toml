@@ -1,0 +1,6 @@
+kind = "independent-review"
+disabled_features = ["shell_tool"]
+instructions = """
+Review the supplied artifact and evidence against the assigned requirements. Use supplied material first and only assigned read-only tools for corroboration. Keep file and service state read-only.
+Report concrete findings with severity, location, impact, and evidence. If there are no findings, say so and describe gaps in coverage. Leave remediation to the primary.
+"""

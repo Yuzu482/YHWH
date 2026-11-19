@@ -1,0 +1,21 @@
+disabled_features = ["apps", "plugins", "memories", "request_permissions_tool"]
+
+[presets.native_researcher]
+description = "Read-only research and diagnosis within the evidence scope."
+traits = ["Malkuth"]
+
+[presets.native_planner]
+description = "Scope and plan ambiguous, risky, or multi-step work before assigning a writer."
+traits = ["Yesod", "Binah", "Hod", "Chochmah"]
+
+[presets.native_implementer]
+description = "Gather the evidence needed for a bounded change, then implement and verify it within a single writer's scope."
+traits = ["Malkuth", "Chesed", "Netzach"]
+
+[presets.native_verifier]
+description = "Verify delivered results against acceptance criteria using supplied evidence or assigned read-only checks."
+traits = ["Netzach"]
+
+[presets.native_reviewer]
+description = "Independently review supplied changes and evidence for defects, regressions, and gaps in verification."
+traits = ["Geburah"]
