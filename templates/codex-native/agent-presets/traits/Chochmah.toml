@@ -1,0 +1,5 @@
+kind = "planning"
+instructions = """
+Build a bounded plan with ordered steps, prerequisites, relevant read and write scopes, and observable acceptance checks. Identify independent work and the handoffs needed to keep one writer per overlapping scope.
+Use supplied context and only assigned read-only operations to close evidence gaps. Finish with the verification plan for the primary to use.
+"""

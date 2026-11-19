@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="368" viewBox="0 0 960 368" role="img" aria-labelledby="title description">
+  <title id="title">YHWH 工作流</title>
+  <desc id="description">主代理在授权范围内选择 Codex 原生执行或 Pi 网关，两条路线最后都由主代理集成与验收。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#526583" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="958" height="366" rx="24" fill="#F5F8FD" stroke="#CCD8EB" stroke-width="2"/>
+  <g fill="none" stroke="#526583" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 480 88 V 111 H 246 V 137" marker-end="url(#arrow)"/>
+    <path d="M 480 111 H 714 V 137" marker-end="url(#arrow)"/>
+    <path d="M 246 256 V 280 H 714 V 256"/>
+    <path d="M 480 280 V 305" marker-end="url(#arrow)"/>
+  </g>
+  <rect x="309" y="16" width="342" height="72" rx="14" fill="#122642"/>
+  <rect x="27" y="141" width="438" height="115" rx="16" fill="#EAF7F5" stroke="#8AC3BA" stroke-width="2"/>
+  <rect x="495" y="141" width="438" height="115" rx="16" fill="#EDF3FF" stroke="#9EB4E1" stroke-width="2"/>
+  <rect x="190" y="309" width="580" height="44" rx="14" fill="#FFFFFF" stroke="#AABAD3" stroke-width="2"/>
+  <g font-family="system-ui,'Segoe UI','Microsoft YaHei UI','Noto Sans CJK SC',sans-serif" text-anchor="middle">
+    <text x="480" y="46" font-size="30" font-weight="700" fill="#FFFFFF">主代理</text>
+    <text x="480" y="73" font-size="23" fill="#E2ECFA">确定范围与路线</text>
+    <text x="246" y="174" font-size="33" font-weight="700" fill="#0B5149">Codex 原生</text>
+    <text x="246" y="209" font-size="28" fill="#224442">直接执行或委派</text>
+    <text x="246" y="239" font-size="28" fill="#224442">记录派单与交接</text>
+    <text x="714" y="174" font-size="33" font-weight="700" fill="#173D7C">Pi 网关</text>
+    <text x="714" y="209" font-size="28" fill="#264371">按需使用获准模型</text>
+    <text x="714" y="239" font-size="28" fill="#264371">写入锁、账本与审查</text>
+    <text x="480" y="340" font-size="27" font-weight="600" fill="#172C4E">在主会话集成与验收</text>
+  </g>
+</svg>

@@ -1,0 +1,5 @@
+kind = "implementation"
+instructions = """
+Confirm writer ownership, writable paths, permitted operations, and acceptance checks. Have the primary resolve overlap or unclear scope before editing.
+Preserve unrelated work. Make the smallest complete change within the assigned scope and run the agreed checks. Before handoff, finish writes and any related processes you started. Report changed paths, observed check results, and remaining issues.
+"""

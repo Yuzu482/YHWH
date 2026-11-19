@@ -2,209 +2,39 @@
 
 [![简体中文](.readme-assets/zh.svg)](README.md) [![English](.readme-assets/en.svg)](README.en.md)
 
-YHWH is a portable Kether governance and Pi execution environment for Windows 11 + WSL2. It is for developers and maintainers who want governed workers, sandboxing and LSP tools in an AI coding workflow. It provides host connection profiles, primary-agent rules, resource limits and result validation; it does not install primary-agent clients or imply hands-on validation of every host or model.
+YHWH provides reusable collaboration rules for AI coding and a Pi gateway for tasks that need it. The primary agent decides how to split the work and who may write where. It owns integration and acceptance.
 
-**Quick start:** See [one-click installation](#one-click-installation-windows-11-x64) (requires Windows 11, WSL2 and hardware virtualization), or start with the [common client guide](docs/common-clients.en.md). The project layout is below; installation details and verification boundaries are in [Installation](#installation) and [Verification and removal](#verification-and-removal).
+![YHWH workflow. The primary agent chooses native Codex or the Pi gateway and accepts results in the main conversation.](.readme-assets/workflow-en.svg)
 
-For friendly agent names and their internal Kether IDs, see the [Pi role preset guide](docs/pi-role-presets.en.md) / [简体中文](docs/pi-role-presets.md).
+## Choose a route
 
-**Switchable worker enforcement.** New source rejects non-Luna workers at YHWH-managed entry points by default, preserving controlled reviewer/heartbeat exceptions; strict mode disables independent headless CLI model execution. The host can select `YHWH_WORKER_ENFORCEMENT=strict|off`; tasks cannot override it. Existing services need a separate upgrade. This does not provide OS isolation for the host's own terminal/editor. See [switch and enforcement scope](docs/worker-enforcement.en.md).
+| What you want to do | Where to start |
+| --- | --- |
+| Use Codex for day-to-day development and delegate to native subagents as needed | [Native Codex workflow](docs/native-codex-workflow.en.md) |
+| Use governed model routing, task write locks, ledgers, or independent review | [Install and maintain Pi](docs/pi-portable-installation.en.md) |
+| Connect Claude Code, OpenCode, DeepSeek Harness, or another host | [Multi-host integration](docs/host-integration.en.md) |
 
-**Primary reasoning and orchestration only:** Astra (or the host-selected primary model) owns planning, scheduling, patch integration and acceptance. Pi subagents author code, tests and implementation repairs. Native workers default to Luna/medium, with explicit low, high or max effort chosen for task complexity. Worker failure never silently falls back to primary coding. This is a host instruction policy, not a mechanism disabling every client's editing tools; see [ownership and failure handling](docs/coordinator-only.en.md) and [worker thinking and delivery budgets](docs/worker-budgets.en.md).
+## Native Codex workflow
 
-**Workspace-write tiers:** New source classifies the whole change as T0/T1/T2 using observable triggers. T0 needs implementation and verification; T1 adds independent post-review; T2 also requires an approved linked pre-review before writing. The gateway requires an explicit tier and declaration, records the tier in the ledger, and rejects missing or understated tiers and T2 without pre-review. Returned T0 patches must stay within one file and 20 changed lines. The primary still checks the declaration's semantic risk claims; existing services need a separate upgrade. See the [tier policy](templates/agent-references/task-tiers.md).
+On a Codex host with native subagents enabled, review and merge the [global rules fragment](templates/codex-native/AGENTS.fragment.md). The kit has five roles for research, planning, implementation, verification, and review. Each role combines the ordered traits from `templates.toml`.
 
-**Subagent supervision heartbeats:** Local timers provide heartbeats without model calls and track execution progress separately; silence never triggers automatic retries. This does not prove remote-model health or automatically wake the primary; see [heartbeat behavior and deployment boundaries](docs/subagent-heartbeat.en.md).
+1. **Assign**. Delegate independent work early when it can shorten delivery. Record the role, permitted tools and scope, and each writer's directories and shared outputs in the main conversation.
+2. **Execute**. Assign one writer to each writable scope at a time. The primary continues its own work and uses a bounded event wait when it needs a subagent's result.
+3. **Hand off**. Confirm that the previous owner and related background processes have stopped writing. Record the check in the main conversation before transferring the scope. The primary owns final acceptance.
 
-**Cooperative small task packets (source CLI):** One goal can be split into 2–4 Pi subtasks with disjoint file ownership and a shared run identity. The existing gateway schedules them concurrently; the primary still integrates and accepts the results. See [usage and verification boundaries](docs/cooperative-runs.en.md).
+The current user and host govern authorization, tool access, and sandboxing. See [setup and an assignment example](docs/native-codex-workflow.en.md).
 
-**Delivery diagnostics:** Thinking, text and tool event counts plus recent activity timings help explain worker timeouts, without retaining raw content or changing budgets and success criteria. Existing installations require an upgrade. This is not a completion-wait interface; see [diagnostic fields and evidence boundaries](docs/worker-delivery-diagnostics.en.md).
+## Install the Pi gateway
 
-Sequential-call improvements: `HeadlessBatchEvents` streams per-request phases, waiting status and results. Session caches reduce repeated file reads and hashing while retaining exact version checks. Entire batches are validated before execution; session calls are serialized and stop after failure, with cache and phase timings reported. See [operations and acceptance boundaries](docs/workflow-operations.md#english).
+1. On Windows 11 x64 with hardware virtualization, prepare Git, WSL2, and network access.
+2. Download `YHWH-OneClick-*.zip` from the [release page](https://github.com/Yuzu482/YHWH/releases/latest) and verify its published checksum. Extract it, run `Install-YHWH.cmd`, and choose the workspace directories the gateway may access. The standalone installer supports `-PlanOnly` for a preview.
+3. Import the generated MCP configuration into your host, set up the model route you plan to use, and verify connectivity and authorization on that host.
 
-**v0.12 workflow improvements:** live CLI echo acceptance, sequential batches and timing evidence, optional Windows Job Object cleanup, managed plugin upgrade/rollback, Git change-impact candidates and Windows CI configuration. Antigravity remains disabled with an empty path; CI still has failures. Source capabilities, deployment and publication are tracked separately; see the [operations and acceptance guide](docs/workflow-operations.md#english).
+[Installation flags, existing installs, Tunnel, verification, and removal](docs/pi-portable-installation.en.md) · [Pi roles](docs/pi-role-presets.en.md) · [Worker enforcement](docs/worker-enforcement.en.md)
 
-New optional feature: official Codex, Claude Code and Antigravity headless primary-host entries, with exact version checks, normalized results, bounded execution and release/local file comparison. Existing Pi routes are unchanged; clients are disabled by default. See the [guide](docs/headless-cli.md#english).
+## Learn more
 
-**0.11 persistent code relationships.** `.yhwh/code-graph/index.json` initially covers files, classes, functions and syntax relationships in JS/TS (including JSX/TSX) and Python. Read-only `code_graph` searches relationships and reverse relative-import impact; the host CLI incrementally refreshes by source hash and offers explicit bounded watching. Unresolved calls, syntax errors and stale state are reported; this is not a complete semantic call graph. See [usage, Git management and limits](docs/code-graph.md#english). The maintainer's local Pi has been updated and verified through actual MCP and incremental refresh checks; this feature shipped in v0.11.0.
+- [Operations and acceptance](docs/workflow-operations.md#english) · [Security boundaries](SECURITY-HARDENING.md) · [Verification](VERIFICATION.md)
+- [Architecture history](docs/architecture-history.md) · [Release history](https://github.com/Yuzu482/YHWH/releases) · [Third-party notices](THIRD_PARTY.en.md)
 
-v0.15.0 consolidated runtime quality and host verification: read-only fixtures, scoped new-file parents, advisory task checks, the hostEvidence fix, raw-byte patch policy, tiered governance and the Claude CLI reviewer. Packaged plugin versions are generated from Git commits. Its local zero-drift checks and two route probes do not establish deployment of later candidates, and no quantified speed claim is made. That release used an authorized exception and disclosed the LSP 1.3.0 license gap; the current source candidate's 1.4.0 evidence is checked separately. See the [historical release notes](docs/release-notes-0.15.0.md).
-
-See the [architecture development history (Chinese)](docs/architecture-history.md) for the background, evolution, key decisions and historical verification limits. The [history evidence index (Chinese)](docs/history-evidence.json) contains the corresponding sanitized records.
-
-Every maintained README in this repository has complete Chinese and English versions with language buttons at the top. Keep both versions synchronized when adding or editing documentation. See [AGENTS.md](https://github.com/Yuzu482/YHWH/blob/main/AGENTS.md) for the maintenance rules (a repository file, excluded from the installation package).
-
-**0.7 controlled API configuration:** OpenCode Go, CommandCode, OpenRouter and custom HTTPS platforms have optional host-configured API routes. Luna/Sonnet 5 and max bindings, no-tools reviewers and no automatic downgrade remain enforced. New `Configure-Providers.cmd`; see the [platform configuration guide](docs/provider-configuration.en.md). Real accounts and paid heartbeats remain unverified.
-
-**0.8 API key encryption:** Anthropic and aggregator keys use Windows DPAPI user encryption. Runtime uses private pipes without plaintext API credential files. After upgrading, run `Migrate-API-Keys.cmd` for legacy keys. See [configuration and migration](docs/provider-configuration.en.md).
-
-**0.10 long-term project knowledge:** `.yhwh/memory/` stores source-backed Markdown knowledge with draft, accepted and deprecated states. The read-only `project_memory` tool provides Chinese/English search, source-change detection and Git review of staged, unstaged and untracked entries. Updates use the primary's existing file permissions without automatic commits. Git is required on the runtime machine; existing services need an upgrade to discover the tool. See the [usage and management guide](docs/project-memory.md#english).
-
-## Repository layout
-
-**0.5 multi-host integration:** 18 host IDs now include Cursor, VS Code/Copilot, Windsurf Cascade, Cline, Roo Code, Gemini CLI, Kiro, Zed, Continue and LM Studio, alongside existing Codex, Cherry Studio, OpenCode, DeepSeek Harness, Claude and generic profiles. Select the primary model in the host. See the [common client guide](docs/common-clients.en.md) and [multi-host guide](docs/host-integration.en.md); configuration and protocol checks do not validate client UIs or the complete governance chain.
-
-- `payload/pi-dispatch/`: gateway source, plugin, editor bridges, tests and module lifecycle implementation.
-- `payload/workflow-skills/`: installs the `kether-governance` primary governance skill; other role and routing skills are retained as historical material, while Pi injects the active worker roles.
-- `templates/AGENTS.kether.md`: compact global policy entry point.
-- `templates/agent-references/`: on-demand governance, routing, contract, authentication and evidence rules.
-- `install/`: installation, validation, host authentication configuration and WSL sandbox provisioning tools.
-
-The current policy pins native workers to Luna, with the primary selecting task-proportional thinking (medium by default); reviewers remain Sonnet/max. Actual availability still depends on the destination account, model service and gateway capability checks. Lifecycle management supports dependency-ordered startup, failure rollback and reverse-order disposal. Only a trusted host may replace dispatch/LSP adapters while the gateway is idle. See [module lifecycle](payload/pi-dispatch/MODULE-LIFECYCLE.md).
-
-The repository excludes credentials, personal runtime configuration, request ledgers, audit logs, caches, dependency directories and machine backups. The image workflow's `image-prompt-review` plugin must be installed separately; this repository contains only the policy reference.
-
-## Pi Kether Portable
-
-This Windows 11 + WSL2 package installs host-neutral Kether/Tifereth rules and Pi execution on another machine, and generates connection profiles for the selected primary-agent tools.
-
-It provides:
-
-- A generic Node stdio MCP entry and an authenticated HTTP entry for Secure MCP Tunnel; the Codex plugin is optional.
-- Primary rules, role skills and references retrieved through `get_workflow`; selecting Codex additionally installs global rules and skills.
-- `openai-codex` for ordinary lower agents; `anthropic` / `claude-sonnet-5` exclusively for Geburah/reviewer, with no tools or file access.
-- A WSL2/Bubblewrap sandbox with limits on CPU, memory, process count, output, execution time and write scope.
-- Request ledgers, idempotency, provider circuits, audit redaction, result-format validation, task queues and monitor cards.
-- LSP services for Python, Java, JavaScript, TypeScript, C#, C/C++, Go and Rust.
-- A first-party [Pi LSP adapter](docs/pi-lsp-adapter.en.md): governed workers call isolated multilspy probes through seven `yhwh_lsp_*` tools, reusing servers for unchanged files within one task. Python retains Pyright and Jedi on demand to accelerate alternating queries; servers are reclaimed on idle expiry or task completion. C/C++ and C# use actual exit checks to reduce cleanup waits. C# uses a fixed single-file .NET project and a private read-only process view, failing immediately on early server exit. Java uses a JIT profile for short tasks, one reusable server and disposable indexes. The old extension remains for compatibility.
-
-## Installation
-
-### One-click installation (Windows 11 x64)
-
-The generated `YHWH-OneClick-0.15.3.zip` contains a script with an embedded package, its checksum and a double-click launcher. Extract it and double-click `Install-YHWH.cmd`, then choose the workspace agents may access. Pressing Enter creates `~/YHWH-Workspace`. Alternatively, copy just the script to the destination computer and run:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1
-```
-
-The default exports generic MCP configuration without changing Codex global settings. Select hosts with `-Hosts "cherry-studio,opencode,deepseek-harness,claude-code"`; including `codex` enables the original Codex integration. Import the generated connection profile and load the primary instructions in each host. The exporter never overwrites existing host configuration.
-
-The installer prepares pinned PowerShell 7 and Node runtimes under `%LOCALAPPDATA%\YHWH`. Git must be installed and the remote reachable: the embedded package obtains source from the official repository, verifies its recorded commit is pushed and belongs to main, and compares every packaged file before running the source installer. Alternatively, `-SourceRepository D:\path\to\checkout` selects a clean local Git checkout, which must still pass its own `origin` pushed-commit and main-branch checks. Windows runtime archives and the Ubuntu image are checked against SHA256 values recorded at build time. Changed downloads stop installation instead of silently accepting new hashes.
-
-It imports a dedicated `YHWH` WSL2 Ubuntu 24.04 distribution, installs the Windows plugin, governance rules and WSL sandbox/LSP, then runs installation checks. Enabling WSL for the first time may require Windows administrator approval and a restart followed by rerunning the script. Exit code `3010` means this prerequisite step is pending restart, not successful installation. Hardware virtualization must be enabled and organizational policy must permit WSL. WSL setup follows [Microsoft's official commands](https://learn.microsoft.com/en-us/windows/wsl/basic-commands).
-
-After installation, open `%LOCALAPPDATA%\YHWH\Open-Pi.cmd` and use `/login` for the lower worker's OpenAI account. Configure the reviewer with your own Anthropic Console API key using `Configure-Claude-API.cmd`; API usage is billed separately from Claude subscriptions. Connect the selected host using the generated profile and load `PRIMARY-AGENT.md`. When selecting Codex, restart it and enable the plugin if needed. Primary-model accounts belong to the host; lower-model authentication, real heartbeats and ChatGPT Tunnel connectivity require separate verification. The installer does not install host apps, create a Tunnel or migrate credentials; existing managed files retain the underlying installer's backup behavior.
-
-An existing Pi installation is protected by default. Once tasks have ended and its runtime is stopped, explicitly pass `-UpgradeExisting` to allow replacement with backups. A running Pi or a `YHWH` WSL distribution without matching installer ownership stops installation. The script never automatically stops processes, removes a WSL distribution or takes over another Ubuntu distribution. Installation does not provide transactional rollback: failures retain completed steps and backups for diagnosis, and can be retried after addressing the cause. Partial WSL imports or inconsistent ownership records require manual inspection.
-
-```powershell
-# Read-only preview: no downloads or host changes
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -PlanOnly
-# Unattended installation with a fixed workspace (WSL must be ready; login is separate)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -NonInteractive -WorkspaceRoots D:\Projects\MyProject
-# Check embedded payload integrity and extract only (Git provenance is not checked); destination must be a new absolute path
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-YHWH-0.15.3.ps1 -ExtractOnly -Destination D:\YHWH-Inspect
-```
-
-Maintainers run `pwsh -NoProfile -File .\Build-Release.ps1` from clean source pushed to `origin/main` to generate the portable ZIP, PS1, SHA256 file and double-click bundle under `release/0.15.3/`. Existing output names stop the build to protect older artifacts. The repository's `Install-YHWH.ps1` also runs directly from a complete source checkout; only the generated versioned script can be copied on its own. `-SkipTests` skips gateway tests only and does not include local `node_modules` in releases. Safe extraction tests: `pwsh -NoProfile -File .\install\Test-OneClick.ps1 -Installer .\release\0.15.3\Install-YHWH-0.15.3.ps1`.
-
-This version has script and package validation, but a full online installation in a fresh Windows VM has not been performed. Windows and WSL Pi use the same dependency lockfile; Ubuntu repositories, WSL system components and the .NET installer remain mutable external dependencies. This is not a completely offline or byte-for-byte reproducible system image.
-
-The installer pins Pi 1.5.1 and LSP 1.4.0 and checks the Windows and WSL dependency trees. On reinstall it reuses a Windows runtime only when the pinned versions and tree digest match. For a standard runtime with an older LSP, it prepares the replacement first and switches only when owner, group and access rules match; activation failure restores the old directory. A permission mismatch, custom dependencies or files, unclassifiable versions and unrecognized trees stop installation so the original files can be reconciled; the prepared directory may need manual cleanup. WSL replaces only a verified older or current tree, and newer Pi or LSP versions are not downgraded. Only a rebuilt installer contains these safeguards; older standalone installers retain their original version. The builder packages files in the Git index and fails if required Pi runtime files are missing.
-
-An existing gateway plugin is reused unchanged only when its files, dependencies, provenance, managed baseline and connection match this release. Other existing plugins stop installation for reconciliation rather than being overwritten. Existing governance instructions, skills, references and Codex configuration also stop installation when they differ from this package. Older or customized environments can therefore require a separate migration; an automatic upgrade is not guaranteed.
-
-This describes the source-supported build and installation flow; the old 0.15.0 installer still contains Pi 0.84.4 and does not update itself. A new formal package must be built under the Git conditions above and validated on the target environment. Public release requires `-PublicRelease` and cannot use `-SkipTests`: the currently pinned LSP 1.4.0 archive contains the complete upstream notice; historical 1.3.0 coverage remains separately unconfirmed.
-
-### Advanced installation
-
-`Workflow.ps1` is the shared entry point, with configuration maintained in `install.config.json`. The default action is a read-only preflight:
-
-```powershell
-pwsh -NoProfile -File .\Workflow.ps1 -Action Init
-# Edit install.config.json with your workspace directories and any Tunnel configuration.
-pwsh -NoProfile -File .\Workflow.ps1 -Action Plan
-pwsh -NoProfile -File .\Workflow.ps1 -Action Install
-pwsh -NoProfile -File .\Workflow.ps1 -Action Verify
-pwsh -NoProfile -File .\Workflow.ps1 -Action Build
-```
-
-`Init` does not overwrite existing configuration. `Plan` validates without installing. `Install` performs installation and backs up existing files. `Verify` checks the installed environment. `Build` validates and creates a versioned ZIP. Installation updates dependencies and may restart the dedicated WSL distribution; wait for active tasks to finish first. This is not a hot-update script. An allowlist controls release contents, excluding local configuration, temporary test directories and runtime credentials.
-
-The shared entry point does not modify Codex's bundled plugin cache. Earlier fixes to this machine's app-tool `cmd.exe` launcher were specific to a Codex version and are not generic installation steps. ChatGPT Work connectivity still depends on the account, workspace permissions and Tunnel configuration. Installing local rules does not establish that they are active in every product session.
-
-1. Prepare PowerShell 7, Windows Node.js 22+, WSL2 and an Ubuntu 24.04 distribution **dedicated to the Pi sandbox**. The installer disables Windows-drive automount and Windows interoperability in that distribution.
-2. Copy `install.config.example.json` to `install.config.json`. Set `workspaceRoots` to the destination directories permitted for reads or sandbox-generated patches.
-3. Run in a normal user terminal:
-
-   ```powershell
-   .\Install.cmd -ConfigFile .\install.config.json
-   ```
-
-4. If the destination account is not signed in to Pi/OpenAI, complete Pi login after installation. Credentials remain in the destination host's `~/.pi/agent/auth.json`; the package neither reads nor carries them.
-5. Import the connection profile and load primary instructions in the selected host; restart or reconnect Codex/ChatGPT Work when applicable.
-
-Inspect without modifying the host:
-
-```powershell
-.\Install.cmd -ConfigFile .\install.config.json -PlanOnly
-```
-
-Install only the Windows plugin and workflow, without configuring WSL:
-
-```powershell
-.\Install.cmd -ConfigFile .\install.config.json -SkipWsl
-```
-
-## Secure MCP Tunnel
-
-The installer does not create an OpenAI Tunnel or embed a Runtime API Key. For an existing Tunnel, configure:
-
-```json
-{
-  "installTunnel": true,
-  "tunnelId": "YOUR_TUNNEL_ID",
-  "tunnelRuntimeKeyFile": "C:\\secure\\runtime-key.txt",
-  "tunnelClientPath": "C:\\tools\\tunnel-client.exe"
-}
-```
-
-The installer generates launch scripts that reference key files, creates a logon scheduled task and starts the runtime without a console window. The Tunnel uses the local `127.0.0.1:17331/mcp` HTTP endpoint, avoiding a stdio launch through `cmd.exe`. This endpoint requires a random Bearer credential, and credential-file access is restricted to the current Windows user. The destination host still needs valid runtime credentials for the Tunnel. When upgrading an existing stdio runtime, stop the `pi-kether` runtime once before running the new launcher. Health checks do not automatically interrupt existing tasks.
-
-## Verification and removal
-
-Run `npm test` and `npm run test:memory` separately under `payload/pi-dispatch` for source regression checks. The latter checks complete 256 KiB results, cancellation, disconnection and memory growth; it is not included in the ordinary test count. `Build-Release.ps1` requires both by default. Use `-SkipTests` only for local packaging with existing verification of the same source; it does not establish a test pass. A built package and a running service are separate snapshots; a partial deployment is not a full package upgrade.
-
-The logon task uses a console-free `wscript.exe` launcher to hide the window when creating the PowerShell process, avoiding flashes that may occur with `-WindowStyle Hidden` alone. Windows Script Host must be available. Gateway, WSL child processes and LSP launches also use hidden-window process options.
-
-```powershell
-pwsh .\install\Test-PiKether.ps1 -Installed
-pwsh .\install\Uninstall-PiKether.ps1
-```
-
-Removal archives plugin and workflow files while retaining the WSL distribution and `/opt/pi-kether`, so other data in the distribution is preserved.
-
-## Reproducibility and security boundaries
-
-Default ordinary execution uses `openai-codex`; optional controlled API routes require explicit host configuration and selection. Geburah/reviewer may use Claude Sonnet 5 with `access:none` and review materials supplied by the primary agent. Claude requires a user-owned API key; credentials are excluded from the package. Model execution tasks retain an empty `/proc`; credential-free C# and Go probes use a read-only `/proc` in a private PID namespace. Task snapshots contain only the union of `readScope` and `writeScope`, using relative file paths or directory `/**` entries. `.env`, credentials, private keys and project Pi configuration are denied by default. Snapshots are limited to 128 MiB and 10,000 files, with a 30-second preparation scan limit. Each task's temporary filesystem is limited to 512 MiB and 30,000 inodes. Both the resulting file tree and patches are checked against write scope; binary patches are rejected.
-
-LSP cannot load project `.pi-lsp.json` files or auto-discover a Lombok Java agent. Tools cannot read credential files. A single route's credential enters the trusted Pi process through a one-time file descriptor that is then closed. The installer tightens Windows credential and state-directory permissions. OpenAI OAuth refresh and persistence occur on the host; its sandbox receives a temporary access token. The reviewer receives its API key only in trusted Pi memory through FD3. Network access remains available for model and language services; no outbound domain allowlist is enforced. These scope checks do not protect against compromise of trusted Pi/LSP dependencies or the operating system itself.
-
-Dependency versions are recorded in `portable.manifest.json`. Node and JDT LS downloads are checked against upstream hashes; Pi's npm dependency tree is pinned by the included lockfile. Installation still requires network access to official Ubuntu, Node.js, npm, Eclipse and Microsoft distribution sources. An offline package cannot replace model login, OpenAI Tunnel setup, ChatGPT workspace administrator authorization or destination-host policy.
-
-Managed-file backups are saved under `~/.local/state/pi-kether/installer-backups/`. When Codex is selected, the installer manages the `PI-KETHER`-marked block in `AGENTS.md` and disables Codex's built-in multi-agent route. Other hosts receive exported connection profiles and primary instructions to merge using the integration guide.
-
-## License
-
-Original YHWH code, documentation and configuration are licensed under [Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party components retain their own licenses. [Third-party inventory](THIRD_PARTY.en.md) and [Claude Code feasibility](docs/claude-code-feasibility.en.md).
-
-The default reviewer now invokes Claude Sonnet through the official Claude Code CLI and the user's official-client login, without reading or migrating subscription tokens. A user-owned Anthropic API key is an explicit alternative; neither route automatically falls back to the other. Service terms still apply.
-
-## Claude reviewer setup
-
-For the default `claude-code-cli` route, sign in using official Claude Code first. Use `probe_model` to check CLI availability; `check_claude_auth` does not check this route. Reviewers run on the host, outside the worker WSL sandbox.
-
-Optional API route: after installation run `Configure-Claude-API.cmd`, or from source run `powershell.exe -NoProfile -File .\install\Set-ClaudeApiKey.ps1 -TargetHome $HOME`. Input is hidden; credentials are encrypted with Windows DPAPI CurrentUser and saved in `~/.local/state/pi-kether/anthropic-api-key.json`. `check_claude_auth` checks only this API configuration, not actual balance or model access; live verification requires a separately authorized probe.
-
-Existing users should wait for tasks to finish before upgrading and configure their selected route. The old `pi-claude-code-provider` route and `renew_claude_auth` tool are no longer accepted. An older public package used an explicitly disclosed, authorized LSP 1.3.0 exception; the current 1.4.0 evidence is checked separately. This does not certify product-wide licensing and no third-party dependencies are bundled.
-
-### Go and Rust single-file support
-
-Go automatically selects pinned Go 1.27.1 / gopls 0.23.0; Rust selects Rust 1.98.1 / rust-analyzer 1.98.1. Both provide diagnostics, hover, definitions, references, symbols, completion and code-action previews, with task-local server reuse, edit invalidation and final cleanup. No model or API key is required.
-
-Go returns a completed `textDocument/diagnostic` pull response and also requires independent diagnostic publication. The pinned gopls may leave `kind` empty on a full response; only its completed response containing `items` is accepted, never `unchanged`. Module downloads, automatic toolchain downloads, workspace configuration, cgo, external package drivers and telemetry are disabled. A read-only private PID view lets gopls read its own executable. External dependencies and multi-file modules are outside the snapshot scope.
-
-Rust uses a fixed edition-2024 single-file library crate and standard library, without reading Cargo projects. Build scripts, procedural macros, Cargo checks and experimental analyzer diagnostics are disabled. Diagnostics and code actions additionally run a bounded `rustc --emit=metadata` check, await compiler termination and cleanup, and require language-server publication. Every diagnostic request checks again; an initial empty notification cannot prove a clean file. Only temporary metadata is generated: user programs are neither linked nor executed, and this does not establish a successful Cargo workspace build. UTF-8 compiler byte offsets are converted to LSP UTF-16 positions.
-
-Probes have no network or credentials and read only their source snapshot; Rust retains an empty `/proc`. Initial installation downloads official Go/Rust archives with pinned SHA-256 checks and builds gopls using the official module proxy and checksum database. Toolchains are installed only into the managed runtime, without replacing host PATH, rustup or Go settings. See the [Go/Rust materials](./licenses/go-rust-runtime.json). The normal `install/Test-PiLspAdapter.py` suite covers real seven-tool calls, corrected errors, reuse, cleanup and Rust ownership errors. Timings are local small-fixture observations, not large-project performance guarantees.
+YHWH's own code, documentation, and configuration are licensed under [Apache-2.0](LICENSE). [Copyright notice](NOTICE)

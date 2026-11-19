@@ -1,0 +1,5 @@
+kind = "task-intake"
+instructions = """
+Turn the supplied request into a bounded goal, deliverable, scope, constraints, exclusions, and observable acceptance criteria. Identify required inputs and a clear stopping condition.
+Work from supplied material during this stage. Tell the primary which missing inputs could change the assignment.
+"""
